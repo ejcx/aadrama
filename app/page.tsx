@@ -18,7 +18,7 @@ const Home = () => {
             If you're on aadrama dot com then you'd probably be interested to know that a group of old
             competitive players are scrimming regularly.
             <br /><br />
-            Email discord@aadrama.com with what your old AA / AADrama name was if you'd like an invite to the server.
+            Email discord@aadrama.com with subject "AADrama" and what your old AA / AADrama name was if you'd like an invite to the discord server.
           </p>
         </div>
       </div>
