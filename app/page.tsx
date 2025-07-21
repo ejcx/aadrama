@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 interface Server {
   ipAddress: string;
   country: string;
+  serverName: string;
   mapName: string;
   currentPlayers: number;
   maxPlayers: number;
@@ -76,7 +77,8 @@ const Home = () => {
                     </div>
                   </div>
 
-                  <h3 className="text-white text-lg font-medium mb-3">{server.mapName}</h3>
+                  <h3 className="text-white text-lg font-medium mb-2">{server.serverName}</h3>
+                  <p className="text-gray-300 text-sm mb-3">Map: {server.mapName}</p>
 
                   <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-2">
