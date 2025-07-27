@@ -45,7 +45,7 @@ const ServerDetails = ({ server }: ServerDetailsProps) => {
         
         // Extract host and port from IP address
         const [host, port] = server.ipAddress.split(':');
-        const url = `http://104.236.15.0:8080/query?host=${host}&port=${port}`;
+        const url = `https://server-details.ej.workers.dev/query?host=${host}&port=${port}`;
         
         const response = await fetch(url, {
           method: 'GET',
