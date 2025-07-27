@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useState, useEffect } from "react";
+import ServerDetails from "./components/ServerDetails";
 
 interface Server {
   ipAddress: string;
@@ -14,6 +15,7 @@ interface Server {
 const Home = () => {
   const [servers, setServers] = useState<Server[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedServer, setExpandedServer] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -64,7 +66,10 @@ const Home = () => {
           ) : activeServers.length > 0 ? (
             <div className="grid grid-cols-1 gap-4">
               {activeServers.map((server, index) => (
-                <div key={index} className="bg-gray-900 border border-gray-700 rounded-lg p-6 hover:bg-gray-800 transition-colors">
+                <div
+                  key={index}
+                  className="bg-gray-900 border border-gray-700 rounded-lg p-6 hover:bg-gray-800 transition-colors"
+                >
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center space-x-2">
                       <span className="text-white font-semibold">{server.country}</span>
@@ -87,7 +92,24 @@ const Home = () => {
                         {server.currentPlayers}/{server.maxPlayers} players
                       </span>
                     </div>
+                    <button
+                      onClick={() => setExpandedServer(expandedServer === server.ipAddress ? null : server.ipAddress)}
+                      className="text-gray-400 cursor-pointer hover:text-white transition-colors"
+                    >
+                      <svg
+                        className={`w-5 h-5 transform transition-transform ${expandedServer === server.ipAddress ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
                   </div>
+
+                  {expandedServer === server.ipAddress && (
+                    <ServerDetails server={server} />
+                  )}
                 </div>
               ))}
             </div>
