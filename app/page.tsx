@@ -58,7 +58,7 @@ const Home = () => {
   useEffect(() => {
     const fetchEngineerServer = async () => {
       try {
-        const response = await fetch('https://server-details.ej.workers.dev/query?host=aa-usa.ddns.net&port=1716');
+        const response = await fetch('https://server-details.ej.workers.dev/query?host=aa-usa.ddns.net&port=7778');
         const data = await response.json();
 
         if (data.success && data.server_info) {
