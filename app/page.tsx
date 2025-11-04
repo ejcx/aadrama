@@ -235,7 +235,9 @@ const Home = () => {
                     </div>
                   </div>
 
-                    <h3 className="text-white text-lg font-medium mb-2">Engineer's Server</h3>
+                    <h3 className="text-white text-lg font-medium mb-2">
+                      {engineerServerInfo.server_name || "Engineer's Server"}
+                    </h3>
                     <p className="text-gray-300 text-sm mb-3">Map: {engineerServerInfo.map_name}</p>
 
                     <div className="flex justify-between items-center">
