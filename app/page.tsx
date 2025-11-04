@@ -12,10 +12,31 @@ interface Server {
   maxPlayers: number;
 }
 
+interface ServerInfo {
+  server_name: string;
+  map_name: string;
+  game_mode: string;
+  players: number;
+  max_players: number;
+  player_list: Array<{
+    name: string;
+    ping: number;
+    kills: number;
+    deaths: number;
+    honor: number;
+  }>;
+  version: string;
+  password: boolean;
+  ping: string;
+}
+
 const Home = () => {
   const [servers, setServers] = useState<Server[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedServer, setExpandedServer] = useState<string | null>(null);
+  const [engineerServerInfo, setEngineerServerInfo] = useState<ServerInfo | null>(null);
+  const [engineerServerLoading, setEngineerServerLoading] = useState(true);
+  const [engineerServerExpanded, setEngineerServerExpanded] = useState(false);
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -33,6 +54,34 @@ const Home = () => {
 
     fetchServers();
   }, []);
+
+  useEffect(() => {
+    const fetchEngineerServer = async () => {
+      try {
+        const response = await fetch('https://server-details.ej.workers.dev/query?host=aa-usa.ddns.net&port=1716');
+        const data = await response.json();
+
+        if (data.success && data.server_info) {
+          setEngineerServerInfo(data.server_info);
+        }
+      } catch (error) {
+        console.error('Failed to fetch engineer server:', error);
+      } finally {
+        setEngineerServerLoading(false);
+      }
+    };
+
+    fetchEngineerServer();
+  }, []);
+
+  const calculateFragRate = (kills: number, deaths: number): number => {
+    if (deaths === 0) return 0;
+    return Number((kills / deaths).toFixed(2));
+  };
+
+  const calculateScore = (kills: number, deaths: number): number => {
+    return kills * 10 - deaths * 10;
+  };
 
   const activeServers = servers.filter(server => server.currentPlayers > 0);
 
@@ -59,7 +108,7 @@ const Home = () => {
         </div>
 
         <div className="w-full max-w-4xl">
-          <h2 className="text-white text-2xl font-bold mb-6 text-center">Active Servers</h2>
+          <h2 className="text-white text-2xl font-bold mb-6 text-center">Active Servers (AA 2.5)</h2>
 
           {loading ? (
             <div className="text-white text-center">Loading servers...</div>
@@ -114,9 +163,122 @@ const Home = () => {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12">
+                <div className="text-center py-12 border-2 border-dashed border-gray-600 rounded-lg">
               <div className="text-gray-400 text-xl mb-2">Nobody is online right now</div>
               <div className="text-gray-500 text-sm">Check back later for active servers</div>
+            </div>
+          )}
+        </div>
+
+        <div className="w-full max-w-4xl mt-8">
+          <h2 className="text-white text-2xl font-bold mb-6 text-center">Active Servers (AA 2.3)</h2>
+
+          {engineerServerLoading ? (
+            <div className="text-white text-center">Loading server...</div>
+          ) : engineerServerInfo ? (
+            <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 hover:bg-gray-800 transition-colors">
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center space-x-2">
+                  <span className="text-white font-semibold">USA</span>
+                  <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full">
+                    ONLINE
+                  </span>
+                </div>
+                <div className="text-right">
+                  <div className="text-white font-mono text-sm">aa-usa.ddns.net:1716</div>
+                </div>
+              </div>
+
+              <h3 className="text-white text-lg font-medium mb-2">Engineer's Server</h3>
+              <p className="text-gray-300 text-sm mb-3">Map: {engineerServerInfo.map_name}</p>
+
+              <div className="flex justify-between items-center">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-gray-300 text-sm">
+                    {engineerServerInfo.players}/{engineerServerInfo.max_players} players
+                  </span>
+                </div>
+                <button
+                  onClick={() => setEngineerServerExpanded(!engineerServerExpanded)}
+                  className="text-gray-400 cursor-pointer hover:text-white transition-colors"
+                >
+                  <svg
+                    className={`w-5 h-5 transform transition-transform ${engineerServerExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+
+              {engineerServerExpanded && (
+                <div className="mt-4 border-t border-gray-700 pt-4">
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-white text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-700">
+                            <th className="text-left py-2 px-2">Player</th>
+                            <th className="text-center py-2 px-2">Ping</th>
+                            <th className="text-center py-2 px-2">Kills</th>
+                            <th className="text-center py-2 px-2">Deaths</th>
+                            <th className="text-center py-2 px-2">Frag Rate</th>
+                            <th className="text-center py-2 px-2">Score</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {engineerServerInfo.player_list.map((player, index) => (
+                            <tr key={index} className="border-b border-gray-800 hover:bg-gray-800">
+                              <td className="py-2 px-2">
+                                <span className="font-medium">[{player.honor}] {player.name}</span>
+                              </td>
+                              <td className="text-center py-2 px-2">
+                                <span className={`px-2 py-1 rounded text-xs ${player.ping < 50 ? 'bg-green-600' :
+                                  player.ping < 100 ? 'bg-yellow-600' :
+                                    player.ping < 150 ? 'bg-orange-600' : 'bg-red-600'
+                                  }`}>
+                                  {player.ping}ms
+                                </span>
+                              </td>
+                              <td className="text-center py-2 px-2 text-green-400">{player.kills}</td>
+                              <td className="text-center py-2 px-2 text-red-400">{player.deaths}</td>
+                              <td className="text-center py-2 px-2">
+                                <span className={`px-2 py-1 rounded text-xs ${calculateFragRate(player.kills, player.deaths) > 1 ? 'bg-green-600' :
+                                  calculateFragRate(player.kills, player.deaths) > 0.5 ? 'bg-yellow-600' :
+                                    'bg-red-600'
+                                  }`}>
+                                  {calculateFragRate(player.kills, player.deaths)}
+                                </span>
+                              </td>
+                              <td className="text-center py-2 px-2">
+                                <span className={`px-2 py-1 rounded text-xs ${calculateScore(player.kills, player.deaths) > 0 ? 'bg-green-600' :
+                                  calculateScore(player.kills, player.deaths) < 0 ? 'bg-red-600' : 'bg-gray-600'
+                                  }`}>
+                                  {calculateScore(player.kills, player.deaths)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="rounded-lg">
+                      <div className="text-sm text-gray-300">
+                        <div>Mode: {engineerServerInfo.game_mode}</div>
+                        <div>Ping: {engineerServerInfo.ping}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-12 border-2 border-dashed border-gray-600 rounded-lg">
+              <div className="text-gray-400 text-xl mb-2">Engineer's Server is offline</div>
+              <div className="text-gray-500 text-sm">Check back later</div>
             </div>
           )}
         </div>
