@@ -85,36 +85,79 @@ const Home = () => {
 
   const activeServers = servers.filter(server => server.currentPlayers > 0);
 
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return (
-    <div className="flex flex-col w-full min-h-screen items-center justify-center bg-black px-8 py-12">
-      <div className="flex flex-col items-center space-y-8 max-w-4xl">
-        <div className="flex flex-col items-center space-y-4">
-          <Image
-            src="/aa.jpg"
-            alt="aa"
-            width={400}
-            height={400}
-            className="rounded-lg shadow-2xl"
-          />
-          <div className="text-left max-w-xl">
-            <p className="text-white text-lg leading-relaxed">
-              AA is back. <br /><br />
-              If you're on aadrama dot com then you'd probably be interested to know that a group of old
-              competitive players are scrimming regularly.
-              <br /><br />
-              Email discord@aadrama.com with subject "AADrama" and what your old AA / AADrama name was if you'd like an invite to the discord server.
-            </p>
+    <div className="flex w-full min-h-screen bg-black">
+      {/* Sidebar */}
+      <div className="hidden lg:block fixed left-0 top-0 h-screen w-64 bg-gray-900 border-r border-gray-700 p-6 overflow-y-auto">
+        <div className="sticky top-6">
+          <div className="flex items-center space-x-2 mb-8">
+            <Image
+              src="/aa.jpg"
+              alt="aa"
+              width={24}
+              height={24}
+              className="rounded"
+            />
+            <span className="text-white font-semibold text-sm">aadrama</span>
           </div>
+          <nav className="flex flex-col">
+            <div>
+              <button
+                onClick={() => scrollToSection('servers-25')}
+                className="text-gray-400 hover:text-white text-left transition-colors font-semibold text-sm"
+              >
+                Active Servers
+              </button>
+            </div>
+            <div>
+              <button
+                onClick={() => scrollToSection('downloads')}
+                className="text-gray-400 hover:text-white text-left transition-colors font-semibold text-sm"
+              >
+                Downloads
+              </button>
+            </div>
+          </nav>
         </div>
+      </div>
 
-        <div className="w-full max-w-4xl">
-          <h2 className="text-white text-2xl font-bold mb-6 text-center">Active Servers (AA 2.5)</h2>
+      {/* Main Content */}
+      <div className="flex-1 lg:ml-64">
+        <div className="flex flex-col items-center justify-center px-8 py-12">
+          <div className="flex flex-col items-start space-y-8 max-w-4xl w-full">
+            <div className="flex flex-col items-start space-y-6 w-full">
+              <div className="flex items-center space-x-4 w-full">
+                <Image
+                  src="/aa.jpg"
+                  alt="aa"
+                  width={80}
+                  height={80}
+                  className="rounded-lg"
+                />
+                <h1 className="text-white text-3xl font-bold">Americas Army Competitive Community</h1>
+              </div>
+              <div className="w-full max-w-4xl">
+                <p className="text-white text-lg leading-relaxed">
+                  A group of competitive players is scrimming regularly. Email discord@aadrama.com with subject "AADrama" and your old AA / AADrama name for a Discord invite.
+                </p>
+              </div>
+            </div>
 
-          {loading ? (
-            <div className="text-white text-center">Loading servers...</div>
-          ) : activeServers.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4">
-              {activeServers.map((server, index) => (
+            <div className="w-full max-w-4xl">
+              <h2 id="servers-25" className="text-white text-2xl font-bold mb-6">Active Servers (AA 2.5)</h2>
+
+              {loading ? (
+                <div className="text-white">Loading servers...</div>
+              ) : activeServers.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4">
+                  {activeServers.map((server, index) => (
                 <div
                   key={index}
                   className="bg-gray-900 border border-gray-700 rounded-lg p-6 hover:bg-gray-800 transition-colors"
@@ -160,129 +203,162 @@ const Home = () => {
                     <ServerDetails server={server} />
                   )}
                 </div>
-              ))}
-            </div>
-          ) : (
-                <div className="text-center py-12 border-2 border-dashed border-gray-600 rounded-lg">
-              <div className="text-gray-400 text-xl mb-2">Nobody is online right now</div>
-              <div className="text-gray-500 text-sm">Check back later for active servers</div>
-            </div>
-          )}
-        </div>
-
-        <div className="w-full max-w-4xl mt-8">
-          <h2 className="text-white text-2xl font-bold mb-6 text-center">Active Servers (AA 2.3)</h2>
-
-          {engineerServerLoading ? (
-            <div className="text-white text-center">Loading server...</div>
-          ) : engineerServerInfo ? (
-            <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 hover:bg-gray-800 transition-colors">
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center space-x-2">
-                  <span className="text-white font-semibold">USA</span>
-                  <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full">
-                    ONLINE
-                  </span>
-                </div>
-                <div className="text-right">
-                  <div className="text-white font-mono text-sm">aa-usa.ddns.net:1716</div>
-                </div>
-              </div>
-
-              <h3 className="text-white text-lg font-medium mb-2">Engineer's Server</h3>
-              <p className="text-gray-300 text-sm mb-3">Map: {engineerServerInfo.map_name}</p>
-
-              <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-gray-300 text-sm">
-                    {engineerServerInfo.players}/{engineerServerInfo.max_players} players
-                  </span>
-                </div>
-                <button
-                  onClick={() => setEngineerServerExpanded(!engineerServerExpanded)}
-                  className="text-gray-400 cursor-pointer hover:text-white transition-colors"
-                >
-                  <svg
-                    className={`w-5 h-5 transform transition-transform ${engineerServerExpanded ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              </div>
-
-              {engineerServerExpanded && (
-                <div className="mt-4 border-t border-gray-700 pt-4">
-                  <div className="space-y-4">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-white text-sm">
-                        <thead>
-                          <tr className="border-b border-gray-700">
-                            <th className="text-left py-2 px-2">Player</th>
-                            <th className="text-center py-2 px-2">Ping</th>
-                            <th className="text-center py-2 px-2">Kills</th>
-                            <th className="text-center py-2 px-2">Deaths</th>
-                            <th className="text-center py-2 px-2">Frag Rate</th>
-                            <th className="text-center py-2 px-2">Score</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {engineerServerInfo.player_list.map((player, index) => (
-                            <tr key={index} className="border-b border-gray-800 hover:bg-gray-800">
-                              <td className="py-2 px-2">
-                                <span className="font-medium">[{player.honor}] {player.name}</span>
-                              </td>
-                              <td className="text-center py-2 px-2">
-                                <span className={`px-2 py-1 rounded text-xs ${player.ping < 50 ? 'bg-green-600' :
-                                  player.ping < 100 ? 'bg-yellow-600' :
-                                    player.ping < 150 ? 'bg-orange-600' : 'bg-red-600'
-                                  }`}>
-                                  {player.ping}ms
-                                </span>
-                              </td>
-                              <td className="text-center py-2 px-2 text-green-400">{player.kills}</td>
-                              <td className="text-center py-2 px-2 text-red-400">{player.deaths}</td>
-                              <td className="text-center py-2 px-2">
-                                <span className={`px-2 py-1 rounded text-xs ${calculateFragRate(player.kills, player.deaths) > 1 ? 'bg-green-600' :
-                                  calculateFragRate(player.kills, player.deaths) > 0.5 ? 'bg-yellow-600' :
-                                    'bg-red-600'
-                                  }`}>
-                                  {calculateFragRate(player.kills, player.deaths)}
-                                </span>
-                              </td>
-                              <td className="text-center py-2 px-2">
-                                <span className={`px-2 py-1 rounded text-xs ${calculateScore(player.kills, player.deaths) > 0 ? 'bg-green-600' :
-                                  calculateScore(player.kills, player.deaths) < 0 ? 'bg-red-600' : 'bg-gray-600'
-                                  }`}>
-                                  {calculateScore(player.kills, player.deaths)}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    <div className="rounded-lg">
-                      <div className="text-sm text-gray-300">
-                        <div>Mode: {engineerServerInfo.game_mode}</div>
-                        <div>Ping: {engineerServerInfo.ping}</div>
-                      </div>
-                    </div>
+                  ))}
                   </div>
+                ) : (
+                <div className="py-12 border-2 border-dashed border-gray-600 rounded-lg">
+                  <div className="text-gray-400 text-xl mb-2">Nobody is online right now</div>
+                  <div className="text-gray-500 text-sm">Check back later for active servers</div>
                 </div>
               )}
             </div>
-          ) : (
-            <div className="text-center py-12 border-2 border-dashed border-gray-600 rounded-lg">
-              <div className="text-gray-400 text-xl mb-2">Engineer's Server is offline</div>
-              <div className="text-gray-500 text-sm">Check back later</div>
+
+            <div className="w-full max-w-4xl mt-8">
+              <h2 id="servers-23" className="text-white text-2xl font-bold mb-6">Active Servers (AA 2.3)</h2>
+
+              {engineerServerLoading ? (
+                <div className="text-white">Loading server...</div>
+              ) : engineerServerInfo ? (
+                <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 hover:bg-gray-800 transition-colors">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-white font-semibold">USA</span>
+                      <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full">
+                        ONLINE
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-white font-mono text-sm">aa-usa.ddns.net:1716</div>
+                    </div>
+                  </div>
+
+                    <h3 className="text-white text-lg font-medium mb-2">Engineer's Server</h3>
+                    <p className="text-gray-300 text-sm mb-3">Map: {engineerServerInfo.map_name}</p>
+
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        <span className="text-gray-300 text-sm">
+                          {engineerServerInfo.players}/{engineerServerInfo.max_players} players
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setEngineerServerExpanded(!engineerServerExpanded)}
+                        className="text-gray-400 cursor-pointer hover:text-white transition-colors"
+                      >
+                        <svg
+                          className={`w-5 h-5 transform transition-transform ${engineerServerExpanded ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {engineerServerExpanded && (
+                      <div className="mt-4 border-t border-gray-700 pt-4">
+                        <div className="space-y-4">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-white text-sm">
+                              <thead>
+                                <tr className="border-b border-gray-700">
+                                  <th className="text-left py-2 px-2">Player</th>
+                                  <th className="text-center py-2 px-2">Ping</th>
+                                  <th className="text-center py-2 px-2">Kills</th>
+                                  <th className="text-center py-2 px-2">Deaths</th>
+                                  <th className="text-center py-2 px-2">Frag Rate</th>
+                                  <th className="text-center py-2 px-2">Score</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {engineerServerInfo.player_list.map((player, index) => (
+                                  <tr key={index} className="border-b border-gray-800 hover:bg-gray-800">
+                                    <td className="py-2 px-2">
+                                      <span className="font-medium">[{player.honor}] {player.name}</span>
+                                    </td>
+                                    <td className="text-center py-2 px-2">
+                                      <span className={`px-2 py-1 rounded text-xs ${player.ping < 50 ? 'bg-green-600' :
+                                        player.ping < 100 ? 'bg-yellow-600' :
+                                          player.ping < 150 ? 'bg-orange-600' : 'bg-red-600'
+                                        }`}>
+                                        {player.ping}ms
+                                      </span>
+                                    </td>
+                                    <td className="text-center py-2 px-2 text-green-400">{player.kills}</td>
+                                    <td className="text-center py-2 px-2 text-red-400">{player.deaths}</td>
+                                    <td className="text-center py-2 px-2">
+                                      <span className={`px-2 py-1 rounded text-xs ${calculateFragRate(player.kills, player.deaths) > 1 ? 'bg-green-600' :
+                                        calculateFragRate(player.kills, player.deaths) > 0.5 ? 'bg-yellow-600' :
+                                          'bg-red-600'
+                                        }`}>
+                                        {calculateFragRate(player.kills, player.deaths)}
+                                      </span>
+                                    </td>
+                                    <td className="text-center py-2 px-2">
+                                      <span className={`px-2 py-1 rounded text-xs ${calculateScore(player.kills, player.deaths) > 0 ? 'bg-green-600' :
+                                        calculateScore(player.kills, player.deaths) < 0 ? 'bg-red-600' : 'bg-gray-600'
+                                        }`}>
+                                        {calculateScore(player.kills, player.deaths)}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          <div className="rounded-lg">
+                            <div className="text-sm text-gray-300">
+                              <div>Mode: {engineerServerInfo.game_mode}</div>
+                              <div>Ping: {engineerServerInfo.ping}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                <div className="py-12 border-2 border-dashed border-gray-600 rounded-lg">
+                  <div className="text-gray-400 text-xl mb-2">Engineer's Server is offline</div>
+                  <div className="text-gray-500 text-sm">Check back later</div>
+                </div>
+              )}
             </div>
-          )}
+
+            <div className="w-full max-w-4xl">
+              <h2 id="downloads" className="text-white text-2xl font-bold mb-6">Americas Army 2.3 Download</h2>
+              <div className="flex flex-col gap-4">
+                <a
+                  href="https://pub-9122f2b1974a4070a1e48b604f43cd00.r2.dev/AmericasArmy220_NVIDIA.exe"
+                  className="bg-gray-900 border border-gray-700 rounded-lg p-4 hover:bg-gray-800 transition-colors"
+                >
+                  <div className="text-white font-semibold mb-1">Americas Army 2.2</div>
+                  <div className="text-gray-400 text-sm mb-2">Base Game</div>
+                  <div className="text-gray-500 text-xs font-mono break-all">SHA256: 401a8939e377540b4817090661e3cc2004d6f6bf68a915f24ab8da7b42fe0916</div>
+                </a>
+                <a
+                  href="https://pub-9122f2b1974a4070a1e48b604f43cd00.r2.dev/aao_patch_220to221.zip"
+                  className="bg-gray-900 border border-gray-700 rounded-lg p-4 hover:bg-gray-800 transition-colors"
+                >
+                  <div className="text-white font-semibold mb-1">Patch 2.2 → 2.2.1</div>
+                  <div className="text-gray-400 text-sm mb-2">Update Patch</div>
+                  <div className="text-gray-500 text-xs font-mono break-all">SHA256: dc2752bbde52c53dda3879c86b0b85c4ddca95ba750d004476b29d6afd4da9ab</div>
+                </a>
+                <a
+                  href="https://pub-9122f2b1974a4070a1e48b604f43cd00.r2.dev/aao_patch_221to230.zip"
+                  className="bg-gray-900 border border-gray-700 rounded-lg p-4 hover:bg-gray-800 transition-colors"
+                >
+                  <div className="text-white font-semibold mb-1">Patch 2.2.1 → 2.3</div>
+                  <div className="text-gray-400 text-sm mb-2">Update Patch</div>
+                  <div className="text-gray-500 text-xs font-mono break-all">SHA256: 6370fb7fa06bd0a8da46bfd1c8d1ef9ffe77b8cb56ca265c1fa39cc92c85baf0</div>
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
     </div>
   );
 };
