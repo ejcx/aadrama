@@ -63,9 +63,12 @@ const Home = () => {
 
         if (data.success && data.server_info) {
           setEngineerServerInfo(data.server_info);
+        } else {
+          setEngineerServerInfo(null);
         }
       } catch (error) {
         console.error('Failed to fetch engineer server:', error);
+        setEngineerServerInfo(null);
       } finally {
         setEngineerServerLoading(false);
       }
@@ -206,7 +209,7 @@ const Home = () => {
                   ))}
                   </div>
                 ) : (
-                <div className="py-12 border-2 border-dashed border-gray-600 rounded-lg">
+                    <div className="py-12 border-2 border-dashed border-gray-600 rounded-lg text-center">
                   <div className="text-gray-400 text-xl mb-2">Nobody is online right now</div>
                   <div className="text-gray-500 text-sm">Check back later for active servers</div>
                 </div>
@@ -319,8 +322,8 @@ const Home = () => {
                     )}
                   </div>
                 ) : (
-                <div className="py-12 border-2 border-dashed border-gray-600 rounded-lg">
-                  <div className="text-gray-400 text-xl mb-2">Engineer's Server is offline</div>
+                    <div className="py-12 border-2 border-dashed border-gray-600 rounded-lg text-center">
+                      <div className="text-gray-400 text-xl mb-2">Engineer's Server isn't available</div>
                   <div className="text-gray-500 text-sm">Check back later</div>
                 </div>
               )}
