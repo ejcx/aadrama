@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import ServerDetails from "./components/ServerDetails";
+import SidebarLayout from "./components/SidebarLayout";
 
 interface Server {
   ipAddress: string;
@@ -96,43 +97,7 @@ const Home = () => {
   };
 
   return (
-    <div className="flex w-full min-h-screen bg-black">
-      {/* Sidebar */}
-      <div className="hidden lg:block fixed left-0 top-0 h-screen w-64 bg-gray-900 border-r border-gray-700 p-6 overflow-y-auto">
-        <div className="sticky top-6">
-          <div className="flex items-center space-x-2 mb-8">
-            <Image
-              src="/aa.jpg"
-              alt="aa"
-              width={24}
-              height={24}
-              className="rounded"
-            />
-            <span className="text-white font-semibold text-sm">aadrama</span>
-          </div>
-          <nav className="flex flex-col">
-            <div>
-              <button
-                onClick={() => scrollToSection('servers-25')}
-                className="text-gray-400 hover:text-white text-left transition-colors font-semibold text-sm"
-              >
-                Active Servers
-              </button>
-            </div>
-            <div>
-              <button
-                onClick={() => scrollToSection('downloads')}
-                className="text-gray-400 hover:text-white text-left transition-colors font-semibold text-sm"
-              >
-                Downloads
-              </button>
-            </div>
-          </nav>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 lg:ml-64">
+    <SidebarLayout>
         <div className="flex flex-col items-center justify-center px-8 py-12">
           <div className="flex flex-col items-start space-y-8 max-w-4xl w-full">
             <div className="flex flex-col items-start space-y-6 w-full">
@@ -329,42 +294,10 @@ const Home = () => {
                   <div className="text-gray-500 text-sm">Check back later</div>
                 </div>
               )}
-            </div>
-
-            <div className="w-full max-w-4xl">
-              <h2 id="downloads" className="text-white text-2xl font-bold mb-6">Americas Army 2.3 Download</h2>
-              <div className="flex flex-col gap-4">
-                <a
-                  href="https://pub-9122f2b1974a4070a1e48b604f43cd00.r2.dev/AmericasArmy220_NVIDIA.exe"
-                  className="bg-gray-900 border border-gray-700 rounded-lg p-4 hover:bg-gray-800 transition-colors"
-                >
-                  <div className="text-white font-semibold mb-1">Americas Army 2.2</div>
-                  <div className="text-gray-400 text-sm mb-2">Base Game</div>
-                  <div className="text-gray-500 text-xs font-mono break-all">SHA256: 401a8939e377540b4817090661e3cc2004d6f6bf68a915f24ab8da7b42fe0916</div>
-                </a>
-                <a
-                  href="https://pub-9122f2b1974a4070a1e48b604f43cd00.r2.dev/aao_patch_220to221.zip"
-                  className="bg-gray-900 border border-gray-700 rounded-lg p-4 hover:bg-gray-800 transition-colors"
-                >
-                  <div className="text-white font-semibold mb-1">Patch 2.2 → 2.2.1</div>
-                  <div className="text-gray-400 text-sm mb-2">Update Patch</div>
-                  <div className="text-gray-500 text-xs font-mono break-all">SHA256: dc2752bbde52c53dda3879c86b0b85c4ddca95ba750d004476b29d6afd4da9ab</div>
-                </a>
-                <a
-                  href="https://pub-9122f2b1974a4070a1e48b604f43cd00.r2.dev/aao_patch_221to230.zip"
-                  className="bg-gray-900 border border-gray-700 rounded-lg p-4 hover:bg-gray-800 transition-colors"
-                >
-                  <div className="text-white font-semibold mb-1">Patch 2.2.1 → 2.3</div>
-                  <div className="text-gray-400 text-sm mb-2">Update Patch</div>
-                  <div className="text-gray-500 text-xs font-mono break-all">SHA256: 6370fb7fa06bd0a8da46bfd1c8d1ef9ffe77b8cb56ca265c1fa39cc92c85baf0</div>
-                </a>
-              </div>
-            </div>
           </div>
         </div>
       </div>
-
-    </div>
+    </SidebarLayout>
   );
 };
 
