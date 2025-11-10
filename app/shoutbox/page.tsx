@@ -84,19 +84,19 @@ const Shoutbox = () => {
             ) : (
               <div className="w-full space-y-1">
                 {messages.map((msg, index) => (
-                  <div key={index} className="flex items-start gap-2 py-1">
-                    <span className="text-gray-600 shrink-0">[{msg.time_ago}]</span>
+                  <div key={index} className="py-1 break-words">
+                    <span className="text-gray-600">[{msg.time_ago}]</span>{' '}
                     <a
                       href={msg.encoded_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`hover:underline shrink-0 ${
+                      className={`hover:underline ${
                         msg.username_text_color === 'red' ? 'text-red-400' : 'text-blue-400'
                       }`}
                     >
                       &lt;{msg.username}&gt;
-                    </a>
-                    <span className="text-gray-300 flex-1 break-words">{msg.message}</span>
+                    </a>{' '}
+                    <span className="text-gray-300">{msg.message}</span>
                   </div>
                 ))}
               </div>
