@@ -1,15 +1,8 @@
-import SessionDetailClient from "./SessionDetailClient";
+"use client";
 
-// Configure Edge Runtime for Cloudflare Pages
 export const runtime = 'edge';
 
-// Required for static export with dynamic routes
-export function generateStaticParams() {
-  // Return empty array since session IDs are dynamic and fetched at runtime
-  return [];
-}
+import SessionDetailClient from "./SessionDetailClient";
 
-export default function SessionDetailPage() {
-  return <SessionDetailClient />;
-}
+export default SessionDetailClient;
 
