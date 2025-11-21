@@ -1,8 +1,7 @@
-import PlayerDetailClient from "./PlayerDetailClient";
+"use client";
 
-// Configure Edge Runtime for Cloudflare Pages
 export const runtime = 'edge';
 
-export default function PlayerDetailPage() {
-  return <PlayerDetailClient />;
-}
+import PlayerDetailClient from "./PlayerDetailClient";
+
+export default PlayerDetailClient;
