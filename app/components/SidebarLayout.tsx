@@ -69,6 +69,15 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
                 Shoutbox
               </a>
             </div>
+            <div>
+              <a
+                href="/tracker"
+                className={`text-left transition-colors font-semibold text-sm ${pathname === '/tracker' ? 'text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+              >
+                Tracker
+              </a>
+            </div>
           </nav>
         </div>
       </div>
@@ -82,4 +91,5 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
 };
 
 export default SidebarLayout;
+
 

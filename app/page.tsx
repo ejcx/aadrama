@@ -31,6 +31,14 @@ interface ServerInfo {
   ping: string;
 }
 
+interface TopPlayer {
+  player_name: string;
+  total_kills: number;
+  total_deaths: number;
+  kd_ratio?: number;
+  total_games?: number;
+}
+
 const Home = () => {
   const [servers, setServers] = useState<Server[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +46,8 @@ const Home = () => {
   const [engineerServerInfo, setEngineerServerInfo] = useState<ServerInfo | null>(null);
   const [engineerServerLoading, setEngineerServerLoading] = useState(true);
   const [engineerServerExpanded, setEngineerServerExpanded] = useState(false);
+  const [topPlayers, setTopPlayers] = useState<TopPlayer[]>([]);
+  const [topPlayersLoading, setTopPlayersLoading] = useState(true);
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -78,6 +88,37 @@ const Home = () => {
     fetchEngineerServer();
   }, []);
 
+  useEffect(() => {
+    const fetchTopPlayers = async () => {
+      try {
+        // Get timestamp for 24 hours ago
+        const endTime = new Date();
+        const startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000);
+        const startTimeISO = startTime.toISOString();
+        
+        const response = await fetch(
+          `https://server-details.ej.workers.dev/analytics/top-players/kills?limit=10&start_time=${encodeURIComponent(startTimeISO)}`
+        );
+        const data = await response.json();
+        
+        if (Array.isArray(data)) {
+          setTopPlayers(data);
+        } else if (data.players && Array.isArray(data.players)) {
+          setTopPlayers(data.players);
+        } else {
+          setTopPlayers([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch top players:', error);
+        setTopPlayers([]);
+      } finally {
+        setTopPlayersLoading(false);
+      }
+    };
+
+    fetchTopPlayers();
+  }, []);
+
   const calculateFragRate = (kills: number, deaths: number): number => {
     if (deaths === 0) return 0;
     return Number((kills / deaths).toFixed(2));
@@ -116,6 +157,57 @@ const Home = () => {
                   A group of competitive players is scrimming regularly. Email discord@aadrama.com with subject "AADrama" and your old AA / AADrama name for a Discord invite.
                 </p>
               </div>
+            </div>
+
+            <div className="w-full max-w-4xl">
+              <h2 className="text-white text-2xl font-bold mb-6">Top Players (Past 24 Hours)</h2>
+              
+              {topPlayersLoading ? (
+                <div className="text-white mb-8">Loading top players...</div>
+              ) : topPlayers.length > 0 ? (
+                <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 mb-8">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-white text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-700">
+                          <th className="text-left py-2 px-2">Rank</th>
+                          <th className="text-left py-2 px-2">Player</th>
+                          <th className="text-center py-2 px-2">Kills</th>
+                          <th className="text-center py-2 px-2">Deaths</th>
+                          <th className="text-center py-2 px-2">K/D</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {topPlayers.map((player, index) => (
+                          <tr key={index} className="border-b border-gray-800 hover:bg-gray-800">
+                            <td className="py-2 px-2 text-gray-400">#{index + 1}</td>
+                            <td className="py-2 px-2">
+                              <a
+                                href={`/tracker/player/${encodeURIComponent(player.player_name)}`}
+                                className="font-medium text-blue-400 hover:text-blue-300 hover:underline"
+                              >
+                                {player.player_name}
+                              </a>
+                            </td>
+                          <td className="text-center py-2 px-2 text-green-400">{player.total_kills}</td>
+                          <td className="text-center py-2 px-2 text-red-400">{player.total_deaths}</td>
+                          <td className="text-center py-2 px-2">
+                              {player.kd_ratio !== undefined 
+                                ? player.kd_ratio.toFixed(2)
+                                : player.total_deaths > 0 
+                                  ? (player.total_kills / player.total_deaths).toFixed(2)
+                                  : player.total_kills > 0 ? '∞' : '0.00'
+                              }
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-gray-400 mb-8">No player data available for the past 24 hours.</div>
+              )}
             </div>
 
             <div className="w-full max-w-4xl">
