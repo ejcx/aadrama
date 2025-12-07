@@ -64,11 +64,11 @@ const Shoutbox = () => {
   return (
     <SidebarLayout>
         <div className="flex flex-col h-screen">
-          <div className="bg-gray-900 border-b border-gray-700 px-6 py-3">
-            <h1 className="text-white text-xl font-mono">#shoutbox</h1>
+          <div className="bg-gray-900 border-b border-gray-700 px-4 sm:px-6 py-2 sm:py-3">
+            <h1 className="text-white text-lg sm:text-xl font-mono">#shoutbox</h1>
           </div>
 
-          <div className="flex-1 overflow-y-auto bg-black p-4 font-mono text-sm" ref={scrollContainerRef}>
+          <div className="flex-1 overflow-y-auto bg-black p-3 sm:p-4 font-mono text-xs sm:text-sm" ref={scrollContainerRef}>
             {loading && messages.length === 0 ? (
               <div className="text-gray-500 text-center py-12">
                 Loading messages...

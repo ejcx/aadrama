@@ -155,8 +155,8 @@ const SessionDetailClient = () => {
 
   return (
     <SidebarLayout>
-      <div className="flex flex-col px-8 py-12">
-        <div className="max-w-6xl w-full mx-auto">
+      <div className="flex flex-col px-4 sm:px-6 md:px-8 py-6 sm:py-12">
+        <div className="w-full max-w-6xl mx-auto">
           <div className="mb-6">
             <Link
               href="/tracker"
@@ -164,7 +164,7 @@ const SessionDetailClient = () => {
             >
               ← Back to Tracker
             </Link>
-            <h1 className="text-white text-3xl font-bold">Session {sessionId}</h1>
+            <h1 className="text-white text-xl sm:text-2xl md:text-3xl font-bold break-all">Session {sessionId}</h1>
           </div>
 
           {error && (
@@ -180,45 +180,45 @@ const SessionDetailClient = () => {
           {!loading && session && (
             <>
               {/* Session Info */}
-              <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 mb-6">
-                <h2 className="text-white text-xl font-bold mb-4">Session Information</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6">
+                <h2 className="text-white text-lg sm:text-xl font-bold mb-3 sm:mb-4">Session Information</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
-                    <div className="text-gray-400 text-sm mb-1">Session ID</div>
-                    <div className="text-white font-mono text-sm">{session.session_id}</div>
+                    <div className="text-gray-400 text-xs sm:text-sm mb-1">Session ID</div>
+                    <div className="text-white font-mono text-xs sm:text-sm break-all">{session.session_id}</div>
                   </div>
                   <div>
-                    <div className="text-gray-400 text-sm mb-1">Start Time</div>
-                    <div className="text-white">{formatDate(session.time_started)}</div>
+                    <div className="text-gray-400 text-xs sm:text-sm mb-1">Start Time</div>
+                    <div className="text-white text-sm">{formatDate(session.time_started)}</div>
                   </div>
                   {session.time_finished && (
                     <div>
-                      <div className="text-gray-400 text-sm mb-1">End Time</div>
-                      <div className="text-white">{formatDate(session.time_finished)}</div>
+                      <div className="text-gray-400 text-xs sm:text-sm mb-1">End Time</div>
+                      <div className="text-white text-sm">{formatDate(session.time_finished)}</div>
                     </div>
                   )}
                   {session.duration !== undefined && (
                     <div>
-                      <div className="text-gray-400 text-sm mb-1">Duration</div>
-                      <div className="text-white">{formatDuration(session.duration)}</div>
+                      <div className="text-gray-400 text-xs sm:text-sm mb-1">Duration</div>
+                      <div className="text-white text-sm">{formatDuration(session.duration)}</div>
                     </div>
                   )}
                   {session.map && (
                     <div>
-                      <div className="text-gray-400 text-sm mb-1">Map</div>
-                      <div className="text-white">{session.map}</div>
+                      <div className="text-gray-400 text-xs sm:text-sm mb-1">Map</div>
+                      <div className="text-white text-sm">{session.map}</div>
                     </div>
                   )}
                   {session.server_ip && (
                     <div>
-                      <div className="text-gray-400 text-sm mb-1">Server IP</div>
-                      <div className="text-white font-mono text-sm">{session.server_ip}</div>
+                      <div className="text-gray-400 text-xs sm:text-sm mb-1">Server IP</div>
+                      <div className="text-white font-mono text-xs sm:text-sm">{session.server_ip}</div>
                     </div>
                   )}
                   {session.peak_players !== undefined && (
                     <div>
-                      <div className="text-gray-400 text-sm mb-1">Peak Players</div>
-                      <div className="text-white">{session.peak_players}</div>
+                      <div className="text-gray-400 text-xs sm:text-sm mb-1">Peak Players</div>
+                      <div className="text-white text-sm">{session.peak_players}</div>
                     </div>
                   )}
                 </div>
@@ -226,25 +226,25 @@ const SessionDetailClient = () => {
 
               {/* Session Analytics */}
               {analytics && (
-                <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 mb-6">
-                  <h2 className="text-white text-xl font-bold mb-4">Session Statistics</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6">
+                  <h2 className="text-white text-lg sm:text-xl font-bold mb-3 sm:mb-4">Session Statistics</h2>
+                  <div className="grid grid-cols-3 gap-3 sm:gap-4">
                     {analytics.total_kills !== undefined && (
                       <div>
-                        <div className="text-gray-400 text-sm mb-1">Total Kills</div>
-                        <div className="text-white text-2xl font-bold text-green-400">{analytics.total_kills}</div>
+                        <div className="text-gray-400 text-xs sm:text-sm mb-1">Total Kills</div>
+                        <div className="text-xl sm:text-2xl font-bold text-green-400">{analytics.total_kills}</div>
                       </div>
                     )}
                     {analytics.total_deaths !== undefined && (
                       <div>
-                        <div className="text-gray-400 text-sm mb-1">Total Deaths</div>
-                        <div className="text-white text-2xl font-bold text-red-400">{analytics.total_deaths}</div>
+                        <div className="text-gray-400 text-xs sm:text-sm mb-1">Total Deaths</div>
+                        <div className="text-xl sm:text-2xl font-bold text-red-400">{analytics.total_deaths}</div>
                       </div>
                     )}
                     {analytics.duration !== undefined && (
                       <div>
-                        <div className="text-gray-400 text-sm mb-1">Duration</div>
-                        <div className="text-white text-2xl font-bold">{formatDuration(analytics.duration)}</div>
+                        <div className="text-gray-400 text-xs sm:text-sm mb-1">Duration</div>
+                        <div className="text-xl sm:text-2xl font-bold text-white">{formatDuration(analytics.duration)}</div>
                       </div>
                     )}
                   </div>
@@ -253,19 +253,19 @@ const SessionDetailClient = () => {
 
               {/* Players */}
               <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
-                <div className="p-4 border-b border-gray-700">
-                  <h2 className="text-white text-xl font-bold">Players ({sortedPlayers.length})</h2>
+                <div className="p-3 sm:p-4 border-b border-gray-700">
+                  <h2 className="text-white text-lg sm:text-xl font-bold">Players ({sortedPlayers.length})</h2>
                 </div>
                 {sortedPlayers.length > 0 ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-white text-sm">
+                    <table className="w-full text-white text-xs sm:text-sm min-w-[400px]">
                       <thead>
                         <tr className="border-b border-gray-700 bg-gray-800">
-                          <th className="text-left py-3 px-4">Rank</th>
-                          <th className="text-left py-3 px-4">Player</th>
-                          <th className="text-center py-3 px-4">Kills</th>
-                          <th className="text-center py-3 px-4">Deaths</th>
-                          <th className="text-center py-3 px-4">K/D</th>
+                          <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Rank</th>
+                          <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Player</th>
+                          <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Kills</th>
+                          <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Deaths</th>
+                          <th className="text-center py-2 sm:py-3 px-2 sm:px-4">K/D</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -274,18 +274,18 @@ const SessionDetailClient = () => {
                             key={`${player.name}-${index}`}
                             className="border-b border-gray-800 hover:bg-gray-800"
                           >
-                            <td className="py-3 px-4 text-gray-400">#{index + 1}</td>
-                            <td className="py-3 px-4">
+                            <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-400">#{index + 1}</td>
+                            <td className="py-2 sm:py-3 px-2 sm:px-4">
                               <Link
                                 href={`/tracker/player/${encodeURIComponent(player.name)}`}
-                                className="text-blue-400 hover:text-blue-300 hover:underline font-medium"
+                                className="text-blue-400 hover:text-blue-300 hover:underline font-medium truncate block max-w-[120px] sm:max-w-none"
                               >
                                 {player.name}
                               </Link>
                             </td>
-                            <td className="text-center py-3 px-4 text-green-400">{player.kills}</td>
-                            <td className="text-center py-3 px-4 text-red-400">{player.deaths}</td>
-                            <td className="text-center py-3 px-4">
+                            <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-green-400">{player.kills}</td>
+                            <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-red-400">{player.deaths}</td>
+                            <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
                               {calculateKD(player.kills, player.deaths)}
                             </td>
                           </tr>
@@ -294,7 +294,7 @@ const SessionDetailClient = () => {
                     </table>
                   </div>
                 ) : (
-                  <div className="p-8 text-center text-gray-400">
+                  <div className="p-6 sm:p-8 text-center text-gray-400">
                     No players found for this session
                   </div>
                 )}

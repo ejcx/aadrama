@@ -106,30 +106,30 @@ const ServerDetails = ({ server }: ServerDetailsProps) => {
       {serverInfo && (
         <div className="space-y-4">
           <div className="overflow-x-auto">
-            <table className="w-full text-white text-sm">
+            <table className="w-full text-white text-xs sm:text-sm min-w-[450px]">
               <thead>
                 <tr className="border-b border-gray-700">
-                  <th className="text-left py-2 px-2">Player</th>
-                  <th className="text-center py-2 px-2">Ping</th>
-                  <th className="text-center py-2 px-2">Kills</th>
-                  <th className="text-center py-2 px-2">Deaths</th>
-                  <th className="text-center py-2 px-2">Frag Rate</th>
-                  <th className="text-center py-2 px-2">Score</th>
+                  <th className="text-left py-2 px-1 sm:px-2">Player</th>
+                  <th className="text-center py-2 px-1 sm:px-2">Ping</th>
+                  <th className="text-center py-2 px-1 sm:px-2">Kills</th>
+                  <th className="text-center py-2 px-1 sm:px-2">Deaths</th>
+                  <th className="text-center py-2 px-1 sm:px-2">Frag Rate</th>
+                  <th className="text-center py-2 px-1 sm:px-2">Score</th>
                 </tr>
               </thead>
               <tbody>
                 {serverInfo.player_list.map((player, index) => (
                   <tr key={index} className="border-b border-gray-800 hover:bg-gray-800">
-                    <td className="py-2 px-2">
+                    <td className="py-2 px-1 sm:px-2">
                       <Link
                         href={`/tracker/player/${encodeURIComponent(player.name)}`}
-                        className="font-medium text-blue-400 hover:text-blue-300 hover:underline"
+                        className="font-medium text-blue-400 hover:text-blue-300 hover:underline truncate block max-w-[100px] sm:max-w-none"
                       >
                         [{player.honor}] {player.name}
                       </Link>
                     </td>
-                    <td className="text-center py-2 px-2">
-                      <span className={`px-2 py-1 rounded text-xs ${
+                    <td className="text-center py-2 px-1 sm:px-2">
+                      <span className={`px-1 sm:px-2 py-0.5 sm:py-1 rounded text-xs ${
                         player.ping < 50 ? 'bg-green-600' :
                         player.ping < 100 ? 'bg-yellow-600' :
                         player.ping < 150 ? 'bg-orange-600' : 'bg-red-600'
@@ -137,10 +137,10 @@ const ServerDetails = ({ server }: ServerDetailsProps) => {
                         {player.ping}ms
                       </span>
                     </td>
-                    <td className="text-center py-2 px-2 text-green-400">{player.kills}</td>
-                    <td className="text-center py-2 px-2 text-red-400">{player.deaths}</td>
-                    <td className="text-center py-2 px-2">
-                      <span className={`px-2 py-1 rounded text-xs ${
+                    <td className="text-center py-2 px-1 sm:px-2 text-green-400">{player.kills}</td>
+                    <td className="text-center py-2 px-1 sm:px-2 text-red-400">{player.deaths}</td>
+                    <td className="text-center py-2 px-1 sm:px-2">
+                      <span className={`px-1 sm:px-2 py-0.5 sm:py-1 rounded text-xs ${
                         calculateFragRate(player.kills, player.deaths) > 1 ? 'bg-green-600' :
                         calculateFragRate(player.kills, player.deaths) > 0.5 ? 'bg-yellow-600' :
                         'bg-red-600'
@@ -148,8 +148,8 @@ const ServerDetails = ({ server }: ServerDetailsProps) => {
                         {calculateFragRate(player.kills, player.deaths)}
                       </span>
                     </td>
-                    <td className="text-center py-2 px-2">
-                      <span className={`px-2 py-1 rounded text-xs ${
+                    <td className="text-center py-2 px-1 sm:px-2">
+                      <span className={`px-1 sm:px-2 py-0.5 sm:py-1 rounded text-xs ${
                         calculateScore(player.kills, player.deaths) > 0 ? 'bg-green-600' :
                         calculateScore(player.kills, player.deaths) < 0 ? 'bg-red-600' : 'bg-gray-600'
                       }`}>
@@ -162,7 +162,7 @@ const ServerDetails = ({ server }: ServerDetailsProps) => {
               </tbody>
             </table>
           <div className="rounded-lg">
-            <div className="text-sm text-gray-300">
+            <div className="text-xs sm:text-sm text-gray-300">
               <div>Mode: {serverInfo.game_mode}</div>
               <div>Ping: {serverInfo.ping}</div>
             </div>

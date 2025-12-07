@@ -17,7 +17,7 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
   };
 
   return (
-    <div className="flex w-full min-h-screen bg-black">
+    <div className="w-full min-h-screen bg-black">
       {/* Sidebar */}
       <div className="hidden lg:block fixed left-0 top-0 h-screen w-64 bg-gray-900 border-r border-gray-700 p-6 overflow-y-auto">
         <div className="sticky top-6">

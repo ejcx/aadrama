@@ -140,59 +140,59 @@ const Home = () => {
 
   return (
     <SidebarLayout>
-        <div className="flex flex-col items-center justify-center px-8 py-12">
-          <div className="flex flex-col items-start space-y-8 max-w-4xl w-full">
-            <div className="flex flex-col items-start space-y-6 w-full">
-              <div className="flex items-center space-x-4 w-full">
+        <div className="flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 py-6 sm:py-12">
+          <div className="flex flex-col items-start space-y-6 sm:space-y-8 w-full max-w-4xl">
+            <div className="flex flex-col items-start space-y-4 sm:space-y-6 w-full">
+              <div className="flex items-center space-x-3 sm:space-x-4 w-full">
                 <Image
                   src="/aa.jpg"
                   alt="aa"
                   width={80}
                   height={80}
-                  className="rounded-lg"
+                  className="rounded-lg w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20"
                 />
-                <h1 className="text-white text-3xl font-bold">Americas Army Competitive Community</h1>
+                <h1 className="text-white text-xl sm:text-2xl md:text-3xl font-bold">Americas Army Competitive Community</h1>
               </div>
-              <div className="w-full max-w-4xl">
-                <p className="text-white text-lg leading-relaxed">
+              <div className="w-full">
+                <p className="text-white text-sm sm:text-base md:text-lg leading-relaxed">
                   A group of competitive players is scrimming regularly. Email discord@aadrama.com with subject "AADrama" and your old AA / AADrama name for a Discord invite.
                 </p>
               </div>
             </div>
 
-            <div className="w-full max-w-4xl">
-              <h2 className="text-white text-2xl font-bold mb-6">Top Players (Past 24 Hours)</h2>
+            <div className="w-full">
+              <h2 className="text-white text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Top Players (Past 24 Hours)</h2>
               
               {topPlayersLoading ? (
-                <div className="text-white mb-8">Loading top players...</div>
+                <div className="text-white mb-6 sm:mb-8">Loading top players...</div>
               ) : topPlayers.length > 0 ? (
-                <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 mb-8">
+                <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 sm:p-6 mb-6 sm:mb-8">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-white text-sm">
+                    <table className="w-full text-white text-xs sm:text-sm min-w-[350px]">
                       <thead>
                         <tr className="border-b border-gray-700">
-                          <th className="text-left py-2 px-2">Rank</th>
-                          <th className="text-left py-2 px-2">Player</th>
-                          <th className="text-center py-2 px-2">Kills</th>
-                          <th className="text-center py-2 px-2">Deaths</th>
-                          <th className="text-center py-2 px-2">K/D</th>
+                          <th className="text-left py-2 px-1 sm:px-2">Rank</th>
+                          <th className="text-left py-2 px-1 sm:px-2">Player</th>
+                          <th className="text-center py-2 px-1 sm:px-2">Kills</th>
+                          <th className="text-center py-2 px-1 sm:px-2">Deaths</th>
+                          <th className="text-center py-2 px-1 sm:px-2">K/D</th>
                         </tr>
                       </thead>
                       <tbody>
                         {topPlayers.map((player, index) => (
                           <tr key={index} className="border-b border-gray-800 hover:bg-gray-800">
-                            <td className="py-2 px-2 text-gray-400">#{index + 1}</td>
-                            <td className="py-2 px-2">
+                            <td className="py-2 px-1 sm:px-2 text-gray-400">#{index + 1}</td>
+                            <td className="py-2 px-1 sm:px-2">
                               <Link
                                 href={`/tracker/player/${encodeURIComponent(player.player_name)}`}
-                                className="font-medium text-blue-400 hover:text-blue-300 hover:underline"
+                                className="font-medium text-blue-400 hover:text-blue-300 hover:underline truncate block max-w-[100px] sm:max-w-none"
                               >
                                 {player.player_name}
                               </Link>
                             </td>
-                          <td className="text-center py-2 px-2 text-green-400">{player.total_kills}</td>
-                          <td className="text-center py-2 px-2 text-red-400">{player.total_deaths}</td>
-                          <td className="text-center py-2 px-2">
+                          <td className="text-center py-2 px-1 sm:px-2 text-green-400">{player.total_kills}</td>
+                          <td className="text-center py-2 px-1 sm:px-2 text-red-400">{player.total_deaths}</td>
+                          <td className="text-center py-2 px-1 sm:px-2">
                               {player.kd_ratio !== undefined 
                                 ? player.kd_ratio.toFixed(2)
                                 : player.total_deaths > 0 
@@ -207,41 +207,41 @@ const Home = () => {
                   </div>
                 </div>
               ) : (
-                <div className="text-gray-400 mb-8">No player data available for the past 24 hours.</div>
+                <div className="text-gray-400 mb-6 sm:mb-8">No player data available for the past 24 hours.</div>
               )}
             </div>
 
-            <div className="w-full max-w-4xl">
-              <h2 id="servers-25" className="text-white text-2xl font-bold mb-6">Active Servers (AA 2.5)</h2>
+            <div className="w-full">
+              <h2 id="servers-25" className="text-white text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Active Servers (AA 2.5)</h2>
 
               {loading ? (
                 <div className="text-white">Loading servers...</div>
               ) : activeServers.length > 0 ? (
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4">
                   {activeServers.map((server, index) => (
                 <div
                   key={index}
-                  className="bg-gray-900 border border-gray-700 rounded-lg p-6 hover:bg-gray-800 transition-colors"
+                  className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 hover:bg-gray-800 transition-colors"
                 >
-                  <div className="flex justify-between items-start mb-3">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-3">
                     <div className="flex items-center space-x-2">
-                      <span className="text-white font-semibold">{server.country}</span>
-                      <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full">
+                      <span className="text-white font-semibold text-sm sm:text-base">{server.country}</span>
+                      <span className="px-2 py-0.5 sm:py-1 bg-green-600 text-white text-xs rounded-full">
                         ONLINE
                       </span>
                     </div>
-                    <div className="text-right">
-                      <div className="text-white font-mono text-sm">{server.ipAddress}</div>
+                    <div className="text-left sm:text-right">
+                      <div className="text-white font-mono text-xs sm:text-sm break-all">{server.ipAddress}</div>
                     </div>
                   </div>
 
-                  <h3 className="text-white text-lg font-medium mb-2">{server.serverName}</h3>
-                  <p className="text-gray-300 text-sm mb-3">Map: {server.mapName}</p>
+                  <h3 className="text-white text-base sm:text-lg font-medium mb-2 break-words">{server.serverName}</h3>
+                  <p className="text-gray-300 text-xs sm:text-sm mb-3">Map: {server.mapName}</p>
 
                   <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                      <span className="text-gray-300 text-sm">
+                      <span className="text-gray-300 text-xs sm:text-sm">
                         {server.currentPlayers}/{server.maxPlayers} players
                       </span>
                     </div>
@@ -267,41 +267,41 @@ const Home = () => {
                   ))}
                   </div>
                 ) : (
-                    <div className="py-12 border-2 border-dashed border-gray-600 rounded-lg text-center">
-                  <div className="text-gray-400 text-xl mb-2">Nobody is online right now</div>
-                  <div className="text-gray-500 text-sm">Check back later for active servers</div>
+                    <div className="py-8 sm:py-12 border-2 border-dashed border-gray-600 rounded-lg text-center px-4">
+                  <div className="text-gray-400 text-lg sm:text-xl mb-2">Nobody is online right now</div>
+                  <div className="text-gray-500 text-xs sm:text-sm">Check back later for active servers</div>
                 </div>
               )}
             </div>
 
-            <div className="w-full max-w-4xl mt-8">
-              <h2 id="servers-23" className="text-white text-2xl font-bold mb-6">Active Servers (AA 2.3)</h2>
+            <div className="w-full mt-6 sm:mt-8">
+              <h2 id="servers-23" className="text-white text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Active Servers (AA 2.3)</h2>
 
               {engineerServerLoading ? (
                 <div className="text-white">Loading server...</div>
               ) : engineerServerInfo ? (
-                <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 hover:bg-gray-800 transition-colors">
-                  <div className="flex justify-between items-start mb-3">
+                <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 hover:bg-gray-800 transition-colors">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-3">
                     <div className="flex items-center space-x-2">
-                      <span className="text-white font-semibold">USA</span>
-                      <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full">
+                      <span className="text-white font-semibold text-sm sm:text-base">USA</span>
+                      <span className="px-2 py-0.5 sm:py-1 bg-green-600 text-white text-xs rounded-full">
                         ONLINE
                       </span>
                     </div>
-                    <div className="text-right">
-                      <div className="text-white font-mono text-sm">aa-usa.ddns.net:1716</div>
+                    <div className="text-left sm:text-right">
+                      <div className="text-white font-mono text-xs sm:text-sm">aa-usa.ddns.net:1716</div>
                     </div>
                   </div>
 
-                    <h3 className="text-white text-lg font-medium mb-2">
+                    <h3 className="text-white text-base sm:text-lg font-medium mb-2 break-words">
                       {engineerServerInfo.server_name || "Engineer's Server"}
                     </h3>
-                    <p className="text-gray-300 text-sm mb-3">Map: {engineerServerInfo.map_name}</p>
+                    <p className="text-gray-300 text-xs sm:text-sm mb-3">Map: {engineerServerInfo.map_name}</p>
 
                     <div className="flex justify-between items-center">
                       <div className="flex items-center space-x-2">
                         <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span className="text-gray-300 text-sm">
+                        <span className="text-gray-300 text-xs sm:text-sm">
                           {engineerServerInfo.players}/{engineerServerInfo.max_players} players
                         </span>
                       </div>
@@ -324,48 +324,48 @@ const Home = () => {
                       <div className="mt-4 border-t border-gray-700 pt-4">
                         <div className="space-y-4">
                           <div className="overflow-x-auto">
-                            <table className="w-full text-white text-sm">
+                            <table className="w-full text-white text-xs sm:text-sm min-w-[450px]">
                               <thead>
                                 <tr className="border-b border-gray-700">
-                                  <th className="text-left py-2 px-2">Player</th>
-                                  <th className="text-center py-2 px-2">Ping</th>
-                                  <th className="text-center py-2 px-2">Kills</th>
-                                  <th className="text-center py-2 px-2">Deaths</th>
-                                  <th className="text-center py-2 px-2">Frag Rate</th>
-                                  <th className="text-center py-2 px-2">Score</th>
+                                  <th className="text-left py-2 px-1 sm:px-2">Player</th>
+                                  <th className="text-center py-2 px-1 sm:px-2">Ping</th>
+                                  <th className="text-center py-2 px-1 sm:px-2">Kills</th>
+                                  <th className="text-center py-2 px-1 sm:px-2">Deaths</th>
+                                  <th className="text-center py-2 px-1 sm:px-2">Frag Rate</th>
+                                  <th className="text-center py-2 px-1 sm:px-2">Score</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {engineerServerInfo.player_list.map((player, index) => (
                                   <tr key={index} className="border-b border-gray-800 hover:bg-gray-800">
-                                    <td className="py-2 px-2">
+                                    <td className="py-2 px-1 sm:px-2">
                                       <Link
                                         href={`/tracker/player/${encodeURIComponent(player.name)}`}
-                                        className="font-medium text-blue-400 hover:text-blue-300 hover:underline"
+                                        className="font-medium text-blue-400 hover:text-blue-300 hover:underline truncate block max-w-[100px] sm:max-w-none"
                                       >
                                         [{player.honor}] {player.name}
                                       </Link>
                                     </td>
-                                    <td className="text-center py-2 px-2">
-                                      <span className={`px-2 py-1 rounded text-xs ${player.ping < 50 ? 'bg-green-600' :
+                                    <td className="text-center py-2 px-1 sm:px-2">
+                                      <span className={`px-1 sm:px-2 py-0.5 sm:py-1 rounded text-xs ${player.ping < 50 ? 'bg-green-600' :
                                         player.ping < 100 ? 'bg-yellow-600' :
                                           player.ping < 150 ? 'bg-orange-600' : 'bg-red-600'
                                         }`}>
                                         {player.ping}ms
                                       </span>
                                     </td>
-                                    <td className="text-center py-2 px-2 text-green-400">{player.kills}</td>
-                                    <td className="text-center py-2 px-2 text-red-400">{player.deaths}</td>
-                                    <td className="text-center py-2 px-2">
-                                      <span className={`px-2 py-1 rounded text-xs ${calculateFragRate(player.kills, player.deaths) > 1 ? 'bg-green-600' :
+                                    <td className="text-center py-2 px-1 sm:px-2 text-green-400">{player.kills}</td>
+                                    <td className="text-center py-2 px-1 sm:px-2 text-red-400">{player.deaths}</td>
+                                    <td className="text-center py-2 px-1 sm:px-2">
+                                      <span className={`px-1 sm:px-2 py-0.5 sm:py-1 rounded text-xs ${calculateFragRate(player.kills, player.deaths) > 1 ? 'bg-green-600' :
                                         calculateFragRate(player.kills, player.deaths) > 0.5 ? 'bg-yellow-600' :
                                           'bg-red-600'
                                         }`}>
                                         {calculateFragRate(player.kills, player.deaths)}
                                       </span>
                                     </td>
-                                    <td className="text-center py-2 px-2">
-                                      <span className={`px-2 py-1 rounded text-xs ${calculateScore(player.kills, player.deaths) > 0 ? 'bg-green-600' :
+                                    <td className="text-center py-2 px-1 sm:px-2">
+                                      <span className={`px-1 sm:px-2 py-0.5 sm:py-1 rounded text-xs ${calculateScore(player.kills, player.deaths) > 0 ? 'bg-green-600' :
                                         calculateScore(player.kills, player.deaths) < 0 ? 'bg-red-600' : 'bg-gray-600'
                                         }`}>
                                         {calculateScore(player.kills, player.deaths)}
@@ -377,7 +377,7 @@ const Home = () => {
                             </table>
                           </div>
                           <div className="rounded-lg">
-                            <div className="text-sm text-gray-300">
+                            <div className="text-xs sm:text-sm text-gray-300">
                               <div>Mode: {engineerServerInfo.game_mode}</div>
                               <div>Ping: {engineerServerInfo.ping}</div>
                             </div>
@@ -387,9 +387,9 @@ const Home = () => {
                     )}
                   </div>
                 ) : (
-                    <div className="py-12 border-2 border-dashed border-gray-600 rounded-lg text-center">
-                      <div className="text-gray-400 text-xl mb-2">Engineer's Server isn't available</div>
-                  <div className="text-gray-500 text-sm">Check back later</div>
+                    <div className="py-8 sm:py-12 border-2 border-dashed border-gray-600 rounded-lg text-center px-4">
+                      <div className="text-gray-400 text-lg sm:text-xl mb-2">Engineer's Server isn't available</div>
+                  <div className="text-gray-500 text-xs sm:text-sm">Check back later</div>
                 </div>
               )}
           </div>
