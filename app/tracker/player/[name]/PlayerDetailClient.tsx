@@ -23,6 +23,15 @@ interface Session {
   server_ip?: string;
 }
 
+interface MapStats {
+  player_name: string;
+  map_name: string;
+  total_kills: number;
+  total_deaths: number;
+  kd_ratio: number;
+  total_sessions: number;
+}
+
 // Helper to get default dates (last 30 days)
 const getDefaultDates = () => {
   const now = new Date();
@@ -50,8 +59,10 @@ const PlayerDetailClient = () => {
   
   const [playerStats, setPlayerStats] = useState<PlayerStats | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [mapStats, setMapStats] = useState<MapStats[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [mapStatsLoading, setMapStatsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   // Time filter for sessions with defaults
@@ -112,6 +123,32 @@ const PlayerDetailClient = () => {
     };
 
     fetchPlayerStats();
+  }, [playerName]);
+
+  // Fetch player map stats
+  useEffect(() => {
+    const fetchMapStats = async () => {
+      try {
+        setMapStatsLoading(true);
+        const response = await fetch(
+          `${API_BASE}/analytics/players/${encodeURIComponent(playerName)}/maps`
+        );
+        const data = await response.json();
+
+        if (Array.isArray(data)) {
+          setMapStats(data);
+        } else {
+          setMapStats([]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch map stats:', err);
+        setMapStats([]);
+      } finally {
+        setMapStatsLoading(false);
+      }
+    };
+
+    fetchMapStats();
   }, [playerName]);
 
   // Fetch player sessions
@@ -234,6 +271,52 @@ const PlayerDetailClient = () => {
               No player stats found
             </div>
           )}
+
+          {/* Per-Map Stats Section */}
+          <div className="mb-6">
+            <h2 className="text-white text-lg sm:text-xl font-bold mb-4">Stats by Map</h2>
+            {mapStatsLoading ? (
+              <div className="text-white text-center py-8">Loading map stats...</div>
+            ) : mapStats.length > 0 ? (
+              <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-white text-xs sm:text-sm min-w-[500px]">
+                    <thead>
+                      <tr className="border-b border-gray-700 bg-gray-800">
+                        <th className="text-left py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Map</th>
+                        <th className="text-right py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Kills</th>
+                        <th className="text-right py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Deaths</th>
+                        <th className="text-right py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">K/D</th>
+                        <th className="text-right py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Sessions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mapStats.map((stat) => (
+                        <tr
+                          key={stat.map_name}
+                          className="border-b border-gray-800 hover:bg-gray-800"
+                        >
+                          <td className="py-2 sm:py-3 px-2 sm:px-4 font-medium">{stat.map_name}</td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4 text-right text-green-400">{stat.total_kills}</td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4 text-right text-red-400">{stat.total_deaths}</td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4 text-right">
+                            <span className={stat.kd_ratio >= 1 ? 'text-green-400' : 'text-red-400'}>
+                              {stat.kd_ratio.toFixed(2)}
+                            </span>
+                          </td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4 text-right text-gray-400">{stat.total_sessions}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-900 border border-gray-700 rounded-lg p-8 text-center text-gray-400">
+                No map stats found
+              </div>
+            )}
+          </div>
 
           {/* Sessions Section */}
           <div className="mb-4">
