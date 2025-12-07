@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 interface Player {
   name: string;
@@ -120,7 +121,12 @@ const ServerDetails = ({ server }: ServerDetailsProps) => {
                 {serverInfo.player_list.map((player, index) => (
                   <tr key={index} className="border-b border-gray-800 hover:bg-gray-800">
                     <td className="py-2 px-2">
-                      <span className="font-medium">[{player.honor}] {player.name}</span>
+                      <Link
+                        href={`/tracker/player/${encodeURIComponent(player.name)}`}
+                        className="font-medium text-blue-400 hover:text-blue-300 hover:underline"
+                      >
+                        [{player.honor}] {player.name}
+                      </Link>
                     </td>
                     <td className="text-center py-2 px-2">
                       <span className={`px-2 py-1 rounded text-xs ${
@@ -168,4 +174,4 @@ const ServerDetails = ({ server }: ServerDetailsProps) => {
   );
 };
 
-export default ServerDetails; 
+export default ServerDetails;

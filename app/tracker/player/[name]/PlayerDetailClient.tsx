@@ -469,4 +469,3 @@ const PlayerDetailClient = () => {
 };
 
 export default PlayerDetailClient;
-

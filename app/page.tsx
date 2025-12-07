@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import ServerDetails from "./components/ServerDetails";
 import SidebarLayout from "./components/SidebarLayout";
 
@@ -182,12 +183,12 @@ const Home = () => {
                           <tr key={index} className="border-b border-gray-800 hover:bg-gray-800">
                             <td className="py-2 px-2 text-gray-400">#{index + 1}</td>
                             <td className="py-2 px-2">
-                              <a
+                              <Link
                                 href={`/tracker/player/${encodeURIComponent(player.player_name)}`}
                                 className="font-medium text-blue-400 hover:text-blue-300 hover:underline"
                               >
                                 {player.player_name}
-                              </a>
+                              </Link>
                             </td>
                           <td className="text-center py-2 px-2 text-green-400">{player.total_kills}</td>
                           <td className="text-center py-2 px-2 text-red-400">{player.total_deaths}</td>
@@ -338,7 +339,12 @@ const Home = () => {
                                 {engineerServerInfo.player_list.map((player, index) => (
                                   <tr key={index} className="border-b border-gray-800 hover:bg-gray-800">
                                     <td className="py-2 px-2">
-                                      <span className="font-medium">[{player.honor}] {player.name}</span>
+                                      <Link
+                                        href={`/tracker/player/${encodeURIComponent(player.name)}`}
+                                        className="font-medium text-blue-400 hover:text-blue-300 hover:underline"
+                                      >
+                                        [{player.honor}] {player.name}
+                                      </Link>
                                     </td>
                                     <td className="text-center py-2 px-2">
                                       <span className={`px-2 py-1 rounded text-xs ${player.ping < 50 ? 'bg-green-600' :
