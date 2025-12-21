@@ -176,7 +176,7 @@ const WinterChampionship = () => {
               </span>
             </div>
             <h1 className="text-white text-3xl sm:text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
-              Americas Army 2.8.5
+              Americas Army 2.5
             </h1>
             <h2 className="text-white text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
               Winter Championship
