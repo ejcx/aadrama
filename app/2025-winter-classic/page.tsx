@@ -70,35 +70,26 @@ const SUBS = [
   { name: "ryan", note: "Might have to work" },
 ];
 
-const SCHEDULE = [
-  {
-    round: 1,
-    title: "Round 1",
-    mapType: "Mid-Range Maps",
-    matches: [
-      { home: "Team 4", away: "Next Level" },
-      { home: "Ataxia", away: "Judas" },
-    ],
-  },
-  {
-    round: 2,
-    title: "Round 2",
-    mapType: "Long-Range Maps",
-    matches: [
-      { home: "Next Level", away: "Ataxia" },
-      { home: "Judas", away: "Team 4" },
-    ],
-  },
-  {
-    round: 3,
-    title: "Round 3",
-    mapType: "Short-Range Maps",
-    matches: [
-      { home: "Judas", away: "Next Level" },
-      { home: "Team 4", away: "Ataxia" },
-    ],
-  },
-];
+// Group Stage Schedule
+const GROUP_A = {
+  name: "Group A",
+  teams: ["Next Level", "Ataxia"],
+  rounds: [
+    { round: 1, mapType: "Mid-Range Maps", home: "Next Level", away: "Ataxia" },
+    { round: 2, mapType: "Long-Range Maps", home: "Ataxia", away: "Next Level" },
+    { round: 3, mapType: "Short-Range Maps", home: "Next Level", away: "Ataxia" },
+  ],
+};
+
+const GROUP_B = {
+  name: "Group B",
+  teams: ["Judas", "Team 4"],
+  rounds: [
+    { round: 1, mapType: "Mid-Range Maps", home: "Judas", away: "Team 4" },
+    { round: 2, mapType: "Long-Range Maps", home: "Team 4", away: "Judas" },
+    { round: 3, mapType: "Short-Range Maps", home: "Judas", away: "Team 4" },
+  ],
+};
 
 const MAP_POOL = [
   {
@@ -276,111 +267,214 @@ const WinterChampionship = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
                 </svg>
               </span>
-              Tournament Bracket
+              Group Stage
             </h3>
             
-            {/* Bracket Visualization */}
-            <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 overflow-x-auto">
-              <div className="min-w-[600px]">
-                {/* Round Headers */}
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                  {SCHEDULE.map((round) => (
-                    <div key={round.round} className="text-center">
-                      <div className="text-white font-bold mb-1">{round.title}</div>
-                      <div className="text-xs text-gray-400 px-2 py-1 bg-gray-800 rounded-full inline-block">
-                        {round.mapType}
+            {/* Group Stage */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              {/* Group A */}
+              <div className="bg-gray-900 border border-blue-500/30 rounded-xl overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-white font-bold text-lg flex items-center gap-2">
+                      <span className="w-6 h-6 bg-white/20 rounded flex items-center justify-center text-sm">A</span>
+                      Group A
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      {GROUP_A.teams.map((teamName, idx) => {
+                        const team = TEAMS.find(t => t.name === teamName);
+                        return team ? (
+                          <Image key={idx} src={team.image} alt={team.name} width={24} height={24} className="rounded" />
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 space-y-3">
+                  {GROUP_A.rounds.map((round, idx) => (
+                    <div key={idx} className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white font-semibold text-sm">Round {round.round}</span>
+                        <span className="text-xs text-gray-400 px-2 py-0.5 bg-gray-700 rounded-full">{round.mapType}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${getTeamColor(round.home)}`}></div>
+                          <span className="text-gray-200 text-sm">{round.home}</span>
+                          <span className="text-green-400 text-[10px] px-1 py-0.5 bg-green-400/10 rounded">H</span>
+                        </div>
+                        <span className="text-gray-500 text-xs">vs</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-orange-400 text-[10px] px-1 py-0.5 bg-orange-400/10 rounded">A</span>
+                          <span className="text-gray-200 text-sm">{round.away}</span>
+                          <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${getTeamColor(round.away)}`}></div>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
+              </div>
 
-                {/* Bracket Lines and Matches */}
-                <div className="grid grid-cols-3 gap-4">
-                  {/* Round 1 */}
-                  <div className="space-y-4">
-                    {SCHEDULE[0].matches.map((match, idx) => (
-                      <div key={idx} className="relative">
-                        <div className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
-                          <div className={`bg-gradient-to-r ${getTeamColor(match.home)} p-0.5`}>
-                            <div className="bg-gray-800 px-3 py-2 flex items-center justify-between">
-                              <span className="text-white text-sm font-medium">{match.home}</span>
-                              <span className="text-green-400 text-[10px] px-1.5 py-0.5 bg-green-400/10 rounded">H</span>
-                            </div>
-                          </div>
-                          <div className="px-3 py-1 text-center text-gray-500 text-xs">vs</div>
-                          <div className={`bg-gradient-to-r ${getTeamColor(match.away)} p-0.5`}>
-                            <div className="bg-gray-800 px-3 py-2 flex items-center justify-between">
-                              <span className="text-white text-sm font-medium">{match.away}</span>
-                              <span className="text-orange-400 text-[10px] px-1.5 py-0.5 bg-orange-400/10 rounded">A</span>
-                            </div>
-                          </div>
-                        </div>
-                        {/* Connector line */}
-                        <div className="absolute right-0 top-1/2 w-4 h-px bg-gray-600 transform translate-x-full"></div>
+              {/* Group B */}
+              <div className="bg-gray-900 border border-red-500/30 rounded-xl overflow-hidden">
+                <div className="bg-gradient-to-r from-red-600 to-red-800 px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-white font-bold text-lg flex items-center gap-2">
+                      <span className="w-6 h-6 bg-white/20 rounded flex items-center justify-center text-sm">B</span>
+                      Group B
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      {GROUP_B.teams.map((teamName, idx) => {
+                        const team = TEAMS.find(t => t.name === teamName);
+                        return team ? (
+                          <Image key={idx} src={team.image} alt={team.name} width={24} height={24} className="rounded" />
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 space-y-3">
+                  {GROUP_B.rounds.map((round, idx) => (
+                    <div key={idx} className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white font-semibold text-sm">Round {round.round}</span>
+                        <span className="text-xs text-gray-400 px-2 py-0.5 bg-gray-700 rounded-full">{round.mapType}</span>
                       </div>
-                    ))}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${getTeamColor(round.home)}`}></div>
+                          <span className="text-gray-200 text-sm">{round.home}</span>
+                          <span className="text-green-400 text-[10px] px-1 py-0.5 bg-green-400/10 rounded">H</span>
+                        </div>
+                        <span className="text-gray-500 text-xs">vs</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-orange-400 text-[10px] px-1 py-0.5 bg-orange-400/10 rounded">A</span>
+                          <span className="text-gray-200 text-sm">{round.away}</span>
+                          <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${getTeamColor(round.away)}`}></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-6 text-xs text-gray-400 mb-8">
+              <div className="flex items-center gap-2">
+                <span className="text-green-400 px-1.5 py-0.5 bg-green-400/10 rounded">H</span>
+                <span>Home Team</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-orange-400 px-1.5 py-0.5 bg-orange-400/10 rounded">A</span>
+                <span>Away Team</span>
+              </div>
+            </div>
+
+            {/* Finals Bracket */}
+            <h3 className="text-white text-xl sm:text-2xl font-bold mb-6 flex items-center gap-3">
+              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+              </span>
+              Finals Bracket
+            </h3>
+
+            <div className="bg-gray-900 border border-amber-500/30 rounded-xl p-4 sm:p-6 overflow-x-auto">
+              <div className="min-w-[500px]">
+                {/* Finals Bracket Visualization */}
+                <div className="flex items-center justify-center gap-4">
+                  {/* Group A Winner */}
+                  <div className="flex-1 max-w-[200px]">
+                    <div className="text-center mb-2">
+                      <span className="text-xs text-gray-400 uppercase tracking-wider">Group A Winner</span>
+                    </div>
+                    <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-0.5 rounded-lg">
+                      <div className="bg-gray-800 rounded-lg p-4 text-center">
+                        <div className="flex justify-center gap-2 mb-2">
+                          {GROUP_A.teams.map((teamName, idx) => {
+                            const team = TEAMS.find(t => t.name === teamName);
+                            return team ? (
+                              <Image key={idx} src={team.image} alt={team.name} width={28} height={28} className="rounded opacity-50" />
+                            ) : null;
+                          })}
+                        </div>
+                        <div className="text-blue-400 font-bold text-sm">TBD</div>
+                        <div className="text-gray-500 text-xs mt-1">Next Level or Ataxia</div>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Round 2 */}
-                  <div className="space-y-4">
-                    {SCHEDULE[1].matches.map((match, idx) => (
-                      <div key={idx} className="relative">
-                        {/* Connector lines */}
-                        <div className="absolute left-0 top-1/2 w-4 h-px bg-gray-600 transform -translate-x-full"></div>
-                        <div className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
-                          <div className={`bg-gradient-to-r ${getTeamColor(match.home)} p-0.5`}>
-                            <div className="bg-gray-800 px-3 py-2 flex items-center justify-between">
-                              <span className="text-white text-sm font-medium">{match.home}</span>
-                              <span className="text-green-400 text-[10px] px-1.5 py-0.5 bg-green-400/10 rounded">H</span>
-                            </div>
-                          </div>
-                          <div className="px-3 py-1 text-center text-gray-500 text-xs">vs</div>
-                          <div className={`bg-gradient-to-r ${getTeamColor(match.away)} p-0.5`}>
-                            <div className="bg-gray-800 px-3 py-2 flex items-center justify-between">
-                              <span className="text-white text-sm font-medium">{match.away}</span>
-                              <span className="text-orange-400 text-[10px] px-1.5 py-0.5 bg-orange-400/10 rounded">A</span>
-                            </div>
-                          </div>
+                  {/* Connector Lines and VS */}
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-8 h-px bg-gradient-to-r from-blue-500 to-amber-500"></div>
+                    <div className="relative">
+                      <div className="absolute -left-4 top-1/2 w-4 h-px bg-blue-500"></div>
+                      <div className="absolute -right-4 top-1/2 w-4 h-px bg-red-500"></div>
+                      <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-0.5 rounded-xl">
+                        <div className="bg-gray-900 rounded-xl px-6 py-4 text-center">
+                          <svg className="w-6 h-6 text-amber-400 mx-auto mb-1" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                          </svg>
+                          <div className="text-amber-400 font-bold text-lg">FINALS</div>
+                          <div className="text-gray-400 text-xs mt-1">Best of 14</div>
                         </div>
-                        <div className="absolute right-0 top-1/2 w-4 h-px bg-gray-600 transform translate-x-full"></div>
                       </div>
-                    ))}
+                    </div>
+                    <div className="w-8 h-px bg-gradient-to-r from-amber-500 to-red-500"></div>
                   </div>
 
-                  {/* Round 3 */}
-                  <div className="space-y-4">
-                    {SCHEDULE[2].matches.map((match, idx) => (
-                      <div key={idx} className="relative">
-                        <div className="absolute left-0 top-1/2 w-4 h-px bg-gray-600 transform -translate-x-full"></div>
-                        <div className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
-                          <div className={`bg-gradient-to-r ${getTeamColor(match.home)} p-0.5`}>
-                            <div className="bg-gray-800 px-3 py-2 flex items-center justify-between">
-                              <span className="text-white text-sm font-medium">{match.home}</span>
-                              <span className="text-green-400 text-[10px] px-1.5 py-0.5 bg-green-400/10 rounded">H</span>
-                            </div>
-                          </div>
-                          <div className="px-3 py-1 text-center text-gray-500 text-xs">vs</div>
-                          <div className={`bg-gradient-to-r ${getTeamColor(match.away)} p-0.5`}>
-                            <div className="bg-gray-800 px-3 py-2 flex items-center justify-between">
-                              <span className="text-white text-sm font-medium">{match.away}</span>
-                              <span className="text-orange-400 text-[10px] px-1.5 py-0.5 bg-orange-400/10 rounded">A</span>
-                            </div>
-                          </div>
+                  {/* Group B Winner */}
+                  <div className="flex-1 max-w-[200px]">
+                    <div className="text-center mb-2">
+                      <span className="text-xs text-gray-400 uppercase tracking-wider">Group B Winner</span>
+                    </div>
+                    <div className="bg-gradient-to-r from-red-600 to-red-800 p-0.5 rounded-lg">
+                      <div className="bg-gray-800 rounded-lg p-4 text-center">
+                        <div className="flex justify-center gap-2 mb-2">
+                          {GROUP_B.teams.map((teamName, idx) => {
+                            const team = TEAMS.find(t => t.name === teamName);
+                            return team ? (
+                              <Image key={idx} src={team.image} alt={team.name} width={28} height={28} className="rounded opacity-50" />
+                            ) : null;
+                          })}
                         </div>
+                        <div className="text-red-400 font-bold text-sm">TBD</div>
+                        <div className="text-gray-500 text-xs mt-1">Judas or Team 4</div>
                       </div>
-                    ))}
+                    </div>
                   </div>
                 </div>
 
-                {/* Legend */}
-                <div className="mt-6 pt-4 border-t border-gray-700 flex items-center justify-center gap-6 text-xs text-gray-400">
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-400 px-1.5 py-0.5 bg-green-400/10 rounded">H</span>
-                    <span>Home Team</span>
+                {/* Tournament Flow Arrow */}
+                <div className="flex justify-center mt-6">
+                  <div className="flex flex-col items-center">
+                    <svg className="w-5 h-5 text-amber-500 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-orange-400 px-1.5 py-0.5 bg-orange-400/10 rounded">A</span>
-                    <span>Away Team</span>
+                </div>
+
+                {/* Champion */}
+                <div className="flex justify-center mt-4">
+                  <div className="bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400 p-0.5 rounded-xl">
+                    <div className="bg-gray-900 rounded-xl px-8 py-4 text-center">
+                      <div className="flex justify-center mb-2">
+                        <div className="relative">
+                          <svg className="w-10 h-10 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M5 3h14a2 2 0 012 2v4a8 8 0 01-8 8 8 8 0 01-8-8V5a2 2 0 012-2zm7 18v-4m-4 6h8" />
+                          </svg>
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full flex items-center justify-center">
+                            <svg className="w-2.5 h-2.5 text-gray-900" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-amber-400 font-bold text-xl">CHAMPION</div>
+                      <div className="text-gray-400 text-xs mt-1">Winter 2025</div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -392,11 +486,11 @@ const WinterChampionship = () => {
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                 </svg>
-                Finals
+                Finals Format
               </h4>
               <div className="space-y-3 text-sm text-gray-300">
                 <p>
-                  The <span className="text-white font-medium">top 2 teams</span> from group play advance to the finals.
+                  The <span className="text-blue-400 font-medium">Group A winner</span> faces the <span className="text-red-400 font-medium">Group B winner</span> in a Best of 14 final match (7-7 tie possible).
                 </p>
                 <div className="bg-gray-800/50 rounded-lg p-4 space-y-2">
                   <div className="flex items-start gap-2">
@@ -417,12 +511,12 @@ const WinterChampionship = () => {
                   </div>
                 </div>
                 <div className="border-t border-gray-700 pt-3 mt-3">
-                  <p className="text-gray-400 mt-4">
-                    <span className="text-white font-medium">Tiebreaker:</span> Sudden death on a map selected by high seed. Low seed picks sides (no swap). First team to win a round wins the match.
+                  <p className="text-gray-400">
+                    <span className="text-white font-medium">Tiebreaker (7-7):</span> Sudden death on a map selected by high seed. Low seed picks sides (no swap). First team to win a round wins the match.
                   </p>
                 </div>
                 <p className="text-gray-500 text-xs italic">
-                  Optional: Bottom teams may play for honor & glory in the final standings.
+                  Optional: Group stage losers may play for 3rd place honor & glory.
                 </p>
               </div>
             </div>

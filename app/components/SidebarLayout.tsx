@@ -62,7 +62,7 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
       {/* Sidebar */}
       <div className={`hidden lg:block fixed left-0 h-screen w-64 bg-gray-900 border-r border-gray-700 p-6 overflow-y-auto transition-all ${showAnnouncement && !announcementExpired ? 'top-10' : 'top-0'}`}>
         <div className="sticky top-6">
-          <div className="flex items-center space-x-2 mb-8">
+          <a href="/" className="flex items-center space-x-2 mb-8 hover:opacity-80 transition-opacity">
             <Image
               src="/aa.jpg"
               alt="aa"
@@ -71,7 +71,7 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
               className="rounded"
             />
             <span className="text-white font-semibold text-sm">aadrama</span>
-          </div>
+          </a>
           <nav className="flex flex-col space-y-1">
             <div>
               {pathname === '/' ? (
