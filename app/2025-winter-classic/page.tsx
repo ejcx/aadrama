@@ -106,7 +106,7 @@ const MAP_POOL = [
     maps: [
       { name: "MOUT McKenna", time: "4 minutes" },
       { name: "Urban Assault", time: "4 minutes" },
-      { name: "Canyon", time: "4 minutes", note: "6v6" },
+      { name: "Canyon", time: "4 minutes" },
       { name: "Insurgent Camp", time: "4 minutes" },
       { name: "SF Sandstorm", time: "4 minutes" },
     ],
@@ -515,9 +515,6 @@ const WinterChampionship = () => {
                         >
                           <span className="text-gray-300">
                             {map.name}
-                            {map.note && (
-                              <span className="text-gray-500 ml-1">({map.note})</span>
-                            )}
                           </span>
                           <span className="text-gray-500 text-xs">{map.time}</span>
                         </div>
