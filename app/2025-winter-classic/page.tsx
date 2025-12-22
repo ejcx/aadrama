@@ -225,12 +225,12 @@ const WinterChampionship = () => {
                   className={`bg-gradient-to-br ${team.color} rounded-xl p-[1px]`}
                 >
                   <div className="bg-gray-900 rounded-xl p-5 h-full">
-                    <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-4 mb-4">
                       <Image
                         src={team.image}
                         alt={team.name}
-                        width={40}
-                        height={40}
+                        width={64}
+                        height={64}
                         className="rounded-lg"
                       />
                       <div>
