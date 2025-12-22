@@ -51,10 +51,10 @@ const TEAMS = [
     ] as Player[],
   },
   {
-    name: "Team 4",
-    tag: "t4",
+    name: "Team Leftovers",
+    tag: "tl",
     color: "from-emerald-600 to-emerald-800",
-    image: "/team4.png",
+    image: "/leftovers.png",
     players: [
       { name: "hyPe", tracker: "hype" },
       { name: "re1ativity2", tracker: "re1ativity2" },
@@ -77,7 +77,7 @@ const GROUP_STAGE = {
       round: 1,
       mapType: "Mid-Range Maps",
       matches: [
-        { home: "Team 4", away: "Next Level" },
+        { home: "Team Leftovers", away: "Next Level" },
         { home: "Ataxia", away: "Judas" },
       ],
     },
@@ -86,7 +86,7 @@ const GROUP_STAGE = {
       mapType: "Long-Range Maps",
       matches: [
         { home: "Next Level", away: "Ataxia" },
-        { home: "Judas", away: "Team 4" },
+        { home: "Judas", away: "Team Leftovers" },
       ],
     },
     {
@@ -94,7 +94,7 @@ const GROUP_STAGE = {
       mapType: "Short-Range Maps",
       matches: [
         { home: "Judas", away: "Next Level" },
-        { home: "Team 4", away: "Ataxia" },
+        { home: "Team Leftovers", away: "Ataxia" },
       ],
     },
   ],
