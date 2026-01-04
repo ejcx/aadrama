@@ -7,17 +7,11 @@ import TrackerLayout from "../../TrackerLayout";
 import Link from "next/link";
 import { SessionContent } from "../SessionContent";
 
-// Delimiter for multiple session IDs in URL
-const SESSION_DELIMITER = "+";
-
 // Safely decode URI component - handles both encoded and non-encoded values
 const safeDecodeURIComponent = (str: string): string => {
   try {
-    // Always try to decode - decodeURIComponent is safe on already-decoded strings
-    // unless they contain % followed by invalid hex, which we catch
     return decodeURIComponent(str);
   } catch {
-    // If decoding fails (malformed URI like a literal % not followed by hex), return original
     return str;
   }
 };
@@ -26,12 +20,13 @@ const SessionDetailPage = () => {
   const params = useParams();
   const rawId = params.id as string;
   
-  // Split on delimiter FIRST, then decode each individual session ID
-  // This handles cases where the session IDs contain encoded characters like %3A for :
+  // Split on + or %2B (encoded +) or space or ~
+  // The browser/Next.js encodes + as %2B in the URL path
+  // Then decode each individual session ID to handle encoded characters like %3A for :
   const sessionIds = rawId
     ? Array.from(new Set(
         rawId
-          .split(SESSION_DELIMITER)
+          .split(/[+~ ]|%2B/i)
           .map(id => safeDecodeURIComponent(id.trim()))
           .filter(id => id.length > 0)
       )).slice(0, 8)
