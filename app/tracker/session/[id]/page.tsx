@@ -10,15 +10,30 @@ import { SessionContent } from "../SessionContent";
 // Delimiter for multiple session IDs in URL
 const SESSION_DELIMITER = "+";
 
+// Safely decode URI component - handles both encoded and non-encoded values
+const safeDecodeURIComponent = (str: string): string => {
+  try {
+    // Check if the string appears to be URI encoded (contains %XX patterns)
+    // If so, decode it; otherwise return as-is
+    if (/%[0-9A-Fa-f]{2}/.test(str)) {
+      return decodeURIComponent(str);
+    }
+    return str;
+  } catch {
+    // If decoding fails (malformed URI), return original string
+    return str;
+  }
+};
+
 const SessionDetailPage = () => {
   const params = useParams();
   const rawId = params.id as string;
   
   // Split on delimiter, dedupe, and limit to 8 sessions
-  // Decode URI components to handle any encoded characters
+  // Safely decode URI components to handle both encoded and non-encoded values
   const sessionIds = rawId
     ? Array.from(new Set(
-        decodeURIComponent(rawId)
+        safeDecodeURIComponent(rawId)
           .split(SESSION_DELIMITER)
           .map(id => id.trim())
           .filter(id => id.length > 0)

@@ -210,7 +210,7 @@ const SessionsPage = () => {
                     >
                       <td className="py-2 sm:py-3 px-2 sm:px-4">
                         <Link
-                          href={`/tracker/session/${session.session_id}`}
+                          href={`/tracker/session/${encodeURIComponent(session.session_id)}`}
                           className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs truncate block max-w-[100px] sm:max-w-none"
                         >
                           {session.session_id}
