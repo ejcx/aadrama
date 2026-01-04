@@ -1,22 +1,19 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useMemo } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import SidebarLayout from "../components/SidebarLayout";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import { 
   createScrim, 
-  getActiveScrims, 
-  getScrimPlayers, 
   joinScrim, 
   leaveScrim, 
   toggleReady,
   endGame,
   submitScore,
   cancelScrim,
-  getRecentScrims,
   setTrackerSessionId,
-  getTrackerMaps,
 } from "./actions";
 import type { ScrimWithCounts, ScrimPlayer } from "@/lib/supabase/types";
 
@@ -90,6 +87,7 @@ function ScrimCard({
   const [scoreA, setScoreA] = useState("");
   const [scoreB, setScoreB] = useState("");
   const [trackerInput, setTrackerInput] = useState("");
+  const supabase = useMemo(() => createClient(), []);
   
   const isParticipant = players.some(p => p.user_id === userId);
   const isCreator = scrim.created_by === userId;
@@ -112,8 +110,14 @@ function ScrimCard({
   
   async function loadPlayers() {
     try {
-      const data = await getScrimPlayers(scrim.id);
-      setPlayers(data);
+      const { data, error } = await supabase
+        .from('scrim_players')
+        .select('*')
+        .eq('scrim_id', scrim.id)
+        .order('joined_at', { ascending: true });
+      
+      if (error) throw error;
+      setPlayers(data || []);
     } catch (err) {
       console.error("Failed to load players:", err);
     }
@@ -400,6 +404,7 @@ export default function ScrimClient() {
   const [creating, setCreating] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [selectedMap, setSelectedMap] = useState("");
+  const supabase = useMemo(() => createClient(), []);
   
   useEffect(() => {
     loadScrims();
@@ -410,14 +415,30 @@ export default function ScrimClient() {
   
   async function loadScrims() {
     try {
-      const [active, recent, maps] = await Promise.all([
-        getActiveScrims(),
-        getRecentScrims(5),
-        getTrackerMaps(),
+      // Use browser client for read operations (edge runtime compatible)
+      const [activeRes, recentRes, mapsRes] = await Promise.all([
+        // Expire stale scrims first, then fetch active
+        supabase.rpc('expire_stale_scrims').then(() =>
+          supabase
+            .from('scrims_with_counts')
+            .select('*')
+            .in('status', ['waiting', 'ready_check', 'in_progress', 'scoring'])
+            .order('created_at', { ascending: false })
+        ),
+        // Fetch recent scrims
+        supabase
+          .from('scrims_with_counts')
+          .select('*')
+          .in('status', ['finalized', 'cancelled', 'expired'])
+          .order('created_at', { ascending: false })
+          .limit(5),
+        // Fetch distinct maps
+        supabase.rpc('get_distinct_maps'),
       ]);
-      setActiveScrims(active);
-      setRecentScrims(recent);
-      setAvailableMaps(maps);
+      
+      setActiveScrims(activeRes.data || []);
+      setRecentScrims(recentRes.data || []);
+      setAvailableMaps(mapsRes.data?.map((row: { map: string }) => row.map) || []);
     } catch (err) {
       console.error("Failed to load scrims:", err);
     } finally {
