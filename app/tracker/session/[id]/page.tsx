@@ -13,14 +13,11 @@ const SESSION_DELIMITER = "+";
 // Safely decode URI component - handles both encoded and non-encoded values
 const safeDecodeURIComponent = (str: string): string => {
   try {
-    // Check if the string appears to be URI encoded (contains %XX patterns)
-    // If so, decode it; otherwise return as-is
-    if (/%[0-9A-Fa-f]{2}/.test(str)) {
-      return decodeURIComponent(str);
-    }
-    return str;
+    // Always try to decode - decodeURIComponent is safe on already-decoded strings
+    // unless they contain % followed by invalid hex, which we catch
+    return decodeURIComponent(str);
   } catch {
-    // If decoding fails (malformed URI), return original string
+    // If decoding fails (malformed URI like a literal % not followed by hex), return original
     return str;
   }
 };
@@ -29,13 +26,13 @@ const SessionDetailPage = () => {
   const params = useParams();
   const rawId = params.id as string;
   
-  // Split on delimiter, dedupe, and limit to 8 sessions
-  // Safely decode URI components to handle both encoded and non-encoded values
+  // Split on delimiter FIRST, then decode each individual session ID
+  // This handles cases where the session IDs contain encoded characters like %3A for :
   const sessionIds = rawId
     ? Array.from(new Set(
-        safeDecodeURIComponent(rawId)
+        rawId
           .split(SESSION_DELIMITER)
-          .map(id => id.trim())
+          .map(id => safeDecodeURIComponent(id.trim()))
           .filter(id => id.length > 0)
       )).slice(0, 8)
     : [];
