@@ -18,11 +18,28 @@ const safeDecodeURIComponent = (str: string): string => {
 
 // Parse session IDs from the URL parameter
 const parseSessionIds = (rawId: string): string[] => {
+  // First, decode the entire string to normalize all encodings
+  // This handles cases where + is %2B or space is %20
+  let decoded = rawId;
+  try {
+    // Keep decoding until stable (handles double-encoding)
+    let prev = '';
+    while (prev !== decoded) {
+      prev = decoded;
+      decoded = decodeURIComponent(decoded);
+    }
+  } catch {
+    // If decoding fails, use the original
+    decoded = rawId;
+  }
+  
+  // Now split on all possible delimiters (after decoding, + becomes space or stays as +)
+  // Split on: + (plus), ~ (tilde), space, or multiple spaces
   return Array.from(new Set(
-        rawId
-          .split(/[+~ ]|%2B/i)
-          .map(id => safeDecodeURIComponent(id.trim()))
-          .filter(id => id.length > 0)
+    decoded
+      .split(/[+~\s]+/)
+      .map(id => id.trim())
+      .filter(id => id.length > 0)
   )).slice(0, 8);
 };
 
