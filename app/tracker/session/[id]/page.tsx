@@ -17,12 +17,12 @@ const SessionDetailPage = () => {
   // Split on delimiter, dedupe, and limit to 8 sessions
   // Decode URI components to handle any encoded characters
   const sessionIds = rawId
-    ? [...new Set(
+    ? Array.from(new Set(
         decodeURIComponent(rawId)
           .split(SESSION_DELIMITER)
           .map(id => id.trim())
           .filter(id => id.length > 0)
-      )].slice(0, 8)
+      )).slice(0, 8)
     : [];
 
   const isMultipleSessions = sessionIds.length > 1;
