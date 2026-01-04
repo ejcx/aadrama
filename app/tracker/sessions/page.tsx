@@ -24,6 +24,48 @@ const SessionsPage = () => {
   const [maps, setMaps] = useState<MapInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+  const [copied, setCopied] = useState(false);
+
+  // Toggle session selection
+  const toggleSessionSelection = (sessionId: string) => {
+    setSelectedSessions((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
+      }
+      return next;
+    });
+  };
+
+  // Select all visible sessions
+  const selectAll = () => {
+    setSelectedSessions(new Set(sessions.map((s) => s.session_id)));
+  };
+
+  // Clear selection
+  const clearSelection = () => {
+    setSelectedSessions(new Set());
+  };
+
+  // Generate combined session URL
+  const getCombinedUrl = () => {
+    const ids = Array.from(selectedSessions);
+    return `${window.location.origin}/tracker/session/${ids.map((id) => encodeURIComponent(id)).join("+")}`;
+  };
+
+  // Copy URL to clipboard
+  const copyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(getCombinedUrl());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
 
   // Time picker state - default to showing recent sessions (last 7 days)
   const [startTime, setStartTime] = useState<string>(() => {
@@ -185,6 +227,15 @@ const SessionsPage = () => {
             <table className="w-full text-white text-xs sm:text-sm min-w-[600px]">
               <thead>
                 <tr className="border-b border-gray-700 bg-gray-800">
+                  <th className="py-2 sm:py-3 px-2 sm:px-4 w-10">
+                    <input
+                      type="checkbox"
+                      checked={sessions.length > 0 && selectedSessions.size === sessions.length}
+                      onChange={(e) => e.target.checked ? selectAll() : clearSelection()}
+                      className="w-4 h-4 accent-cyan-500 cursor-pointer"
+                      title="Select all"
+                    />
+                  </th>
                   <th className="text-left py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">
                     Session ID
                   </th>
@@ -206,9 +257,19 @@ const SessionsPage = () => {
                   sessions.map((session) => (
                     <tr
                       key={session.session_id}
-                      className="border-b border-gray-800 hover:bg-gray-800"
+                      className={`border-b border-gray-800 hover:bg-gray-800 cursor-pointer ${selectedSessions.has(session.session_id) ? "bg-cyan-900/30" : ""
+                        }`}
+                      onClick={() => toggleSessionSelection(session.session_id)}
                     >
-                      <td className="py-2 sm:py-3 px-2 sm:px-4">
+                      <td className="py-2 sm:py-3 px-2 sm:px-4" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedSessions.has(session.session_id)}
+                          onChange={() => toggleSessionSelection(session.session_id)}
+                          className="w-4 h-4 accent-cyan-500 cursor-pointer"
+                        />
+                      </td>
+                      <td className="py-2 sm:py-3 px-2 sm:px-4" onClick={(e) => e.stopPropagation()}>
                         <Link
                           href={`/tracker/session/${encodeURIComponent(session.session_id)}`}
                           className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs truncate block max-w-[100px] sm:max-w-none"
@@ -233,7 +294,7 @@ const SessionsPage = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-400">
+                      <td colSpan={7} className="text-center py-8 text-gray-400">
                       No sessions found
                     </td>
                   </tr>
@@ -241,6 +302,56 @@ const SessionsPage = () => {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Floating selection bar */}
+      {selectedSessions.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 border border-cyan-500 rounded-lg shadow-lg shadow-cyan-500/20 px-4 py-3 flex items-center gap-3 sm:gap-4">
+          <span className="text-white text-sm font-medium">
+            {selectedSessions.size} session{selectedSessions.size > 1 ? "s" : ""} selected
+          </span>
+
+          {selectedSessions.size >= 2 && (
+            <>
+              <Link
+                href={`/tracker/session/${Array.from(selectedSessions).map((id) => encodeURIComponent(id)).join("+")}`}
+                className="bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-medium px-3 py-1.5 rounded transition-colors"
+              >
+                View Combined
+              </Link>
+              <button
+                onClick={copyUrl}
+                className="bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium px-3 py-1.5 rounded transition-colors flex items-center gap-1.5"
+              >
+                {copied ? (
+                  <>
+                    <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Copy URL
+                  </>
+                )}
+              </button>
+            </>
+          )}
+
+          <button
+            onClick={clearSelection}
+            className="text-gray-400 hover:text-white transition-colors p-1"
+            title="Clear selection"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       )}
     </TrackerLayout>
