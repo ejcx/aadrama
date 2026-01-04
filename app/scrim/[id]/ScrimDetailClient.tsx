@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import SidebarLayout from "../../components/SidebarLayout";
+import { createClient } from "@/lib/supabase/client";
 import {
-  getScrim,
-  getScrimPlayers,
   joinScrim,
   leaveScrim,
   toggleReady,
@@ -15,7 +14,6 @@ import {
   submitScore,
   cancelScrim,
   setTrackerSessionId,
-  getScoreSubmissions,
   getSessionStats,
   type SessionStats,
 } from "../actions";
