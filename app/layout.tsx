@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: 'We\'re back',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
