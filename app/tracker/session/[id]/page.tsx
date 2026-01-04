@@ -169,7 +169,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   });
   const playerCount = uniquePlayerNames.size;
 
-  // Get top 3 players by kills
+  // Get top 10 players by kills
   const aggregatedPlayers = new Map<string, { kills: number; deaths: number }>();
   players.forEach((playerList) => {
     playerList.forEach((p) => {
@@ -182,10 +182,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       }
     });
   });
-  const topPlayers = Array.from(aggregatedPlayers.entries())
-    .sort((a, b) => b[1].kills - a[1].kills)
-    .slice(0, 3)
-    .map(([name, stats]) => `${name}: ${stats.kills}K/${stats.deaths}D`);
+  const sortedPlayers = Array.from(aggregatedPlayers.entries())
+    .sort((a, b) => b[1].kills - a[1].kills);
+  const topPlayers = sortedPlayers
+    .slice(0, 10)
+    .map(([name, stats], i) => `${i + 1}. ${name}: ${stats.kills}K/${stats.deaths}D`);
 
   // Get maps
   const uniqueMaps = Array.from(new Set(sessions.map(s => s.map).filter(Boolean)));
@@ -224,6 +225,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   let ogDescription = description;
   if (topPlayers.length > 0) {
     ogDescription += `\n\n🏆 Top Players:\n${topPlayers.join('\n')}`;
+    
+    // Show how many more players if there are more than 10
+    const remainingPlayers = sortedPlayers.length - 10;
+    if (remainingPlayers > 0) {
+      ogDescription += `\n... and ${remainingPlayers} more players`;
+    }
   }
 
   return {
