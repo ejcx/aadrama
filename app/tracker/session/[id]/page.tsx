@@ -2,7 +2,51 @@
 
 export const runtime = 'edge';
 
-import SessionDetailClient from "./SessionDetailClient";
+import { useParams } from "next/navigation";
+import TrackerLayout from "../../TrackerLayout";
+import Link from "next/link";
+import { SessionContent } from "../SessionContent";
 
-export default SessionDetailClient;
+// Delimiter for multiple session IDs in URL
+const SESSION_DELIMITER = "+";
 
+const SessionDetailPage = () => {
+  const params = useParams();
+  const rawId = params.id as string;
+  
+  // Split on delimiter, dedupe, and limit to 8 sessions
+  // Decode URI components to handle any encoded characters
+  const sessionIds = rawId
+    ? [...new Set(
+        decodeURIComponent(rawId)
+          .split(SESSION_DELIMITER)
+          .map(id => id.trim())
+          .filter(id => id.length > 0)
+      )].slice(0, 8)
+    : [];
+
+  const isMultipleSessions = sessionIds.length > 1;
+
+  return (
+    <TrackerLayout>
+      <div className="mb-6">
+        <Link
+          href="/tracker/sessions"
+          className="text-blue-400 hover:text-blue-300 hover:underline text-sm mb-2 inline-block"
+        >
+          ← Back to Sessions
+        </Link>
+        <h1 className="text-white text-xl sm:text-2xl md:text-3xl font-bold break-all">
+          {isMultipleSessions 
+            ? `Combined Sessions (${sessionIds.length})`
+            : `Session ${sessionIds[0] || ''}`
+          }
+        </h1>
+      </div>
+
+      <SessionContent sessionIds={sessionIds} />
+    </TrackerLayout>
+  );
+};
+
+export default SessionDetailPage;

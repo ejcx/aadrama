@@ -2,6 +2,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import SidebarLayout from "../components/SidebarLayout";
+import { SessionContent } from "../tracker/session/SessionContent";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 // Player type with display name and optional tracker profile
 interface Player {
@@ -77,27 +79,74 @@ const GROUP_STAGE = {
       round: 1,
       mapType: "Mid-Range Maps",
       matches: [
-        { home: "Team Leftovers", away: "Next Level", map: "Insurgent Camp" },
-        { home: "Ataxia", away: "Judas", map: "Insurgent Camp" },
+        { home: "Team Leftovers", away: "Next Level", map: "Insurgent Camp", homeScore: 3, awayScore: 11, sessionIds: ["185.150.189.120:1797_1767476967", "185.150.189.120:1797_1767474807"] },
+        { home: "Ataxia", away: "Judas", map: "Insurgent Camp", homeScore: 8, awayScore: 6, sessionIds: ["185.150.189.120:1787_1767478257", "185.150.189.120:1787_1767477387", "185.150.189.120:1787_1767475257"] },
       ],
     },
     {
       round: 2,
       mapType: "Long-Range Maps",
       matches: [
-        { home: "Next Level", away: "Ataxia", map: "Mountain Ambush" },
-        { home: "Judas", away: "Team Leftovers", map: "River Basin" },
+        { home: "Next Level", away: "Ataxia", map: "Mountain Ambush", homeScore: 8, awayScore: 6, sessionIds: ["185.150.189.120:1787_1767481647", "185.150.189.120:1787_1767478707"] },
+        { home: "Judas", away: "Team Leftovers", map: "River Basin", homeScore: 6, awayScore: 8, sessionIds: ["185.150.189.120:1777_1767481407", "185.150.189.120:1777_1767478947"] },
       ],
     },
     {
       round: 3,
       mapType: "Short-Range Maps",
       matches: [
-        { home: "Judas", away: "Next Level", map: "Collapsed Tunnel" },
-        { home: "Team Leftovers", away: "Ataxia", map: "Pipeline" },
+        { home: "Judas", away: "Next Level", map: "Collapsed Tunnel", homeScore: 4, awayScore: 7, draws: 1, sessionIds: ["185.150.189.120:1797_1767482907"] },
+        { home: "Team Leftovers", away: "Ataxia", map: "Pipeline", homeScore: 7, awayScore: 7, sessionIds: ["185.150.189.120:1787_1767485517", "185.150.189.120:1787_1767483207"] },
       ],
     },
   ],
+};
+
+// Finals result
+const FINALS = {
+  map: "Urban Assault",
+  team1: "Next Level",
+  team2: "Ataxia",
+  score1: 8,
+  score2: 2,
+  winner: "Next Level",
+};
+
+// Calculate standings from group stage results
+const calculateStandings = () => {
+  const standings: Record<string, { wins: number; losses: number; ties: number; roundsFor: number; roundsAgainst: number }> = {
+    "Next Level": { wins: 0, losses: 0, ties: 0, roundsFor: 0, roundsAgainst: 0 },
+    "Ataxia": { wins: 0, losses: 0, ties: 0, roundsFor: 0, roundsAgainst: 0 },
+    "Judas": { wins: 0, losses: 0, ties: 0, roundsFor: 0, roundsAgainst: 0 },
+    "Team Leftovers": { wins: 0, losses: 0, ties: 0, roundsFor: 0, roundsAgainst: 0 },
+  };
+
+  GROUP_STAGE.rounds.forEach((round) => {
+    round.matches.forEach((match) => {
+      const homeScore = match.homeScore;
+      const awayScore = match.awayScore;
+
+      standings[match.home].roundsFor += homeScore;
+      standings[match.home].roundsAgainst += awayScore;
+      standings[match.away].roundsFor += awayScore;
+      standings[match.away].roundsAgainst += homeScore;
+
+      if (homeScore > awayScore) {
+        standings[match.home].wins++;
+        standings[match.away].losses++;
+      } else if (awayScore > homeScore) {
+        standings[match.away].wins++;
+        standings[match.home].losses++;
+      } else {
+        standings[match.home].ties++;
+        standings[match.away].ties++;
+      }
+    });
+  });
+
+  return Object.entries(standings)
+    .map(([team, stats]) => ({ team, ...stats, points: stats.wins * 3 + stats.ties }))
+    .sort((a, b) => b.points - a.points || (b.roundsFor - b.roundsAgainst) - (a.roundsFor - a.roundsAgainst));
 };
 
 const MAP_POOL = [
@@ -152,6 +201,42 @@ const PlayerName = ({ player }: { player: Player }) => {
     );
   }
   return <span>{player.name}</span>;
+};
+
+// Session popover component for clicking on matches
+const SessionPopover = ({
+  sessionIds,
+  children
+}: {
+  sessionIds: string[];
+  children: React.ReactNode;
+}) => {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <div className="cursor-pointer">
+          {children}
+        </div>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-[420px] max-h-[500px] overflow-y-auto bg-gray-800 border border-cyan-500/50 shadow-2xl shadow-cyan-500/20 p-0"
+        align="center"
+        sideOffset={8}
+      >
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-white font-bold text-sm flex items-center gap-2">
+              <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Match Statistics
+            </h3>
+          </div>
+          <SessionContent sessionIds={sessionIds} compact />
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 };
 
 const WinterChampionship = () => {
@@ -307,32 +392,112 @@ const WinterChampionship = () => {
                       <span className="text-xs text-gray-400 px-2 py-1 bg-gray-700 rounded-full">{round.mapType}</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {round.matches.map((match, matchIdx) => (
-                        <div key={matchIdx} className="bg-gray-800 rounded-lg p-3 border border-gray-600">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 flex-1">
-                              <div className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${getTeamColor(match.home)}`}></div>
-                              <span className="text-gray-200 text-sm font-medium">{match.home}</span>
-                              <span className="text-green-400 text-[10px] px-1.5 py-0.5 bg-green-400/10 rounded">H</span>
+                      {round.matches.map((match, matchIdx) => {
+                        const homeWon = match.homeScore > match.awayScore;
+                        const awayWon = match.awayScore > match.homeScore;
+                        const isTie = match.homeScore === match.awayScore;
+                        const drawsText = 'draws' in match && match.draws ? `-${match.draws}` : '';
+                        const hasSessionData = 'sessionIds' in match && match.sessionIds && match.sessionIds.length > 0;
+
+                        const matchCard = (
+                          <div className={`bg-gray-800 rounded-lg p-3 border ${isTie ? 'border-yellow-500/50' : 'border-gray-600'} ${hasSessionData ? 'hover:border-cyan-500/50 transition-colors' : ''}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 flex-1">
+                                <div className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${getTeamColor(match.home)}`}></div>
+                                <span className={`text-sm font-medium ${homeWon ? 'text-green-400' : isTie ? 'text-yellow-400' : 'text-gray-400'}`}>{match.home}</span>
+                              </div>
+                              <div className="flex items-center gap-1 px-3">
+                                <span className={`text-lg font-bold ${homeWon ? 'text-green-400' : isTie ? 'text-yellow-400' : 'text-gray-400'}`}>{match.homeScore}</span>
+                                <span className="text-gray-500 text-sm">-</span>
+                                <span className={`text-lg font-bold ${awayWon ? 'text-green-400' : isTie ? 'text-yellow-400' : 'text-gray-400'}`}>{match.awayScore}{drawsText}</span>
+                              </div>
+                              <div className="flex items-center gap-2 flex-1 justify-end">
+                                <span className={`text-sm font-medium ${awayWon ? 'text-green-400' : isTie ? 'text-yellow-400' : 'text-gray-400'}`}>{match.away}</span>
+                                <div className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${getTeamColor(match.away)}`}></div>
+                              </div>
                             </div>
-                            <span className="text-gray-500 text-xs px-2">vs</span>
-                            <div className="flex items-center gap-2 flex-1 justify-end">
-                              <span className="text-orange-400 text-[10px] px-1.5 py-0.5 bg-orange-400/10 rounded">A</span>
-                              <span className="text-gray-200 text-sm font-medium">{match.away}</span>
-                              <div className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${getTeamColor(match.away)}`}></div>
+                            <div className="mt-2 pt-2 border-t border-gray-700 flex items-center justify-center gap-2">
+                              <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                              </svg>
+                              <span className="text-gray-400 text-xs">{match.map}</span>
                             </div>
                           </div>
-                          <div className="mt-2 pt-2 border-t border-gray-700 flex items-center justify-center gap-2">
-                            <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                            </svg>
-                            <span className="text-gray-400 text-xs">{match.map}</span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+
+                        return hasSessionData ? (
+                          <SessionPopover key={matchIdx} sessionIds={match.sessionIds as string[]}>
+                            {matchCard}
+                          </SessionPopover>
+                        ) : (
+                          <div key={matchIdx}>{matchCard}</div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
+
+                {/* Standings Table */}
+                <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 mt-4">
+                  <h4 className="text-white font-semibold mb-3 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Final Standings
+                  </h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-gray-400 text-xs uppercase border-b border-gray-700">
+                          <th className="text-left py-2 px-2">#</th>
+                          <th className="text-left py-2 px-2">Team</th>
+                          <th className="text-center py-2 px-2">W</th>
+                          <th className="text-center py-2 px-2">L</th>
+                          <th className="text-center py-2 px-2">T</th>
+                          <th className="text-center py-2 px-2">Pts</th>
+                          <th className="text-center py-2 px-2">+/-</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {calculateStandings().map((team, idx) => {
+                          const teamData = TEAMS.find(t => t.name === team.team);
+                          const isQualified = idx < 2;
+                          return (
+                            <tr key={team.team} className={`border-b border-gray-700/50 ${isQualified ? 'bg-cyan-500/10' : ''}`}>
+                              <td className="py-2 px-2">
+                                <span className={`${idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-cyan-400' : 'text-gray-500'} font-bold`}>
+                                  {idx + 1}
+                                </span>
+                              </td>
+                              <td className="py-2 px-2">
+                                <div className="flex items-center gap-2">
+                                  {teamData && (
+                                    <Image src={teamData.image} alt={team.team} width={20} height={20} className="rounded" />
+                                  )}
+                                  <span className={`font-medium ${isQualified ? 'text-white' : 'text-gray-400'}`}>{team.team}</span>
+                                  {isQualified && (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${idx === 0 ? 'bg-amber-400/20 text-amber-400' : 'bg-cyan-400/20 text-cyan-400'}`}>
+                                      {idx === 0 ? '1st' : '2nd'}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="text-center py-2 px-2 text-green-400 font-medium">{team.wins}</td>
+                              <td className="text-center py-2 px-2 text-red-400 font-medium">{team.losses}</td>
+                              <td className="text-center py-2 px-2 text-yellow-400 font-medium">{team.ties}</td>
+                              <td className="text-center py-2 px-2 text-white font-bold">{team.points}</td>
+                              <td className="text-center py-2 px-2">
+                                <span className={team.roundsFor - team.roundsAgainst >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                  {team.roundsFor - team.roundsAgainst >= 0 ? '+' : ''}{team.roundsFor - team.roundsAgainst}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -358,98 +523,95 @@ const WinterChampionship = () => {
               Finals Bracket
             </h3>
 
-            <div className="bg-gray-900 border border-amber-500/30 rounded-xl p-4 sm:p-6 overflow-x-auto">
-              <div className="min-w-[500px]">
-                {/* Finals Bracket Visualization */}
-                <div className="flex items-center justify-center gap-4">
-                  {/* 1st Seed */}
-                  <div className="flex-1 max-w-[200px]">
-                    <div className="text-center mb-2">
-                      <span className="text-xs text-amber-400 uppercase tracking-wider font-semibold">1st Seed</span>
-                    </div>
-                    <div className="bg-gradient-to-r from-amber-500 to-yellow-600 p-0.5 rounded-lg">
-                      <div className="bg-gray-800 rounded-lg p-4 text-center">
-                        <div className="flex justify-center gap-1 mb-2">
-                          {TEAMS.map((team, idx) => (
-                            <Image key={idx} src={team.image} alt={team.name} width={24} height={24} className="rounded opacity-40" />
-                          ))}
+            <SessionPopover sessionIds={["185.150.189.120:1787_1767488427"]}>
+              <div className="bg-gray-900 border border-amber-500/30 rounded-xl p-4 sm:p-6 overflow-x-auto hover:border-amber-400/60 transition-colors">
+                <div className="min-w-[500px]">
+                  {/* Finals Bracket Visualization */}
+                  <div className="flex items-center justify-center gap-4">
+                    {/* 1st Seed - NX */}
+                    <div className="flex-1 max-w-[200px]">
+                      <div className="text-center mb-2">
+                        <span className="text-xs text-amber-400 uppercase tracking-wider font-semibold">1st Seed</span>
+                      </div>
+                      <div className="bg-gradient-to-r from-amber-500 to-yellow-600 p-0.5 rounded-lg">
+                        <div className="bg-gray-800 rounded-lg p-4 text-center">
+                          <div className="flex justify-center mb-2">
+                            <Image src="/nx.png" alt="Next Level" width={48} height={48} className="rounded" />
+                          </div>
+                          <div className="text-amber-400 font-bold text-sm">Next Level</div>
+                          <div className="text-green-400 text-lg font-bold">{FINALS.score1}</div>
                         </div>
-                        <div className="text-amber-400 font-bold text-sm">TBD</div>
-                        <div className="text-gray-500 text-xs mt-1">Top ranked team</div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Connector Lines and VS */}
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-8 h-px bg-gradient-to-r from-amber-500 to-amber-500"></div>
-                    <div className="relative">
-                      <div className="absolute -left-4 top-1/2 w-4 h-px bg-amber-500"></div>
-                      <div className="absolute -right-4 top-1/2 w-4 h-px bg-cyan-500"></div>
-                      <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-0.5 rounded-xl">
-                        <div className="bg-gray-900 rounded-xl px-6 py-4 text-center">
-                          <svg className="w-6 h-6 text-amber-400 mx-auto mb-1" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                          </svg>
-                          <div className="text-amber-400 font-bold text-lg">FINALS</div>
-                          <div className="text-gray-400 text-xs mt-1">Best of 14</div>
+                    {/* Connector Lines and VS */}
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-8 h-px bg-gradient-to-r from-amber-500 to-amber-500"></div>
+                      <div className="relative">
+                        <div className="absolute -left-4 top-1/2 w-4 h-px bg-amber-500"></div>
+                        <div className="absolute -right-4 top-1/2 w-4 h-px bg-cyan-500"></div>
+                        <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-0.5 rounded-xl">
+                          <div className="bg-gray-900 rounded-xl px-6 py-4 text-center">
+                            <svg className="w-6 h-6 text-amber-400 mx-auto mb-1" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                            <div className="text-amber-400 font-bold text-lg">FINALS</div>
+                            <div className="text-gray-400 text-xs mt-1">{FINALS.map}</div>
+                          </div>
                         </div>
                       </div>
+                      <div className="w-8 h-px bg-gradient-to-r from-amber-500 to-cyan-500"></div>
                     </div>
-                    <div className="w-8 h-px bg-gradient-to-r from-amber-500 to-cyan-500"></div>
-                  </div>
 
-                  {/* 2nd Seed */}
-                  <div className="flex-1 max-w-[200px]">
-                    <div className="text-center mb-2">
-                      <span className="text-xs text-cyan-400 uppercase tracking-wider font-semibold">2nd Seed</span>
-                    </div>
-                    <div className="bg-gradient-to-r from-cyan-500 to-blue-600 p-0.5 rounded-lg">
-                      <div className="bg-gray-800 rounded-lg p-4 text-center">
-                        <div className="flex justify-center gap-1 mb-2">
-                          {TEAMS.map((team, idx) => (
-                            <Image key={idx} src={team.image} alt={team.name} width={24} height={24} className="rounded opacity-40" />
-                          ))}
+                    {/* 2nd Seed - Ataxia */}
+                    <div className="flex-1 max-w-[200px]">
+                      <div className="text-center mb-2">
+                        <span className="text-xs text-cyan-400 uppercase tracking-wider font-semibold">2nd Seed</span>
+                      </div>
+                      <div className="bg-gradient-to-r from-cyan-500 to-blue-600 p-0.5 rounded-lg">
+                        <div className="bg-gray-800 rounded-lg p-4 text-center">
+                          <div className="flex justify-center mb-2">
+                            <Image src="/ataxia.png" alt="Ataxia" width={48} height={48} className="rounded" />
+                          </div>
+                          <div className="text-cyan-400 font-bold text-sm">Ataxia</div>
+                          <div className="text-gray-400 text-lg font-bold">{FINALS.score2}</div>
                         </div>
-                        <div className="text-cyan-400 font-bold text-sm">TBD</div>
-                        <div className="text-gray-500 text-xs mt-1">2nd ranked team</div>
                       </div>
                     </div>
                   </div>
-                </div>
 
                 {/* Tournament Flow Arrow */}
                 <div className="flex justify-center mt-6">
                   <div className="flex flex-col items-center">
-                    <svg className="w-5 h-5 text-amber-500 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                     </svg>
                   </div>
                 </div>
 
-                {/* Champion */}
+                  {/* Champion - NX */}
                 <div className="flex justify-center mt-4">
                   <div className="bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400 p-0.5 rounded-xl">
                     <div className="bg-gray-900 rounded-xl px-8 py-4 text-center">
                       <div className="flex justify-center mb-2">
                         <div className="relative">
-                          <svg className="w-10 h-10 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M5 3h14a2 2 0 012 2v4a8 8 0 01-8 8 8 8 0 01-8-8V5a2 2 0 012-2zm7 18v-4m-4 6h8" />
-                          </svg>
-                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full flex items-center justify-center">
-                            <svg className="w-2.5 h-2.5 text-gray-900" fill="currentColor" viewBox="0 0 24 24">
+                            <Image src="/nx.png" alt="Next Level" width={64} height={64} className="rounded-lg" />
+                            <div className="absolute -top-2 -right-2 w-6 h-6 bg-amber-400 rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-gray-900" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                             </svg>
                           </div>
                         </div>
                       </div>
-                      <div className="text-amber-400 font-bold text-xl">CHAMPION</div>
+                        <div className="text-amber-400 font-bold text-xl">🏆 CHAMPION</div>
+                        <div className="text-blue-400 font-bold text-lg">Next Level</div>
                       <div className="text-gray-400 text-xs mt-1">Winter 2025</div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+            </SessionPopover>
 
             {/* Finals Info */}
             <div className="mt-6 bg-gradient-to-r from-amber-500/5 via-yellow-500/10 to-amber-500/5 border border-amber-500/20 rounded-xl p-5">
