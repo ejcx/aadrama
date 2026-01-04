@@ -244,6 +244,60 @@ const WinterChampionship = () => {
     <SidebarLayout>
       <div className="flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 py-6 sm:py-12">
         <div className="flex flex-col items-start space-y-8 sm:space-y-12 w-full max-w-5xl">
+          {/* Champion Banner */}
+          <div className="w-full">
+            <div className="relative overflow-hidden bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 rounded-2xl p-[2px] shadow-2xl shadow-amber-500/30">
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 opacity-50 animate-pulse"></div>
+              <div className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl px-6 py-6 sm:py-8">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
+                  {/* Trophy */}
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-amber-400 rounded-full blur-xl opacity-40 animate-pulse"></div>
+                    <div className="relative bg-gradient-to-br from-amber-400 to-yellow-600 p-4 rounded-full">
+                      <svg className="w-10 h-10 sm:w-12 sm:h-12 text-gray-900" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Champion Text */}
+                  <div className="text-center">
+                    <div className="text-amber-400 text-xs sm:text-sm font-bold uppercase tracking-[0.2em] mb-1">
+                      🏆 Winter 2025 Champions 🏆
+                    </div>
+                    <div className="flex items-center justify-center gap-3">
+                      <Image
+                        src="/nx.png"
+                        alt="Next Level"
+                        width={48}
+                        height={48}
+                        className="rounded-lg border-2 border-amber-500/50"
+                      />
+                      <div className="text-center sm:text-left">
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-500 bg-clip-text text-transparent">
+                          NEXT LEVEL
+                        </h2>
+                        <div className="text-gray-400 text-xs sm:text-sm">
+                          Finals: 8-2 vs Ataxia
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Trophy (right side, hidden on mobile) */}
+                  <div className="relative hidden sm:block">
+                    <div className="absolute inset-0 bg-amber-400 rounded-full blur-xl opacity-40 animate-pulse"></div>
+                    <div className="relative bg-gradient-to-br from-amber-400 to-yellow-600 p-4 rounded-full">
+                      <svg className="w-10 h-10 sm:w-12 sm:h-12 text-gray-900" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Header with Logo */}
           <div className="w-full text-center">
             <div className="flex justify-center mb-6">
@@ -260,7 +314,7 @@ const WinterChampionship = () => {
                 WINTER 2025
               </span>
             </div>
-            <h1 className="text-white text-3xl sm:text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
               Americas Army 2.5
             </h1>
             <h2 className="text-white text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
