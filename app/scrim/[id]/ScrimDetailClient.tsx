@@ -80,6 +80,7 @@ export default function ScrimDetailClient() {
   const params = useParams();
   const scrimId = params.id as string;
   const { user } = useUser();
+  const supabase = useMemo(() => createClient(), []);
 
   const [scrim, setScrim] = useState<ScrimWithCounts | null>(null);
   const [players, setPlayers] = useState<ScrimPlayer[]>([]);
@@ -113,23 +114,36 @@ export default function ScrimDetailClient() {
 
   async function loadScrimData() {
     try {
-      const [scrimData, playersData] = await Promise.all([
-        getScrim(scrimId),
-        getScrimPlayers(scrimId),
+      // Use browser client for read operations (edge runtime compatible)
+      const [scrimRes, playersRes] = await Promise.all([
+        supabase
+          .from('scrims_with_counts')
+          .select('*')
+          .eq('id', scrimId)
+          .single(),
+        supabase
+          .from('scrim_players')
+          .select('*')
+          .eq('scrim_id', scrimId)
+          .order('joined_at', { ascending: true }),
       ]);
 
-      if (!scrimData) {
+      if (scrimRes.error || !scrimRes.data) {
         setError("Scrim not found");
         return;
       }
 
+      const scrimData = scrimRes.data as ScrimWithCounts;
       setScrim(scrimData);
-      setPlayers(playersData);
+      setPlayers(playersRes.data || []);
 
       // Load score submissions if in scoring phase
       if (scrimData.status === "scoring" || scrimData.status === "finalized") {
-        const submissions = await getScoreSubmissions(scrimId);
-        setScoreSubmissions(submissions);
+        const { data: submissions } = await supabase
+          .from('scrim_score_submissions')
+          .select('*')
+          .eq('scrim_id', scrimId);
+        setScoreSubmissions(submissions || []);
       }
       
       // Load session stats if tracker link is set
