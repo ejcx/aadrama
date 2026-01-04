@@ -256,10 +256,10 @@ const SessionDetailClient = () => {
     }
     
     // Get unique IPs
-    const uniqueIPs = [...new Set(sessions.map(s => s.server_ip).filter(Boolean))];
+    const uniqueIPs = Array.from(new Set(sessions.map(s => s.server_ip).filter((ip): ip is string => Boolean(ip))));
     
     // Get unique maps
-    const uniqueMaps = [...new Set(sessions.map(s => s.map).filter(Boolean))];
+    const uniqueMaps = Array.from(new Set(sessions.map(s => s.map).filter((m): m is string => Boolean(m))));
     
     // Get total unique players across all sessions
     const allPlayerNames = new Set<string>();
