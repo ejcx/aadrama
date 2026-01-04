@@ -9,6 +9,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 interface Player {
   name: string;
   tracker?: string; // tracker profile path (without /tracker/player/)
+  scratched?: boolean; // player was scratched/couldn't play
+  replacement?: string; // name of replacement player
+  replacementTracker?: string; // tracker profile for replacement player
 }
 
 // Team constants with player profiles
@@ -19,7 +22,7 @@ const TEAMS = [
     color: "from-blue-600 to-blue-800",
     image: "/nx.png",
     players: [
-      { name: "method", tracker: "nx.method;" },
+      { name: "method", tracker: "nx.method;", scratched: true, replacement: ".YOshii^", replacementTracker: ".YOshii^" },
       { name: "budd", tracker: "nx.budd;" },
       { name: "intensity", tracker: "intensity-" },
       { name: "TuhMat3r", tracker: "TuhMat3r" },
@@ -190,6 +193,33 @@ const getTeamColor = (teamName: string) => {
 
 // Player name component with optional link
 const PlayerName = ({ player }: { player: Player }) => {
+  if (player.scratched) {
+    return (
+      <span className="flex items-center gap-2">
+        {player.tracker ? (
+          <Link
+            href={`/tracker/player/${encodeURIComponent(player.tracker)}`}
+            className="line-through text-gray-500 hover:text-gray-400 hover:underline transition-colors"
+          >
+            {player.name}
+          </Link>
+        ) : (
+          <span className="line-through text-gray-500">{player.name}</span>
+        )}
+        <span className="text-gray-500">→</span>
+        {player.replacementTracker ? (
+          <Link
+            href={`/tracker/player/${encodeURIComponent(player.replacementTracker)}`}
+            className="text-green-400 hover:text-green-300 hover:underline transition-colors"
+          >
+            {player.replacement}
+          </Link>
+        ) : (
+          <span className="text-green-400">{player.replacement}</span>
+        )}
+      </span>
+    );
+  }
   if (player.tracker) {
     return (
       <Link
