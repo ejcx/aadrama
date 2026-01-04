@@ -195,6 +195,19 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
                 Tracker
               </a>
             </div>
+            <div>
+              <a
+                href="/scrim"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 text-left transition-colors font-semibold text-sm py-2 lg:py-0 ${pathname === '/scrim' || pathname?.startsWith('/scrim/') ? 'text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+              >
+                Scrim
+                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-purple-600 text-purple-100 rounded">
+                  BETA
+                </span>
+              </a>
+            </div>
             <div className="pt-4 mt-4 border-t border-gray-700">
               <a
                 href="/2025-winter-classic"
