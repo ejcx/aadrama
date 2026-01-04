@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import TrackerLayout from "../TrackerLayout";
+import { SessionHoverPopover } from "../../components/SessionHoverPopover";
 
 const API_BASE = "https://server-details.ej.workers.dev";
 
@@ -270,12 +271,10 @@ const SessionsPage = () => {
                         />
                       </td>
                       <td className="py-2 sm:py-3 px-2 sm:px-4" onClick={(e) => e.stopPropagation()}>
-                        <Link
-                          href={`/tracker/session/${encodeURIComponent(session.session_id)}`}
+                        <SessionHoverPopover
+                          session={session}
                           className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs truncate block max-w-[100px] sm:max-w-none"
-                        >
-                          {session.session_id}
-                        </Link>
+                        />
                       </td>
                       <td className="py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">
                         {formatDate(session.time_started)}

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import SidebarLayout from "../../../components/SidebarLayout";
 import Link from "next/link";
+import { SessionHoverPopover } from "../../../components/SessionHoverPopover";
 
 const API_BASE = "https://server-details.ej.workers.dev";
 
@@ -446,12 +447,10 @@ const PlayerDetailClient = () => {
                                 />
                               </td>
                               <td className="py-2 sm:py-3 px-2 sm:px-4" onClick={(e) => e.stopPropagation()}>
-                                <Link
-                                  href={`/tracker/session/${session.session_id}`}
+                                <SessionHoverPopover
+                                  session={session}
                                   className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs truncate block max-w-[120px] sm:max-w-none"
-                                >
-                                  {session.session_id}
-                                </Link>
+                                />
                               </td>
                               <td className="py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">{formatDate(session.time_started)}</td>
                               <td className="py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">{session.time_finished ? formatDate(session.time_finished) : "Active"}</td>
