@@ -13,11 +13,10 @@ import {
   endGame,
   submitScore,
   cancelScrim,
-  setTrackerSessionId,
-  getSessionStats,
-  type SessionStats,
+    setTrackerSessionId,
 } from "../actions";
 import type { ScrimWithCounts, ScrimPlayer, ScrimScoreSubmission } from "@/lib/supabase/types";
+import { SessionContent } from "../../tracker/session/SessionContent";
 
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
@@ -84,8 +83,7 @@ export default function ScrimDetailClient() {
 
   const [scrim, setScrim] = useState<ScrimWithCounts | null>(null);
   const [players, setPlayers] = useState<ScrimPlayer[]>([]);
-  const [scoreSubmissions, setScoreSubmissions] = useState<ScrimScoreSubmission[]>([]);
-  const [sessionStats, setSessionStats] = useState<SessionStats[]>([]);
+    const [scoreSubmissions, setScoreSubmissions] = useState<ScrimScoreSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -144,16 +142,6 @@ export default function ScrimDetailClient() {
           .select('*')
           .eq('scrim_id', scrimId);
         setScoreSubmissions(submissions || []);
-      }
-      
-      // Load session stats if tracker link is set
-      if (scrimData.tracker_session_id) {
-        try {
-          const stats = await getSessionStats(scrimData.tracker_session_id);
-          setSessionStats(stats);
-        } catch (err) {
-          console.error("Failed to load session stats:", err);
-        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load scrim");
@@ -248,8 +236,8 @@ export default function ScrimDetailClient() {
         )}
 
         {/* Session Stats */}
-        {scrim.tracker_session_id && sessionStats.length > 0 && (
-          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 mb-6">
+              {scrim.tracker_session_id && (
+                  <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-white text-xl font-semibold">📊 Game Stats</h2>
               <Link
@@ -259,104 +247,13 @@ export default function ScrimDetailClient() {
                 View Full Details →
               </Link>
             </div>
-            
-            {/* Aggregate Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-              <div className="bg-gray-800 rounded-lg p-3 text-center">
-                <div className="text-gray-400 text-xs mb-1">Total Kills</div>
-                <div className="text-green-400 text-2xl font-bold">
-                  {sessionStats.reduce((sum, s) => sum + s.total_kills, 0)}
-                </div>
-              </div>
-              <div className="bg-gray-800 rounded-lg p-3 text-center">
-                <div className="text-gray-400 text-xs mb-1">Total Deaths</div>
-                <div className="text-red-400 text-2xl font-bold">
-                  {sessionStats.reduce((sum, s) => sum + s.total_deaths, 0)}
-                </div>
-              </div>
-              <div className="bg-gray-800 rounded-lg p-3 text-center">
-                <div className="text-gray-400 text-xs mb-1">Players</div>
-                <div className="text-white text-2xl font-bold">
-                  {new Set(sessionStats.flatMap(s => s.players.map(p => p.name))).size}
-                </div>
-              </div>
-              <div className="bg-gray-800 rounded-lg p-3 text-center">
-                <div className="text-gray-400 text-xs mb-1">Duration</div>
-                <div className="text-white text-2xl font-bold">
-                  {(() => {
-                    const totalSecs = sessionStats.reduce((sum, s) => sum + (s.duration || 0), 0);
-                    const mins = Math.floor(totalSecs / 60);
-                    return `${mins}m`;
-                  })()}
-                </div>
-              </div>
-            </div>
-            
-            {/* Player Leaderboard */}
-            <h3 className="text-gray-300 font-medium mb-2">Player Stats</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-700 text-gray-400">
-                    <th className="text-left py-2 px-2">Player</th>
-                    <th className="text-center py-2 px-2">Kills</th>
-                    <th className="text-center py-2 px-2">Deaths</th>
-                    <th className="text-center py-2 px-2">K/D</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    // Aggregate player stats across all sessions
-                    const playerMap = new Map<string, { kills: number; deaths: number }>();
-                    sessionStats.forEach(s => {
-                      s.players.forEach(p => {
-                        const existing = playerMap.get(p.name) || { kills: 0, deaths: 0 };
-                        playerMap.set(p.name, {
-                          kills: existing.kills + p.kills,
-                          deaths: existing.deaths + p.deaths,
-                        });
-                      });
-                    });
-                    
-                    return Array.from(playerMap.entries())
-                      .sort((a, b) => b[1].kills - a[1].kills)
-                      .slice(0, 16)
-                      .map(([name, stats]) => (
-                        <tr key={name} className="border-b border-gray-800 hover:bg-gray-800">
-                          <td className="py-2 px-2">
-                            <Link 
-                              href={`/tracker/player/${encodeURIComponent(name)}`}
-                              className="text-blue-400 hover:text-blue-300 hover:underline"
-                            >
-                              {name}
-                            </Link>
-                          </td>
-                          <td className="text-center py-2 px-2 text-green-400">{stats.kills}</td>
-                          <td className="text-center py-2 px-2 text-red-400">{stats.deaths}</td>
-                          <td className="text-center py-2 px-2 text-gray-300">
-                            {stats.deaths > 0 ? (stats.kills / stats.deaths).toFixed(2) : stats.kills > 0 ? '∞' : '0.00'}
-                          </td>
-                        </tr>
-                      ));
-                  })()}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-        
-        {/* Tracker Link (no stats yet) */}
-        {scrim.tracker_session_id && sessionStats.length === 0 && (
-          <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
-            <div className="flex items-center gap-3">
-              <span className="text-blue-400">📊 Game Stats:</span>
-              <Link
-                href={`/tracker/session/${scrim.tracker_session_id}`}
-                className="text-blue-300 hover:text-blue-200 hover:underline"
-              >
-                View Full Session Details →
-              </Link>
-            </div>
+                      <SessionContent
+                          sessionIds={(() => {
+                              // Decode URL encoding first, then split by + or other delimiters
+                              const decoded = decodeURIComponent(scrim.tracker_session_id);
+                              return decoded.split(/[+~\s]+/).filter(id => id.trim());
+                          })()}
+                      />
           </div>
         )}
 

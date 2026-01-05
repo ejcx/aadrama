@@ -59,7 +59,7 @@ export const SessionContent = ({ sessionIds, compact = false }: SessionContentPr
         
         const sessionPromises = sessionIds.map(async (id) => {
           try {
-            const response = await fetch(`${API_BASE}/sessions/${encodeURIComponent(id)}`);
+            const response = await fetch(`${API_BASE}/sessions/${id}`);
             const data = await response.json();
             if (data && !data.error) {
               return data as Session;
@@ -101,7 +101,7 @@ export const SessionContent = ({ sessionIds, compact = false }: SessionContentPr
       
       await Promise.all(sessionIds.map(async (id) => {
         try {
-          const response = await fetch(`${API_BASE}/sessions/${encodeURIComponent(id)}/players`);
+          const response = await fetch(`${API_BASE}/sessions/${id}/players`);
           const data = await response.json();
           
           let players: SessionPlayer[] = [];
@@ -133,7 +133,7 @@ export const SessionContent = ({ sessionIds, compact = false }: SessionContentPr
       
       await Promise.all(sessionIds.map(async (id) => {
         try {
-          const response = await fetch(`${API_BASE}/analytics/sessions/${encodeURIComponent(id)}`);
+          const response = await fetch(`${API_BASE}/analytics/sessions/${id}`);
           const data = await response.json();
           
           if (data && !data.error) {
