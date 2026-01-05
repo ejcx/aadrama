@@ -14,6 +14,9 @@ import {
   submitScore,
   cancelScrim,
     setTrackerSessionId,
+    retryEloProcessing,
+    debugEloValidation,
+    setScrimRanked,
 } from "../actions";
 import type { ScrimWithCounts, ScrimPlayer, ScrimScoreSubmission } from "@/lib/supabase/types";
 import { SessionContent } from "../../tracker/session/SessionContent";
@@ -86,6 +89,19 @@ export default function ScrimDetailClient() {
     const [scoreSubmissions, setScoreSubmissions] = useState<ScrimScoreSubmission[]>([]);
     const [eloChanges, setEloChanges] = useState<Map<string, { change: number; newElo: number }>>(new Map());
     const [userGameNames, setUserGameNames] = useState<Map<string, string>>(new Map()); // userId -> gameNameLower
+    const [eloDebugInfo, setEloDebugInfo] = useState<{
+        sessionPlayers: string[]
+        sessionPlayersLower: string[]
+        playerMatches: Array<{
+            userName: string
+            gameNameLower: string | null
+            sessionPlayerName: string | null
+            matched: boolean
+        }>
+        errors: string[]
+        scrimPlayerUserIds: Array<{ userName: string; userNameLower: string; odUserId: string }>
+        linkedGameNames: Array<{ odUserId: string; gameName: string; gameNameLower: string }>
+    } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -545,6 +561,179 @@ export default function ScrimDetailClient() {
               </div>
             </div>
           )}
+
+              {/* ELO Debug Section */}
+              {scrim.status === "finalized" && scrim.tracker_session_id && eloChanges.size === 0 && (
+                  <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-6 mb-6">
+                      <h2 className="text-yellow-400 text-xl font-semibold mb-2">⚠️ ELO Not Processed</h2>
+                      <p className="text-gray-400 text-sm mb-4">
+                          This ranked scrim has a linked session but ELO wasn't calculated.
+                          This usually means player names didn't match between the scrim and the tracker session.
+                      </p>
+
+                      <button
+                          onClick={async () => {
+                              const result = await debugEloValidation(scrimId);
+                              setEloDebugInfo({
+                                  sessionPlayers: result.sessionPlayers,
+                                  sessionPlayersLower: result.sessionPlayersLower || [],
+                                  playerMatches: result.validation?.playerMatches.map(pm => ({
+                                      userName: pm.userName,
+                                      gameNameLower: pm.gameNameLower,
+                                      sessionPlayerName: pm.sessionPlayerName,
+                                      matched: pm.matched,
+                                  })) || [],
+                                  errors: result.validation?.errors || [],
+                                  scrimPlayerUserIds: result.scrimPlayerUserIds || [],
+                                  linkedGameNames: result.linkedGameNames || [],
+                              });
+                          }}
+                          className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg font-medium mb-4"
+                      >
+                          Debug Player Matching
+                      </button>
+
+                      {eloDebugInfo && (
+                          <div className="mt-4 space-y-4">
+                              {eloDebugInfo.errors.length > 0 && (
+                                  <div className="bg-red-900/30 border border-red-700 rounded p-3">
+                                      <h3 className="text-red-400 font-medium mb-1">Errors:</h3>
+                                      <ul className="text-red-300 text-sm list-disc list-inside">
+                                          {eloDebugInfo.errors.map((e, i) => <li key={i}>{e}</li>)}
+                                      </ul>
+                                  </div>
+                              )}
+
+                              <div className="bg-gray-800 rounded p-3">
+                                  <h3 className="text-gray-300 font-medium mb-2">Session Players (from tracker):</h3>
+                                  <div className="text-xs text-gray-500 mb-2">
+                                      Tracker Session ID: <code className="text-blue-400">{scrim.tracker_session_id}</code>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2 mb-2">
+                                      {eloDebugInfo.sessionPlayers.length > 0 ? (
+                                          eloDebugInfo.sessionPlayers.map((name, i) => (
+                                              <span key={i} className="px-2 py-1 bg-gray-700 text-gray-200 text-sm rounded">
+                                                  {name}
+                                              </span>
+                                          ))
+                                      ) : (
+                                          <span className="text-red-400 text-sm">⚠️ No players found in session! Check if the session ID is correct.</span>
+                                      )}
+                                  </div>
+                                  {eloDebugInfo.sessionPlayersLower.length > 0 && (
+                                      <div className="text-xs text-gray-500">
+                                          Lowercased for matching: {eloDebugInfo.sessionPlayersLower.join(', ')}
+                                      </div>
+                                  )}
+                              </div>
+
+                              <div className="bg-gray-800 rounded p-3">
+                                  <h3 className="text-gray-300 font-medium mb-2">Linked Game Names (from user_game_names table):</h3>
+                                  {eloDebugInfo.linkedGameNames.length > 0 ? (
+                                      <div className="space-y-1">
+                                          {eloDebugInfo.linkedGameNames.map((gn, i) => (
+                                              <div key={i} className="text-sm">
+                                                  <span className="text-blue-400">{gn.gameName}</span>
+                                                  <span className="text-gray-500"> ({gn.gameNameLower})</span>
+                                                  <span className="text-gray-600 text-xs ml-2">user: {gn.odUserId}</span>
+                                              </div>
+                                          ))}
+                                      </div>
+                                  ) : (
+                                      <span className="text-red-400 text-sm">⚠️ No linked game names found for any scrim players!</span>
+                                  )}
+                              </div>
+
+                              <div className="bg-gray-800 rounded p-3">
+                                  <h3 className="text-gray-300 font-medium mb-2">Scrim Players (with user IDs):</h3>
+                                  <div className="space-y-1">
+                                      {eloDebugInfo.scrimPlayerUserIds.map((p, i) => {
+                                          const matchesSession = eloDebugInfo.sessionPlayersLower.includes(p.userNameLower);
+                                          // Check if this player's user_id matches any linked game name
+                                          const hasLinkedName = eloDebugInfo.linkedGameNames.some(gn => gn.odUserId === p.odUserId);
+                                          return (
+                                              <div key={i} className="text-sm">
+                                                  <div className="flex items-center gap-2">
+                                                      <span className="text-white font-medium">{p.userName}</span>
+                                                      <span className="text-gray-600 text-xs">({p.odUserId})</span>
+                                                  </div>
+                                                  <div className="ml-4 text-xs text-gray-400">
+                                                      Has linked game name: <span className={hasLinkedName ? 'text-green-400' : 'text-red-400'}>{hasLinkedName ? 'YES' : 'NO'}</span>
+                                                  </div>
+                                              </div>
+                                          );
+                                      })}
+                                  </div>
+                              </div>
+
+                              <div className="bg-gray-800 rounded p-3">
+                                  <h3 className="text-gray-300 font-medium mb-2">Player Matching:</h3>
+                                  <div className="space-y-2">
+                                      {eloDebugInfo.playerMatches.map((pm, i) => (
+                                          <div key={i} className={`p-2 rounded text-sm ${pm.matched ? 'bg-green-900/30 border border-green-700' : 'bg-red-900/30 border border-red-700'}`}>
+                                              <div className="flex items-center gap-2">
+                                                  <span className={pm.matched ? 'text-green-400' : 'text-red-400'}>
+                                                      {pm.matched ? '✓' : '✗'}
+                                                  </span>
+                                                  <span className="text-white font-medium">{pm.userName}</span>
+                                              </div>
+                                              <div className="ml-6 text-gray-400 text-xs">
+                                                  Linked game name: <span className={pm.gameNameLower ? 'text-blue-400' : 'text-gray-500'}>{pm.gameNameLower || 'none'}</span>
+                                                  {' → '}
+                                                  Matched: <span className={pm.sessionPlayerName ? 'text-green-400' : 'text-red-400'}>{pm.sessionPlayerName || 'no match'}</span>
+                                              </div>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+
+                              <div className="text-gray-400 text-sm space-y-3">
+                                  <p>
+                                      <strong>To fix:</strong> Players need to link their in-game name in their
+                                      <Link href="/account/game-names" className="text-blue-400 hover:underline ml-1">Account Settings</Link>.
+                                      The linked name must <em>exactly match</em> (case-insensitive) a player name from the tracker session.
+                                  </p>
+
+                                  {scrim.is_ranked === false && (
+                                      <div className="bg-red-900/30 border border-red-700 rounded p-3">
+                                          <p className="text-red-400 mb-2">⚠️ This scrim is marked as <strong>not ranked</strong>.</p>
+                                          <button
+                                              onClick={async () => {
+                                                  const result = await setScrimRanked(scrimId, true);
+                                                  if (result.success) {
+                                                      await loadScrimData();
+                                                  } else {
+                                                      alert(`Failed to mark as ranked: ${result.error}`);
+                                                  }
+                                              }}
+                                              disabled={isPending}
+                                              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-white rounded-lg font-medium"
+                                          >
+                                              Mark as Ranked
+                                          </button>
+                                      </div>
+                                  )}
+
+                                  <button
+                                      onClick={async () => {
+                                          const result = await retryEloProcessing(scrimId);
+                                          if (result.success) {
+                                              alert(`ELO processed for ${result.eloResult?.eloChanges?.length || 0} players!`);
+                                              await loadScrimData();
+                                          } else {
+                                              alert(`ELO processing failed: ${result.error || 'Unknown error'}`);
+                                          }
+                                      }}
+                                      disabled={isPending || scrim.is_ranked === false}
+                                      className="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded-lg font-medium"
+                                  >
+                                      Retry ELO Processing
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              )}
 
         {/* Share Link */}
         <div className="bg-gray-800 rounded-lg p-4 text-center">

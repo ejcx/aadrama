@@ -350,6 +350,21 @@ export async function setTrackerSessionId(scrimId: string, sessionId: string): P
   // Automatically process ELO for ranked scrims when session ID is added
   if (data.is_ranked && data.status === 'finalized' && !data.ranked_processed_at) {
     try {
+      // First log the validation state for debugging
+      const debugInfo = await debugEloValidation(scrimId)
+      console.log('=== ELO Debug Info ===')
+      console.log('Scrim:', debugInfo.scrim)
+      console.log('Session players from tracker:', debugInfo.sessionPlayers)
+      console.log('Validation errors:', debugInfo.validation?.errors)
+      console.log('Player matches:')
+      for (const pm of debugInfo.validation?.playerMatches || []) {
+        console.log(`  - ${pm.userName} (user_id: ${pm.userId.slice(0, 8)}...)`)
+        console.log(`    Linked game name: ${pm.gameNameLower || 'NONE'}`)
+        console.log(`    Matched to session player: ${pm.sessionPlayerName || 'NO MATCH'}`)
+        console.log(`    Matched: ${pm.matched}`)
+      }
+      console.log('======================')
+      
       const eloResult = await processRankedScrim(scrimId)
       if (eloResult.success) {
         console.log(`ELO processed for ${eloResult.eloChanges?.length || 0} players`)
@@ -388,14 +403,18 @@ const TRACKER_API = "https://server-details.ej.workers.dev"
 
 // Fetch session stats from tracker API
 export async function getSessionStats(sessionIds: string): Promise<SessionStats[]> {
+  // Decode URL encoding first (handles %3A -> : etc)
+  const decoded = decodeURIComponent(sessionIds)
+  
   // Parse session IDs (supports + delimited)
-  const ids = sessionIds.split(/[+~\s]+/).filter(id => id.trim())
+  const ids = decoded.split(/[+~\s]+/).filter(id => id.trim())
   
   const results: SessionStats[] = []
   
   for (const id of ids.slice(0, 8)) { // Max 8 sessions
     try {
       // Fetch session info and players in parallel
+      // Note: id is now decoded, so we need to encode it for the URL
       const [sessionRes, playersRes, analyticsRes] = await Promise.all([
         fetch(`${TRACKER_API}/sessions/${encodeURIComponent(id)}`),
         fetch(`${TRACKER_API}/sessions/${encodeURIComponent(id)}/players`),
@@ -595,7 +614,7 @@ export async function validateRankedScrim(scrimId: string): Promise<RankedValida
             userId: player.user_id,
             userName: player.user_name,
             team: player.team || 'unassigned',
-            gameNameLower: matchedGameName,
+            gameNameLower: linkedGameName || null, // The actual linked game name (or null if not linked)
             sessionPlayerName: sessionPlayer?.name || null,
             kills: sessionPlayer?.kills || null,
             deaths: sessionPlayer?.deaths || null,
@@ -632,9 +651,9 @@ export async function processRankedScrim(scrimId: string): Promise<{
     const scrim = await getScrim(scrimId)
     if (!scrim) return { success: false, error: 'Scrim not found' }
     
-    // Check if this is a ranked scrim
-    if (!scrim.is_ranked) {
-        return { success: false, error: 'This is not a ranked scrim' }
+    // Check if this is a ranked scrim (only block if explicitly set to false)
+    if (scrim.is_ranked === false) {
+        return { success: false, error: 'This scrim is explicitly marked as not ranked' }
     }
 
     // Check basic requirements
@@ -740,6 +759,163 @@ export async function processRankedScrim(scrimId: string): Promise<{
     revalidatePath(`/scrim/${scrimId}`)
 
     return { success: true, eloChanges }
+}
+
+// Mark a scrim as ranked (or unranked)
+export async function setScrimRanked(scrimId: string, isRanked: boolean): Promise<{ success: boolean; error?: string }> {
+    const supabase = await createClient()
+    
+    const { error } = await supabase
+        .from('scrims')
+        .update({ is_ranked: isRanked })
+        .eq('id', scrimId)
+    
+    if (error) {
+        return { success: false, error: error.message }
+    }
+    
+    revalidatePath('/scrim')
+    revalidatePath(`/scrim/${scrimId}`)
+    
+    return { success: true }
+}
+
+// Retry ELO processing for a scrim (clears ranked_processed_at first)
+export async function retryEloProcessing(scrimId: string): Promise<{
+    success: boolean
+    error?: string
+    debugInfo: Awaited<ReturnType<typeof debugEloValidation>>
+    eloResult?: Awaited<ReturnType<typeof processRankedScrim>>
+}> {
+    const supabase = await createClient()
+    
+    // Get debug info first
+    const debugInfo = await debugEloValidation(scrimId)
+    
+    console.log('=== RETRY ELO PROCESSING ===')
+    console.log('Scrim ID:', scrimId)
+    console.log('Session players from tracker:', debugInfo.sessionPlayers)
+    console.log('Validation errors:', debugInfo.validation?.errors)
+    console.log('Player matches:')
+    for (const pm of debugInfo.validation?.playerMatches || []) {
+        console.log(`  - ${pm.userName} (user_id: ${pm.userId.slice(0, 8)}...)`)
+        console.log(`    Linked game name: ${pm.gameNameLower || 'NONE'}`)
+        console.log(`    Matched to session player: ${pm.sessionPlayerName || 'NO MATCH'}`)
+        console.log(`    Matched: ${pm.matched}`)
+    }
+    
+    // Check if we can process
+    if (debugInfo.scrim?.is_ranked === false) {
+        console.log('Cannot process: scrim is explicitly marked as not ranked')
+        return { success: false, error: 'Scrim is marked as not ranked. Click "Mark as Ranked" first.', debugInfo }
+    }
+    
+    if (debugInfo.scrim?.status !== 'finalized') {
+        console.log('Cannot process: scrim is not finalized')
+        return { success: false, error: 'Scrim is not finalized', debugInfo }
+    }
+    
+    // Clear ranked_processed_at to allow re-processing
+    // BUT only if no ELO history exists (to avoid double-counting)
+    const { data: existingHistory } = await supabase
+        .from('elo_history')
+        .select('id')
+        .eq('scrim_id', scrimId)
+        .limit(1)
+    
+    if (existingHistory && existingHistory.length > 0) {
+        console.log('Cannot retry: ELO already processed (history exists)')
+        return { success: false, error: 'ELO already processed for this scrim', debugInfo }
+    }
+    
+    // Now process
+    const eloResult = await processRankedScrim(scrimId)
+    console.log('ELO result:', eloResult)
+    console.log('============================')
+    
+    revalidatePath('/scrim')
+    revalidatePath(`/scrim/${scrimId}`)
+    
+    return { success: eloResult.success, error: eloResult.error, debugInfo, eloResult }
+}
+
+// Debug function to see ELO validation results
+export async function debugEloValidation(scrimId: string): Promise<{
+    scrim: {
+        id: string
+        status: string
+        is_ranked: boolean
+        ranked_processed_at: string | null
+        tracker_session_id: string | null
+        team_a_score: number | null
+        team_b_score: number | null
+    } | null
+    validation: RankedValidationResult | null
+    sessionPlayers: string[]
+    sessionPlayersLower: string[]
+    scrimPlayerUserIds: Array<{ userName: string; userNameLower: string; odUserId: string }>
+    linkedGameNames: Array<{ odUserId: string; gameName: string; gameNameLower: string }>
+    error?: string
+}> {
+    const supabase = await createClient()
+    
+    // Get scrim details
+    const scrim = await getScrim(scrimId)
+    if (!scrim) {
+        return { scrim: null, validation: null, sessionPlayers: [], sessionPlayersLower: [], scrimPlayerUserIds: [], linkedGameNames: [], error: 'Scrim not found' }
+    }
+    
+    // Get session players if tracker session exists
+    let sessionPlayers: string[] = []
+    let sessionPlayersLower: string[] = []
+    if (scrim.tracker_session_id) {
+        const stats = await getSessionStats(scrim.tracker_session_id)
+        for (const s of stats) {
+            sessionPlayers.push(...s.players.map(p => p.name))
+            sessionPlayersLower.push(...s.players.map(p => p.name.toLowerCase()))
+        }
+    }
+    
+    // Get scrim players and their user IDs
+    const players = await getScrimPlayers(scrimId)
+    const scrimPlayerUserIds = players.map(p => ({ 
+        userName: p.user_name,
+        userNameLower: p.user_name.toLowerCase(),
+        odUserId: p.user_id.substring(0, 20) + '...' // Truncate for display
+    }))
+    
+    // Get linked game names for these users
+    const userIds = players.map(p => p.user_id)
+    const { data: gameNames } = await supabase
+        .from('user_game_names')
+        .select('user_id, game_name, game_name_lower')
+        .in('user_id', userIds)
+    
+    const linkedGameNames = (gameNames || []).map(gn => ({
+        odUserId: gn.user_id.substring(0, 20) + '...',
+        gameName: gn.game_name,
+        gameNameLower: gn.game_name_lower,
+    }))
+    
+    // Get validation
+    const validation = await validateRankedScrim(scrimId)
+    
+    return {
+        scrim: {
+            id: scrim.id,
+            status: scrim.status,
+            is_ranked: scrim.is_ranked || false,
+            ranked_processed_at: scrim.ranked_processed_at || null,
+            tracker_session_id: scrim.tracker_session_id || null,
+            team_a_score: scrim.team_a_score,
+            team_b_score: scrim.team_b_score,
+        },
+        validation,
+        sessionPlayers,
+        sessionPlayersLower,
+        scrimPlayerUserIds,
+        linkedGameNames,
+    }
 }
 
 // Get ranked status for a scrim

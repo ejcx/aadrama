@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import SidebarLayout from "../../../components/SidebarLayout";
 import Link from "next/link";
 import { SessionHoverPopover } from "../../../components/SessionHoverPopover";
+import { createClient } from "@/lib/supabase/client";
 
 const API_BASE = "https://server-details.ej.workers.dev";
 
@@ -34,6 +35,22 @@ interface MapStats {
   total_sessions: number;
 }
 
+interface PlayerEloData {
+  elo: number;
+  games_played: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  eloChange7Days: number;
+  recentHistory: Array<{
+    scrim_id: string;
+    elo_change: number;
+    elo_after: number;
+    result: string;
+    created_at: string;
+  }>;
+}
+
 // Helper to get default dates (last 30 days)
 const getDefaultDates = () => {
   const now = new Date();
@@ -58,13 +75,16 @@ const getDefaultDates = () => {
 const PlayerDetailClient = () => {
   const params = useParams();
   const playerName = decodeURIComponent(params.name as string);
+  const supabase = useMemo(() => createClient(), []);
   
   const [playerStats, setPlayerStats] = useState<PlayerStats | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [mapStats, setMapStats] = useState<MapStats[]>([]);
+  const [eloData, setEloData] = useState<PlayerEloData | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [mapStatsLoading, setMapStatsLoading] = useState(true);
+  const [eloLoading, setEloLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   // Session selection state
@@ -116,6 +136,62 @@ const PlayerDetailClient = () => {
       console.error("Failed to copy:", err);
     }
   };
+
+  // Fetch player ELO data
+  useEffect(() => {
+    const fetchEloData = async () => {
+      try {
+        setEloLoading(true);
+        const playerNameLower = playerName.toLowerCase();
+
+        // Fetch current ELO
+        const { data: eloRecord } = await supabase
+          .from('player_elo')
+          .select('*')
+          .eq('game_name_lower', playerNameLower)
+          .single();
+
+        if (!eloRecord) {
+          setEloData(null);
+          return;
+        }
+
+        // Fetch ELO history for the past 7 days
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        const { data: historyRecords } = await supabase
+          .from('elo_history')
+          .select('scrim_id, elo_change, elo_after, result, created_at')
+          .eq('game_name_lower', playerNameLower)
+          .gte('created_at', sevenDaysAgo.toISOString())
+          .order('created_at', { ascending: false });
+
+        // Calculate 7-day ELO change
+        const eloChange7Days = (historyRecords || []).reduce(
+          (sum, record) => sum + record.elo_change,
+          0
+        );
+
+        setEloData({
+          elo: eloRecord.elo,
+          games_played: eloRecord.games_played,
+          wins: eloRecord.wins,
+          losses: eloRecord.losses,
+          draws: eloRecord.draws,
+          eloChange7Days,
+          recentHistory: historyRecords || [],
+        });
+      } catch (err) {
+        console.error('Failed to fetch ELO data:', err);
+        setEloData(null);
+      } finally {
+        setEloLoading(false);
+      }
+    };
+
+    fetchEloData();
+  }, [playerName, supabase]);
 
   // Fetch player stats (all-time)
   useEffect(() => {
@@ -279,6 +355,89 @@ const PlayerDetailClient = () => {
           {error && (
             <div className="bg-red-900 border border-red-700 rounded-lg p-4 mb-6 text-red-200">
               {error}
+            </div>
+          )}
+
+          {/* ELO Rating Section */}
+          {!eloLoading && eloData && (
+            <div className="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border border-yellow-700/50 rounded-lg p-4 sm:p-6 mb-6">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="text-yellow-400/80 text-xs sm:text-sm mb-1">Ranked ELO</div>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-3xl sm:text-4xl font-bold text-yellow-400">{eloData.elo}</span>
+                    {eloData.eloChange7Days !== 0 && (
+                      <span className={`text-lg sm:text-xl font-semibold ${eloData.eloChange7Days > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {eloData.eloChange7Days > 0 ? '▲' : '▼'} {eloData.eloChange7Days > 0 ? '+' : ''}{eloData.eloChange7Days}
+                        <span className="text-xs sm:text-sm text-gray-400 ml-1">7d</span>
+                      </span>
+                    )}
+                    {eloData.eloChange7Days === 0 && eloData.recentHistory.length > 0 && (
+                      <span className="text-lg text-gray-400">
+                        ─ <span className="text-xs sm:text-sm">7d</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex gap-4 sm:gap-6 text-center">
+                  <div>
+                    <div className="text-gray-400 text-xs mb-1">Ranked Games</div>
+                    <div className="text-white text-lg sm:text-xl font-semibold">{eloData.games_played}</div>
+                  </div>
+                  <div>
+                    <div className="text-gray-400 text-xs mb-1">W-L-D</div>
+                    <div className="text-sm sm:text-base">
+                      <span className="text-green-400 font-semibold">{eloData.wins}</span>
+                      <span className="text-gray-500">-</span>
+                      <span className="text-red-400 font-semibold">{eloData.losses}</span>
+                      <span className="text-gray-500">-</span>
+                      <span className="text-gray-400 font-semibold">{eloData.draws}</span>
+                    </div>
+                  </div>
+                  {eloData.games_played > 0 && (
+                    <div>
+                      <div className="text-gray-400 text-xs mb-1">Win Rate</div>
+                      <div className={`text-lg sm:text-xl font-semibold ${(eloData.wins / eloData.games_played) >= 0.5 ? 'text-green-400' : 'text-red-400'}`}>
+                        {((eloData.wins / eloData.games_played) * 100).toFixed(0)}%
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Recent ELO History */}
+              {eloData.recentHistory.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-yellow-700/30">
+                  <div className="text-gray-400 text-xs mb-2">Recent Matches (7 days) - click to view scrim</div>
+                  <div className="flex flex-wrap gap-2">
+                    {eloData.recentHistory.slice(0, 10).map((match, i) => (
+                      <Link
+                        key={i}
+                        href={`/scrim/${match.scrim_id}`}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-all hover:scale-105 hover:shadow-lg ${match.result === 'win'
+                          ? 'bg-green-900/50 text-green-400 border border-green-700/50 hover:bg-green-800/60 hover:border-green-600'
+                          : match.result === 'loss'
+                            ? 'bg-red-900/50 text-red-400 border border-red-700/50 hover:bg-red-800/60 hover:border-red-600'
+                            : 'bg-gray-700/50 text-gray-400 border border-gray-600/50 hover:bg-gray-600/60 hover:border-gray-500'
+                          }`}
+                        title={`View scrim - ${new Date(match.created_at).toLocaleString()}`}
+                      >
+                        {match.result === 'win' ? 'W' : match.result === 'loss' ? 'L' : 'D'}
+                        {' '}
+                        <span className={match.elo_change >= 0 ? 'text-green-300' : 'text-red-300'}>
+                          {match.elo_change >= 0 ? '+' : ''}{match.elo_change}
+                        </span>
+                      </Link>
+                    ))}
+                    {eloData.recentHistory.length > 10 && (
+                      <span className="text-gray-500 text-xs self-center">
+                        +{eloData.recentHistory.length - 10} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
