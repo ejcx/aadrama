@@ -221,6 +221,19 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
                 Winter Championship
               </a>
             </div>
+            <div className="pt-4 mt-4 border-t border-gray-700">
+              <a
+                href="/account"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 text-left transition-colors font-semibold text-sm py-2 lg:py-0 ${pathname?.startsWith('/account') ? 'text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                Account
+              </a>
+            </div>
           </nav>
         </div>
       </div>

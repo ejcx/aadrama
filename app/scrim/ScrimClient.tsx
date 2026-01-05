@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition, useMemo } from "react";
-import { UserButton, useUser } from "@clerk/nextjs";
+import { UserButton, useUser, SignInButton } from "@clerk/nextjs";
 import SidebarLayout from "../components/SidebarLayout";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -74,10 +74,12 @@ function ExpiresIn({ expiresAt }: { expiresAt: string }) {
 function ScrimCard({ 
   scrim, 
   userId,
+  isLoggedIn,
   onRefresh 
 }: { 
   scrim: ScrimWithCounts;
   userId: string | null;
+  isLoggedIn: boolean;
   onRefresh: () => void;
 }) {
   const [players, setPlayers] = useState<ScrimPlayer[]>([]);
@@ -151,6 +153,11 @@ function ScrimCard({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {scrim.is_ranked && (
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-600/20 text-yellow-400 border border-yellow-600/30">
+              Ranked
+            </span>
+          )}
           <StatusBadge status={scrim.status} />
           {scrim.status === "waiting" && <ExpiresIn expiresAt={scrim.expires_at} />}
         </div>
@@ -184,14 +191,22 @@ function ScrimCard({
           </Link>
         </div>
         
-        {userId && scrim.status === "waiting" && !isParticipant && (
-          <button
-            onClick={() => handleAction(() => joinScrim(scrim.id))}
-            disabled={loading || isPending}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded text-sm font-medium"
-          >
-            Join
-          </button>
+        {scrim.status === "waiting" && !isParticipant && (
+          isLoggedIn ? (
+            <button
+              onClick={() => handleAction(() => joinScrim(scrim.id))}
+              disabled={loading || isPending}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded text-sm font-medium"
+            >
+              Join
+            </button>
+          ) : (
+            <SignInButton mode="modal">
+              <button className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium">
+                Sign in to Join
+              </button>
+            </SignInButton>
+          )
         )}
       </div>
       
@@ -404,6 +419,7 @@ export default function ScrimClient() {
   const [creating, setCreating] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [selectedMap, setSelectedMap] = useState("");
+  const [isRanked, setIsRanked] = useState(true);
   const supabase = useMemo(() => createClient(), []);
   
   useEffect(() => {
@@ -454,7 +470,7 @@ export default function ScrimClient() {
     setCreating(true);
     startTransition(async () => {
       try {
-        await createScrim({ map: selectedMap });
+        await createScrim({ map: selectedMap, is_ranked: isRanked });
         setSelectedMap("");
         await loadScrims();
       } catch (err) {
@@ -474,41 +490,72 @@ export default function ScrimClient() {
             <h1 className="text-white text-2xl sm:text-3xl md:text-4xl font-bold">
               AA Scrim
             </h1>
-            <UserButton 
-              afterSignOutUrl="/"
-              appearance={{
-                elements: {
-                  avatarBox: "w-10 h-10"
-                }
-              }}
-            />
+            {user ? (
+              <UserButton 
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: "w-10 h-10"
+                  }
+                }}
+              />
+            ) : (
+              <SignInButton mode="modal">
+                <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+                  Sign In
+                </button>
+              </SignInButton>
+            )}
           </div>
           
           {/* Create scrim */}
           <div className="w-full bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6">
             <h2 className="text-white font-semibold mb-4">Create New Scrim</h2>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <select
-                value={selectedMap}
-                onChange={(e) => setSelectedMap(e.target.value)}
-                className="flex-1 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white"
-              >
-                <option value="">Select a map...</option>
-                {availableMaps.map(map => (
-                  <option key={map} value={map}>{map}</option>
-                ))}
-              </select>
-              <button
-                onClick={handleCreateScrim}
-                disabled={creating || isPending || !isLoaded || !selectedMap}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
-              >
-                {creating ? "Creating..." : "Create Scrim"}
-              </button>
-            </div>
-            <p className="text-gray-400 text-sm mt-2">
-              Scrims expire after 20 minutes if not started.
-            </p>
+            {user ? (
+              <>
+                <div className="flex flex-col sm:flex-row gap-3 mb-3">
+                  <select
+                    value={selectedMap}
+                    onChange={(e) => setSelectedMap(e.target.value)}
+                    className="flex-1 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white"
+                  >
+                    <option value="">Select a map...</option>
+                    {availableMaps.map(map => (
+                      <option key={map} value={map}>{map}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleCreateScrim}
+                    disabled={creating || isPending || !isLoaded || !selectedMap}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+                  >
+                    {creating ? "Creating..." : "Create Scrim"}
+                  </button>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isRanked}
+                    onChange={(e) => setIsRanked(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-white text-sm">Ranked</span>
+                  <span className="text-gray-400 text-xs">(ELO tracking)</span>
+                </label>
+                <p className="text-gray-400 text-sm mt-2">
+                  Scrims expire after 20 minutes if not started.
+                </p>
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-gray-400 mb-4">Sign in to create or join scrims</p>
+                <SignInButton mode="modal">
+                  <button className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+                    Sign In to Participate
+                  </button>
+                </SignInButton>
+              </div>
+            )}
           </div>
           
           {/* Active Scrims */}
@@ -523,6 +570,7 @@ export default function ScrimClient() {
                     key={scrim.id} 
                     scrim={scrim} 
                     userId={user?.id || null}
+                    isLoggedIn={!!user}
                     onRefresh={loadScrims}
                   />
                 ))}

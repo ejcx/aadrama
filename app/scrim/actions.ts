@@ -21,6 +21,7 @@ export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
   const { userId, userName } = await getCurrentUser()
   const supabase = await createClient()
   
+  
   const { data, error } = await supabase
     .from('scrims')
     .insert({
@@ -30,6 +31,7 @@ export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
       map: input?.map || null,
       max_players_per_team: input?.max_players_per_team || 8,
       min_players_per_team: input?.min_players_per_team || 1,
+      is_ranked: input?.is_ranked !== false, // Default to ranked
     })
     .select()
     .single()
@@ -102,6 +104,7 @@ export async function joinScrim(scrimId: string): Promise<ScrimPlayer> {
   if (scrim.player_count >= scrim.max_players_per_team * 2) {
     throw new Error('Scrim is full')
   }
+  
   
   const { data, error } = await supabase
     .from('scrim_players')
@@ -258,6 +261,20 @@ export async function submitScore(
   // Try to finalize if consensus reached
   await supabase.rpc('finalize_scrim', { p_scrim_id: scrimId })
   
+  // Check if scrim was finalized and process ELO automatically
+  const updatedScrim = await getScrim(scrimId)
+  if (updatedScrim?.status === 'finalized' && updatedScrim.is_ranked && 
+      updatedScrim.tracker_session_id && !updatedScrim.ranked_processed_at) {
+    try {
+      const eloResult = await processRankedScrim(scrimId)
+      if (eloResult.success) {
+        console.log(`ELO processed for ${eloResult.eloChanges?.length || 0} players after finalization`)
+      }
+    } catch (eloError) {
+      console.error('ELO processing error after finalization:', eloError)
+    }
+  }
+  
   revalidatePath('/scrim')
 }
 
@@ -330,6 +347,21 @@ export async function setTrackerSessionId(scrimId: string, sessionId: string): P
   
   console.log('Updated scrim:', data)
   
+  // Automatically process ELO for ranked scrims when session ID is added
+  if (data.is_ranked && data.status === 'finalized' && !data.ranked_processed_at) {
+    try {
+      const eloResult = await processRankedScrim(scrimId)
+      if (eloResult.success) {
+        console.log(`ELO processed for ${eloResult.eloChanges?.length || 0} players`)
+      } else {
+        console.log('ELO processing skipped:', eloResult.error)
+      }
+    } catch (eloError) {
+      // Don't fail the whole operation if ELO processing fails
+      console.error('ELO processing error:', eloError)
+    }
+  }
+  
   revalidatePath('/scrim')
   revalidatePath(`/scrim/${scrimId}`)
 }
@@ -371,12 +403,16 @@ export async function getSessionStats(sessionIds: string): Promise<SessionStats[
       ])
       
       const sessionData = sessionRes.ok ? await sessionRes.json() : null
-      const playersData = playersRes.ok ? await playersRes.json() : []
+      const playersData = playersRes.ok ? await playersRes.json() : null
       const analyticsData = analyticsRes.ok ? await analyticsRes.json() : {}
       
-      const players: SessionPlayer[] = Array.isArray(playersData) 
-        ? playersData 
-        : (playersData.players || [])
+      // Handle various response formats - could be array, object with players, or null
+      let players: SessionPlayer[] = []
+      if (Array.isArray(playersData)) {
+        players = playersData
+      } else if (playersData && typeof playersData === 'object' && Array.isArray(playersData.players)) {
+        players = playersData.players
+      }
       
       results.push({
         session_id: id,
@@ -449,5 +485,315 @@ export async function getCurrentUserScrimStatus(scrimId: string): Promise<{
     isCreator: scrim.created_by === userId,
     player: player || null,
   }
+}
+
+// ==================== RANKED / ELO SYSTEM ====================
+
+export interface RankedValidationResult {
+    isValid: boolean
+    errors: string[]
+    playerMatches: Array<{
+        scrimPlayerId: string
+        userId: string
+        userName: string
+        team: string
+        gameNameLower: string | null
+        sessionPlayerName: string | null
+        kills: number | null
+        deaths: number | null
+        matched: boolean
+    }>
+}
+
+// Validate and match scrim players to session stats
+// Note: This no longer requires ALL players to match - it just reports which players matched
+export async function validateRankedScrim(scrimId: string): Promise<RankedValidationResult> {
+    const supabase = await createClient()
+    const errors: string[] = []
+
+    // Get scrim details
+    const scrim = await getScrim(scrimId)
+    if (!scrim) {
+        return { isValid: false, errors: ['Scrim not found'], playerMatches: [] }
+    }
+
+    if (scrim.status !== 'finalized') {
+        errors.push('Scrim must be finalized')
+    }
+
+    if (scrim.team_a_score === null || scrim.team_b_score === null) {
+        errors.push('Scrim must have final scores')
+    }
+
+    if (!scrim.tracker_session_id) {
+        errors.push('Scrim must have a linked tracker session for ELO')
+    }
+
+    // Get scrim players
+    const players = await getScrimPlayers(scrimId)
+
+    // Get all game names for these users (optional - for users who have linked names)
+    const userIds = players.map(p => p.user_id)
+    const { data: gameNames } = await supabase
+        .from('user_game_names')
+        .select('*')
+        .in('user_id', userIds)
+
+    // Create a map of user_id -> game_name_lower
+    const userGameNameMap = new Map<string, string>()
+    for (const gn of gameNames || []) {
+        if (!userGameNameMap.has(gn.user_id)) {
+            userGameNameMap.set(gn.user_id, gn.game_name_lower)
+        }
+    }
+
+    // Get session stats if we have a tracker session
+    let sessionPlayers: SessionPlayer[] = []
+    if (scrim.tracker_session_id) {
+        const stats = await getSessionStats(scrim.tracker_session_id)
+        // Combine players from all linked sessions
+        for (const s of stats) {
+            sessionPlayers.push(...s.players)
+        }
+    }
+
+    // Create a map of session player names (lowercase) -> player data
+    const sessionPlayerMap = new Map<string, SessionPlayer>()
+    for (const sp of sessionPlayers) {
+        sessionPlayerMap.set(sp.name.toLowerCase(), sp)
+    }
+
+    // Match scrim players to session players
+    // Priority: 1) linked game name, 2) Clerk display name (user_name)
+    const playerMatches: RankedValidationResult['playerMatches'] = []
+
+    for (const player of players) {
+        const linkedGameName = userGameNameMap.get(player.user_id)
+        const displayNameLower = player.user_name.toLowerCase()
+        
+        let sessionPlayer: SessionPlayer | null = null
+        let matchedGameName: string | null = null
+        
+        // Try linked game name first
+        if (linkedGameName) {
+            sessionPlayer = sessionPlayerMap.get(linkedGameName) || null
+            if (sessionPlayer) {
+                matchedGameName = linkedGameName
+            }
+        }
+        
+        // Fall back to Clerk display name
+        if (!sessionPlayer) {
+            sessionPlayer = sessionPlayerMap.get(displayNameLower) || null
+            if (sessionPlayer) {
+                matchedGameName = displayNameLower
+            }
+        }
+
+        playerMatches.push({
+            scrimPlayerId: player.id,
+            userId: player.user_id,
+            userName: player.user_name,
+            team: player.team || 'unassigned',
+            gameNameLower: matchedGameName,
+            sessionPlayerName: sessionPlayer?.name || null,
+            kills: sessionPlayer?.kills || null,
+            deaths: sessionPlayer?.deaths || null,
+            matched: sessionPlayer !== null,
+        })
+    }
+
+    // Count matched players (for informational purposes)
+    const matchedCount = playerMatches.filter(p => p.matched).length
+
+    return {
+        isValid: errors.length === 0, // Only fails if scrim not finalized, no scores, or no tracker
+        errors,
+        playerMatches,
+    }
+}
+
+// Process ranked ELO updates for a scrim
+// Uses the database stored procedure for each player
+// Only processes players who have linked game names that match the session
+export async function processRankedScrim(scrimId: string): Promise<{
+    success: boolean
+    error?: string
+    eloChanges?: Array<{
+        gameName: string
+        eloChange: number
+        newElo: number
+        result: 'win' | 'loss' | 'draw'
+    }>
+}> {
+    const supabase = await createClient()
+
+    // Get scrim details
+    const scrim = await getScrim(scrimId)
+    if (!scrim) return { success: false, error: 'Scrim not found' }
+    
+    // Check if this is a ranked scrim
+    if (!scrim.is_ranked) {
+        return { success: false, error: 'This is not a ranked scrim' }
+    }
+
+    // Check basic requirements
+    if (scrim.status !== 'finalized') {
+        return { success: false, error: 'Scrim must be finalized' }
+    }
+    if (scrim.team_a_score === null || scrim.team_b_score === null) {
+        return { success: false, error: 'Scrim must have final scores' }
+    }
+    if (!scrim.tracker_session_id) {
+        return { success: false, error: 'Scrim must have a linked tracker session' }
+    }
+
+    // Check if already processed using the database function
+    const { data: isAlreadyProcessed } = await supabase.rpc('is_scrim_ranked', { p_scrim_id: scrimId })
+    if (isAlreadyProcessed) {
+        return { success: false, error: 'ELO has already been processed for this scrim' }
+    }
+
+    // Get player matches
+    const validation = await validateRankedScrim(scrimId)
+    const matchedPlayers = validation.playerMatches.filter(p => p.matched)
+    
+    if (matchedPlayers.length === 0) {
+        return { success: false, error: 'No players with linked game names matched the session' }
+    }
+
+    const teamAScore = scrim.team_a_score
+    const teamBScore = scrim.team_b_score
+
+    // Group matched players by team (only matched players get ELO)
+    const teamAPlayers = matchedPlayers.filter(p => p.team === 'team_a')
+    const teamBPlayers = matchedPlayers.filter(p => p.team === 'team_b')
+
+    // Get current ELO for matched players to calculate team averages
+    const allGameNames = matchedPlayers
+        .map(p => p.gameNameLower)
+        .filter((n): n is string => n !== null)
+
+    const { data: eloRecords } = await supabase
+        .from('player_elo')
+        .select('*')
+        .in('game_name_lower', allGameNames)
+
+    const eloMap = new Map(eloRecords?.map(e => [e.game_name_lower, e]) || [])
+
+    // Calculate average ELO for each team
+    const getPlayerElo = (gameNameLower: string) => eloMap.get(gameNameLower)?.elo || 1200
+
+    const teamAAvgElo = teamAPlayers.length > 0
+        ? Math.round(teamAPlayers.reduce((sum, p) => sum + getPlayerElo(p.gameNameLower!), 0) / teamAPlayers.length)
+        : 1200
+    const teamBAvgElo = teamBPlayers.length > 0
+        ? Math.round(teamBPlayers.reduce((sum, p) => sum + getPlayerElo(p.gameNameLower!), 0) / teamBPlayers.length)
+        : 1200
+
+    const eloChanges: Array<{
+        gameName: string
+        eloChange: number
+        newElo: number
+        result: 'win' | 'loss' | 'draw'
+    }> = []
+
+    // Process each matched player using the stored procedure
+    for (const player of matchedPlayers) {
+        const isTeamA = player.team === 'team_a'
+        const roundsFor = isTeamA ? teamAScore : teamBScore
+        const roundsAgainst = isTeamA ? teamBScore : teamAScore
+        const opponentAvgElo = isTeamA ? teamBAvgElo : teamAAvgElo
+
+        // Call the stored procedure with simplified interface
+        const { data, error } = await supabase.rpc('process_player_elo', {
+            p_scrim_id: scrimId,
+            p_game_name: player.sessionPlayerName || player.gameNameLower,
+            p_rounds_for: roundsFor,
+            p_rounds_against: roundsAgainst,
+            p_kills: player.kills || 0,
+            p_opponent_avg_elo: opponentAvgElo,
+        })
+
+        if (error) {
+            console.error(`Failed to process ELO for ${player.gameNameLower}:`, error)
+            continue
+        }
+
+        if (data && data.length > 0) {
+            const result = data[0]
+            eloChanges.push({
+                gameName: result.game_name,
+                eloChange: result.elo_change,
+                newElo: result.elo_after,
+                result: result.result as 'win' | 'loss' | 'draw',
+            })
+        }
+    }
+
+    // Mark ELO as processed (is_ranked is already set at creation)
+    await supabase.from('scrims').update({
+        ranked_processed_at: new Date().toISOString(),
+    }).eq('id', scrimId)
+
+    revalidatePath('/scrim')
+    revalidatePath(`/scrim/${scrimId}`)
+
+    return { success: true, eloChanges }
+}
+
+// Get ranked status for a scrim
+export async function getScrimRankedStatus(scrimId: string): Promise<{
+    isRanked: boolean
+    canBeRanked: boolean
+    validation: RankedValidationResult | null
+    eloChanges: Array<{
+        gameName: string
+        eloChange: number
+        result: string
+    }> | null
+}> {
+    const supabase = await createClient()
+
+    const scrim = await getScrim(scrimId)
+    if (!scrim) {
+        return { isRanked: false, canBeRanked: false, validation: null, eloChanges: null }
+    }
+
+    // Check if already ranked
+    const { data: scrimData } = await supabase
+        .from('scrims')
+        .select('is_ranked')
+        .eq('id', scrimId)
+        .single()
+
+    if (scrimData?.is_ranked) {
+        // Get ELO history for this scrim
+        const { data: history } = await supabase
+            .from('elo_history')
+            .select('*')
+            .eq('scrim_id', scrimId)
+
+        return {
+            isRanked: true,
+            canBeRanked: false,
+            validation: null,
+            eloChanges: history?.map(h => ({
+                gameName: h.game_name_lower,
+                eloChange: h.elo_change,
+                result: h.result,
+            })) || null,
+        }
+    }
+
+    // Validate if it can be ranked
+    const validation = await validateRankedScrim(scrimId)
+
+    return {
+        isRanked: false,
+        canBeRanked: validation.isValid,
+        validation,
+        eloChanges: null,
+    }
 }
 

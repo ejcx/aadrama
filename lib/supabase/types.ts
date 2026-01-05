@@ -26,6 +26,8 @@ export interface Scrim {
   team_b_score: number | null
   winner: Winner | null
   tracker_session_id: string | null
+  is_ranked: boolean
+  ranked_processed_at: string | null
   created_at: string
   expires_at: string
   ready_check_at: string | null
@@ -67,5 +69,63 @@ export interface CreateScrimInput {
   map?: string
   max_players_per_team?: number
   min_players_per_team?: number
+  is_ranked?: boolean
+}
+
+// User Game Names - mapping user accounts to in-game names
+export interface UserGameName {
+  id: string
+  user_id: string
+  game_name: string
+  game_name_lower: string
+  created_at: string
+}
+
+export interface CreateGameNameInput {
+  game_name: string
+}
+
+// ELO System
+export interface PlayerElo {
+  id: string
+  game_name_lower: string
+  game_name: string
+  elo: number
+  games_played: number
+  wins: number
+  losses: number
+  draws: number
+  created_at: string
+  updated_at: string
+}
+
+export interface EloHistory {
+  id: string
+  game_name_lower: string
+  scrim_id: string
+  elo_before: number
+  elo_after: number
+  elo_change: number
+  result: 'win' | 'loss' | 'draw'
+  team: 'team_a' | 'team_b'
+  team_score: number
+  opponent_score: number
+  kills: number | null
+  deaths: number | null
+  k_factor: number
+  created_at: string
+}
+
+export interface EloLeaderboardEntry {
+  game_name_lower: string
+  game_name: string
+  elo: number
+  games_played: number
+  wins: number
+  losses: number
+  draws: number
+  win_rate: number
+  user_id: string | null
+  updated_at: string
 }
 

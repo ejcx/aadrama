@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition, useMemo } from "react";
 import { useParams } from "next/navigation";
-import { UserButton, useUser } from "@clerk/nextjs";
+import { UserButton, useUser, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
 import SidebarLayout from "../../components/SidebarLayout";
 import { createClient } from "@/lib/supabase/client";
@@ -84,6 +84,8 @@ export default function ScrimDetailClient() {
   const [scrim, setScrim] = useState<ScrimWithCounts | null>(null);
   const [players, setPlayers] = useState<ScrimPlayer[]>([]);
     const [scoreSubmissions, setScoreSubmissions] = useState<ScrimScoreSubmission[]>([]);
+    const [eloChanges, setEloChanges] = useState<Map<string, { change: number; newElo: number }>>(new Map());
+    const [userGameNames, setUserGameNames] = useState<Map<string, string>>(new Map()); // userId -> gameNameLower
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -143,6 +145,44 @@ export default function ScrimDetailClient() {
           .eq('scrim_id', scrimId);
         setScoreSubmissions(submissions || []);
       }
+
+        // Load user game names for all players
+        const userIds = (playersRes.data || []).map(p => p.user_id);
+        if (userIds.length > 0) {
+            const { data: gameNames } = await supabase
+                .from('user_game_names')
+                .select('user_id, game_name_lower')
+                .in('user_id', userIds);
+
+            if (gameNames) {
+                const gameNameMap = new Map<string, string>();
+                for (const gn of gameNames) {
+                    if (!gameNameMap.has(gn.user_id)) {
+                        gameNameMap.set(gn.user_id, gn.game_name_lower);
+                    }
+                }
+                setUserGameNames(gameNameMap);
+            }
+        }
+
+        // Load ELO changes for finalized ranked scrims
+        if (scrimData.status === "finalized" && scrimData.is_ranked) {
+            const { data: eloHistory } = await supabase
+                .from('elo_history')
+                .select('game_name_lower, elo_change, elo_after')
+                .eq('scrim_id', scrimId);
+
+            if (eloHistory) {
+                const eloMap = new Map<string, { change: number; newElo: number }>();
+                for (const entry of eloHistory) {
+                    eloMap.set(entry.game_name_lower, {
+                        change: entry.elo_change,
+                        newElo: entry.elo_after,
+                    });
+                }
+                setEloChanges(eloMap);
+            }
+        }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load scrim");
     } finally {
@@ -192,7 +232,15 @@ export default function ScrimDetailClient() {
           <Link href="/scrim" className="text-blue-400 hover:text-blue-300 hover:underline text-sm">
             ← Back to Scrims
           </Link>
-          <UserButton afterSignOutUrl="/" />
+                  {user ? (
+                      <UserButton afterSignOutUrl="/" />
+                  ) : (
+                      <SignInButton mode="modal">
+                          <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+                              Sign In
+                          </button>
+                      </SignInButton>
+                  )}
         </div>
 
         {/* Scrim Title */}
@@ -201,6 +249,11 @@ export default function ScrimDetailClient() {
             <h1 className="text-white text-2xl sm:text-3xl font-bold">
               {scrim.map ? `🗺️ ${scrim.map}` : scrim.title || `Scrim #${scrim.id.slice(0, 8)}`}
             </h1>
+                      {scrim.is_ranked && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-600/20 text-yellow-400 border border-yellow-600/30">
+                              Ranked
+                          </span>
+                      )}
             <StatusBadge status={scrim.status} />
           </div>
           <p className="text-gray-400">
@@ -286,14 +339,22 @@ export default function ScrimDetailClient() {
 
               {/* Join/Ready actions */}
               <div className="flex flex-wrap gap-3">
-                {user && !isParticipant && (
-                  <button
-                    onClick={() => handleAction(() => joinScrim(scrimId))}
-                    disabled={isPending}
-                    className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium"
-                  >
-                    Join Scrim
-                  </button>
+                              {!isParticipant && (
+                                  user ? (
+                                      <button
+                                          onClick={() => handleAction(() => joinScrim(scrimId))}
+                                          disabled={isPending}
+                                          className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium"
+                                      >
+                                          Join Scrim
+                                      </button>
+                                  ) : (
+                                      <SignInButton mode="modal">
+                                          <button className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium">
+                                              Sign in to Join
+                                          </button>
+                                      </SignInButton>
+                                  )
                 )}
                 {isParticipant && (
                   <>
@@ -350,21 +411,39 @@ export default function ScrimDetailClient() {
                 <div>
                   <h3 className="text-blue-400 font-semibold mb-3 text-lg">Team A</h3>
                   <div className="space-y-2">
-                    {teamA.map(p => (
-                      <div key={p.id} className="bg-blue-900/30 border border-blue-800 rounded px-3 py-2 text-white">
-                        {p.user_name}
-                      </div>
-                    ))}
+                                      {teamA.map(p => {
+                                          const gameNameLower = userGameNames.get(p.user_id);
+                                          const elo = gameNameLower ? eloChanges.get(gameNameLower) : null;
+                                          return (
+                                              <div key={p.id} className="bg-blue-900/30 border border-blue-800 rounded px-3 py-2 text-white flex items-center justify-between">
+                                                  <span>{p.user_name}</span>
+                                                  {elo && (
+                                                      <span className={`text-sm font-medium ${elo.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                          {elo.change >= 0 ? '▲' : '▼'} {elo.change >= 0 ? '+' : ''}{elo.change}
+                                                      </span>
+                                                  )}
+                                              </div>
+                        );
+                    })}
                   </div>
                 </div>
                 <div>
                   <h3 className="text-red-400 font-semibold mb-3 text-lg">Team B</h3>
                   <div className="space-y-2">
-                    {teamB.map(p => (
-                      <div key={p.id} className="bg-red-900/30 border border-red-800 rounded px-3 py-2 text-white">
-                        {p.user_name}
-                      </div>
-                    ))}
+                                      {teamB.map(p => {
+                                          const gameNameLower = userGameNames.get(p.user_id);
+                                          const elo = gameNameLower ? eloChanges.get(gameNameLower) : null;
+                                          return (
+                                              <div key={p.id} className="bg-red-900/30 border border-red-800 rounded px-3 py-2 text-white flex items-center justify-between">
+                                                  <span>{p.user_name}</span>
+                                                  {elo && (
+                                                      <span className={`text-sm font-medium ${elo.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                          {elo.change >= 0 ? '▲' : '▼'} {elo.change >= 0 ? '+' : ''}{elo.change}
+                                                      </span>
+                                                  )}
+                                              </div>
+                        );
+                    })}
                   </div>
                 </div>
               </div>
