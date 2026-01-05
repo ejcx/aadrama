@@ -1,8 +1,8 @@
-export const runtime = 'edge';
-
 import type { Metadata } from 'next';
 import ScrimDetailClient from './ScrimDetailClient';
 import { createEdgeClient } from '@/lib/supabase/edge';
+
+export const runtime = 'edge';
 
 const API_BASE = "https://server-details.ej.workers.dev";
 
@@ -21,88 +21,113 @@ interface ScrimData {
   finished_at: string | null;
 }
 
-interface SessionAnalytics {
-  total_kills?: number;
-  total_deaths?: number;
-  player_count?: number;
-}
-
 interface SessionPlayer {
   name: string;
   kills: number;
   deaths: number;
 }
 
+interface SessionAnalytics {
+  total_kills?: number;
+  total_deaths?: number;
+  player_count?: number;
+  duration?: number;
+}
+
+interface Session {
+  session_id: string;
+  time_started: string;
+  time_finished?: string;
+  server_ip?: string;
+  map?: string;
+  peak_players?: number;
+  duration?: number;
+}
+
 // Parse session IDs from tracker_session_id
 const parseSessionIds = (trackerId: string): string[] => {
+  let decoded = trackerId;
   try {
-    const decoded = decodeURIComponent(trackerId);
-    return decoded
-      .split(/[+~\s]+/)
-      .map(id => id.trim())
-      .filter(id => id.length > 0)
-      .slice(0, 8);
+    let prev = '';
+    while (prev !== decoded) {
+      prev = decoded;
+      decoded = decodeURIComponent(decoded);
+    }
   } catch {
-    return trackerId
+    decoded = trackerId;
+  }
+  
+  return Array.from(new Set(
+    decoded
       .split(/[+~\s]+/)
       .map(id => id.trim())
       .filter(id => id.length > 0)
-      .slice(0, 8);
-  }
+  )).slice(0, 8);
 };
 
-// Fetch session stats for metadata
-async function fetchSessionStats(sessionIds: string[]): Promise<{
-  totalKills: number;
-  totalDeaths: number;
-  topPlayers: { name: string; kills: number; deaths: number }[];
+// Format duration for display
+const formatDuration = (seconds?: number): string => {
+  if (!seconds) return "";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+};
+
+// Fetch session data for metadata generation
+async function fetchSessionData(sessionIds: string[]): Promise<{
+  sessions: Session[];
+  analytics: Map<string, SessionAnalytics>;
+  players: Map<string, SessionPlayer[]>;
 }> {
-  let totalKills = 0;
-  let totalDeaths = 0;
-  const playerMap = new Map<string, { kills: number; deaths: number }>();
+  const sessions: Session[] = [];
+  const analytics = new Map<string, SessionAnalytics>();
+  const players = new Map<string, SessionPlayer[]>();
 
   await Promise.all(sessionIds.map(async (id) => {
     try {
+      // Fetch session info
+      const sessionRes = await fetch(`${API_BASE}/sessions/${encodeURIComponent(id)}`, {
+        cache: 'no-store',
+      });
+      if (sessionRes.ok) {
+        const sessionData = await sessionRes.json();
+        if (sessionData && !sessionData.error) {
+          sessions.push(sessionData);
+        }
+      }
+
       // Fetch analytics
-      const analyticsRes = await fetch(`${API_BASE}/analytics/sessions/${id}`, {
+      const analyticsRes = await fetch(`${API_BASE}/analytics/sessions/${encodeURIComponent(id)}`, {
         cache: 'no-store',
       });
       if (analyticsRes.ok) {
-        const data: SessionAnalytics = await analyticsRes.json();
-        if (data && !('error' in data)) {
-          totalKills += data.total_kills || 0;
-          totalDeaths += data.total_deaths || 0;
+        const analyticsData = await analyticsRes.json();
+        if (analyticsData && !analyticsData.error) {
+          analytics.set(id, analyticsData);
         }
       }
 
       // Fetch players
-      const playersRes = await fetch(`${API_BASE}/sessions/${id}/players`, {
+      const playersRes = await fetch(`${API_BASE}/sessions/${encodeURIComponent(id)}/players`, {
         cache: 'no-store',
       });
       if (playersRes.ok) {
-        const data = await playersRes.json();
-        const players: SessionPlayer[] = Array.isArray(data) ? data : (data.players || []);
-        players.forEach(p => {
-          const existing = playerMap.get(p.name);
-          if (existing) {
-            existing.kills += p.kills;
-            existing.deaths += p.deaths;
-          } else {
-            playerMap.set(p.name, { kills: p.kills, deaths: p.deaths });
-          }
-        });
+        const playersData = await playersRes.json();
+        if (Array.isArray(playersData)) {
+          players.set(id, playersData);
+        } else if (playersData.players && Array.isArray(playersData.players)) {
+          players.set(id, playersData.players);
+        }
       }
     } catch (err) {
-      console.error(`Failed to fetch stats for session ${id}:`, err);
+      console.error(`Failed to fetch data for session ${id}:`, err);
     }
   }));
 
-  const topPlayers = Array.from(playerMap.entries())
-    .map(([name, stats]) => ({ name, ...stats }))
-    .sort((a, b) => b.kills - a.kills)
-    .slice(0, 10);
-
-  return { totalKills, totalDeaths, topPlayers };
+  return { sessions, analytics, players };
 }
 
 // Generate dynamic metadata for Discord/social sharing
@@ -127,8 +152,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
     const scrimData = scrim as ScrimData;
     
-    // Build title
-    const mapName = scrimData.map || 'Unknown Map';
+    // Status labels
     const statusLabels: Record<string, string> = {
       waiting: 'Waiting for Players',
       ready_check: 'Ready Check',
@@ -139,51 +163,91 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       cancelled: 'Cancelled',
     };
     const statusText = statusLabels[scrimData.status] || scrimData.status;
-    
-    let title = scrimData.title || `${mapName} Scrim`;
-    title += ` | AA Drama`;
+    const mapName = scrimData.map || 'Unknown Map';
 
     // Build description parts
     const descParts: string[] = [];
-    
-    // Map and status
     descParts.push(`🗺️ ${mapName}`);
     descParts.push(`📊 ${statusText}`);
     descParts.push(`👥 ${scrimData.player_count} players`);
     
     // Final score if available
     if (scrimData.status === 'finalized' && scrimData.team_a_score !== null && scrimData.team_b_score !== null) {
-      descParts.push(`🏆 Score: ${scrimData.team_a_score} - ${scrimData.team_b_score}`);
+      descParts.push(`🏆 ${scrimData.team_a_score} - ${scrimData.team_b_score}`);
+    }
+
+    const description = descParts.join(' • ');
+
+    // Build longer description for Open Graph
+    let ogDescription = description;
+
+    // If there's tracker session data, fetch game stats (same as session page)
+    if (scrimData.tracker_session_id) {
+      const sessionIds = parseSessionIds(scrimData.tracker_session_id);
       
-      if (scrimData.winner === 'team_a') {
-        descParts.push('Team A Wins!');
-      } else if (scrimData.winner === 'team_b') {
-        descParts.push('Team B Wins!');
-      } else if (scrimData.winner === 'draw') {
-        descParts.push('Draw');
+      if (sessionIds.length > 0) {
+        const { sessions, analytics, players } = await fetchSessionData(sessionIds);
+        
+        // Aggregate stats
+        let totalKills = 0;
+        let totalDeaths = 0;
+        analytics.forEach((a) => {
+          totalKills += a.total_kills || 0;
+          totalDeaths += a.total_deaths || 0;
+        });
+
+        // Calculate total duration
+        let totalDuration = 0;
+        sessions.forEach(s => {
+          if (s.duration) totalDuration += s.duration;
+        });
+
+        if (totalKills > 0 || totalDeaths > 0) {
+          ogDescription += `\n⚔️ ${totalKills} kills • 💀 ${totalDeaths} deaths`;
+          if (totalDuration > 0) {
+            ogDescription += ` • ⏱️ ${formatDuration(totalDuration)}`;
+          }
+        }
+
+        // Get top 10 players by kills
+        const aggregatedPlayers = new Map<string, { kills: number; deaths: number }>();
+        players.forEach((playerList) => {
+          playerList.forEach((p) => {
+            const existing = aggregatedPlayers.get(p.name);
+            if (existing) {
+              existing.kills += p.kills;
+              existing.deaths += p.deaths;
+            } else {
+              aggregatedPlayers.set(p.name, { kills: p.kills, deaths: p.deaths });
+            }
+          });
+        });
+        
+        const sortedPlayers = Array.from(aggregatedPlayers.entries())
+          .sort((a, b) => b[1].kills - a[1].kills);
+        const topPlayers = sortedPlayers
+          .slice(0, 10)
+          .map(([name, stats], i) => `${i + 1}. ${name}: ${stats.kills}K/${stats.deaths}D`);
+
+        if (topPlayers.length > 0) {
+          ogDescription += `\n\n🏆 Top Players:\n${topPlayers.join('\n')}`;
+          
+          const remainingPlayers = sortedPlayers.length - 10;
+          if (remainingPlayers > 0) {
+            ogDescription += `\n... and ${remainingPlayers} more players`;
+          }
+        }
       }
     }
 
-    let description = descParts.join(' • ');
-    let ogDescription = description;
-
-    // If there's tracker session data, fetch game stats
-    if (scrimData.tracker_session_id) {
-      const sessionIds = parseSessionIds(scrimData.tracker_session_id);
-      if (sessionIds.length > 0) {
-        const { totalKills, totalDeaths, topPlayers } = await fetchSessionStats(sessionIds);
-        
-        if (totalKills > 0 || totalDeaths > 0) {
-          ogDescription += `\n\n⚔️ ${totalKills} kills • 💀 ${totalDeaths} deaths`;
-        }
-        
-        if (topPlayers.length > 0) {
-          ogDescription += `\n\n🏆 Top Players:`;
-          topPlayers.forEach((p, i) => {
-            const kd = p.deaths > 0 ? (p.kills / p.deaths).toFixed(2) : (p.kills > 0 ? '∞' : '0.00');
-            ogDescription += `\n${i + 1}. ${p.name}: ${p.kills}K/${p.deaths}D (${kd} K/D)`;
-          });
-        }
+    // Add winner info
+    if (scrimData.status === 'finalized' && scrimData.winner) {
+      if (scrimData.winner === 'team_a') {
+        ogDescription += '\n\n🎉 Team A Wins!';
+      } else if (scrimData.winner === 'team_b') {
+        ogDescription += '\n\n🎉 Team B Wins!';
+      } else if (scrimData.winner === 'draw') {
+        ogDescription += '\n\n🤝 Draw';
       }
     }
 
@@ -192,18 +256,25 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       ogDescription += `\n\nCreated by ${scrimData.created_by_name}`;
     }
 
+    // Build title
+    const title = scrimData.title 
+      ? `${scrimData.title} | AA Drama`
+      : `${mapName} Scrim | AA Drama`;
+
+    const ogTitle = scrimData.title || `${mapName} Scrim`;
+
     return {
       title,
       description: ogDescription,
       openGraph: {
-        title: scrimData.title || `${mapName} Scrim`,
+        title: ogTitle,
         description: ogDescription,
         type: 'website',
         siteName: 'AA Drama',
       },
       twitter: {
         card: 'summary',
-        title: scrimData.title || `${mapName} Scrim`,
+        title: ogTitle,
         description: ogDescription,
       },
     };
