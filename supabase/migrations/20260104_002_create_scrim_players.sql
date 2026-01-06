@@ -49,3 +49,4 @@ CREATE POLICY "Users can leave scrims" ON public.scrim_players
 COMMENT ON TABLE public.scrim_players IS 'Players registered for a scrim waiting room';
 
 
+

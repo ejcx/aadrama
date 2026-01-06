@@ -42,6 +42,7 @@ interface PlayerEloData {
   losses: number;
   draws: number;
   eloChange7Days: number;
+  rank: number | null; // Position in leaderboard (1 = highest)
   recentHistory: Array<{
     scrim_id: string;
     elo_change: number;
@@ -49,6 +50,134 @@ interface PlayerEloData {
     result: string;
     created_at: string;
   }>;
+}
+
+// Grandmaster Badge Component for top 10 players
+function GrandmasterBadge({ rank }: { rank: number }) {
+  // Different tiers within top 10
+  const isTop3 = rank <= 3;
+  const isTop1 = rank === 1;
+  
+  return (
+    <div className="relative group cursor-pointer" title={`Rank #${rank} - Top 10 Competitive Player`}>
+      <div className={`
+        relative flex items-center justify-center
+        w-14 h-14 sm:w-16 sm:h-16
+        ${isTop1 
+          ? 'animate-pulse' 
+          : ''
+        }
+      `}>
+        {/* Outer glow */}
+        <div className={`
+          absolute inset-0 rounded-full blur-md opacity-60
+          ${isTop1 
+            ? 'bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-600' 
+            : isTop3 
+              ? 'bg-gradient-to-br from-purple-500 via-violet-600 to-indigo-700'
+              : 'bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-700'
+          }
+        `} />
+        
+        {/* Main badge shape - hexagonal/diamond inspired */}
+        <svg 
+          viewBox="0 0 100 100" 
+          className={`
+            relative w-12 h-12 sm:w-14 sm:h-14 drop-shadow-lg
+            ${isTop1 ? 'animate-spin-slow' : ''}
+          `}
+          style={{ animationDuration: '20s' }}
+        >
+          <defs>
+            {/* Gradient definitions */}
+            <linearGradient id={`gmGrad${rank}`} x1="0%" y1="0%" x2="100%" y2="100%">
+              {isTop1 ? (
+                <>
+                  <stop offset="0%" stopColor="#fbbf24" />
+                  <stop offset="50%" stopColor="#f59e0b" />
+                  <stop offset="100%" stopColor="#d97706" />
+                </>
+              ) : isTop3 ? (
+                <>
+                  <stop offset="0%" stopColor="#a855f7" />
+                  <stop offset="50%" stopColor="#7c3aed" />
+                  <stop offset="100%" stopColor="#6366f1" />
+                </>
+              ) : (
+                <>
+                  <stop offset="0%" stopColor="#22d3ee" />
+                  <stop offset="50%" stopColor="#3b82f6" />
+                  <stop offset="100%" stopColor="#6366f1" />
+                </>
+              )}
+            </linearGradient>
+            <linearGradient id={`gmInner${rank}`} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#1f2937" />
+              <stop offset="100%" stopColor="#111827" />
+            </linearGradient>
+          </defs>
+          
+          {/* Outer hexagon */}
+          <polygon 
+            points="50,2 93,25 93,75 50,98 7,75 7,25" 
+            fill={`url(#gmGrad${rank})`}
+            stroke={isTop1 ? "#fcd34d" : isTop3 ? "#c4b5fd" : "#67e8f9"}
+            strokeWidth="2"
+          />
+          
+          {/* Inner hexagon */}
+          <polygon 
+            points="50,12 83,30 83,70 50,88 17,70 17,30" 
+            fill={`url(#gmInner${rank})`}
+          />
+          
+          {/* Star/emblem in center */}
+          <polygon 
+            points="50,22 55,38 72,38 58,48 63,65 50,54 37,65 42,48 28,38 45,38" 
+            fill={`url(#gmGrad${rank})`}
+            opacity="0.9"
+          />
+          
+          {/* Crown for #1 */}
+          {isTop1 && (
+            <path 
+              d="M35,35 L40,28 L50,33 L60,28 L65,35 L60,35 L55,32 L50,35 L45,32 L40,35 Z"
+              fill="#fcd34d"
+            />
+          )}
+        </svg>
+        
+        {/* Rank number */}
+        <div className={`
+          absolute bottom-0 right-0
+          w-5 h-5 sm:w-6 sm:h-6 
+          rounded-full 
+          flex items-center justify-center
+          text-xs font-bold
+          border-2
+          ${isTop1 
+            ? 'bg-yellow-500 text-yellow-950 border-yellow-300' 
+            : isTop3 
+              ? 'bg-purple-500 text-purple-950 border-purple-300'
+              : 'bg-cyan-500 text-cyan-950 border-cyan-300'
+          }
+        `}>
+          {rank}
+        </div>
+      </div>
+      
+      {/* Tooltip on hover */}
+      <div className="
+        absolute left-1/2 -translate-x-1/2 -bottom-8
+        opacity-0 group-hover:opacity-100 transition-opacity
+        whitespace-nowrap text-xs font-medium
+        px-2 py-1 rounded bg-gray-800 text-gray-200
+        pointer-events-none z-10
+      ">
+        {isTop1 ? '👑 #1 Champion' : isTop3 ? '🏆 Elite' : '⭐ Grandmaster'}
+      </div>
+    </div>
+  );
 }
 
 // Helper to get default dates (last 30 days)
@@ -156,16 +285,27 @@ const PlayerDetailClient = () => {
           return;
         }
 
-        // Fetch ELO history for the past 7 days
+        // Fetch ELO history and rank in parallel
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-        const { data: historyRecords } = await supabase
-          .from('elo_history')
-          .select('scrim_id, elo_change, elo_after, result, created_at')
-          .eq('game_name_lower', playerNameLower)
-          .gte('created_at', sevenDaysAgo.toISOString())
-          .order('created_at', { ascending: false });
+        const [historyResult, rankResult] = await Promise.all([
+          supabase
+            .from('elo_history')
+            .select('scrim_id, elo_change, elo_after, result, created_at')
+            .eq('game_name_lower', playerNameLower)
+            .gte('created_at', sevenDaysAgo.toISOString())
+            .order('created_at', { ascending: false }),
+          // Count how many players have higher ELO to determine rank
+          supabase
+            .from('player_elo')
+            .select('id', { count: 'exact', head: true })
+            .gt('elo', eloRecord.elo)
+        ]);
+
+        const historyRecords = historyResult.data;
+        // Rank is 1 + number of players with higher ELO
+        const rank = rankResult.count !== null ? rankResult.count + 1 : null;
 
         // Calculate 7-day ELO change
         const eloChange7Days = (historyRecords || []).reduce(
@@ -180,6 +320,7 @@ const PlayerDetailClient = () => {
           losses: eloRecord.losses,
           draws: eloRecord.draws,
           eloChange7Days,
+          rank,
           recentHistory: historyRecords || [],
         });
       } catch (err) {
@@ -360,23 +501,47 @@ const PlayerDetailClient = () => {
 
           {/* ELO Rating Section */}
           {!eloLoading && eloData && (
-            <div className="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border border-yellow-700/50 rounded-lg p-4 sm:p-6 mb-6">
+            <div className={`
+              rounded-lg p-4 sm:p-6 mb-6 border
+              ${eloData.rank !== null && eloData.rank <= 10
+                ? eloData.rank === 1
+                  ? 'bg-gradient-to-r from-yellow-900/40 via-amber-900/30 to-orange-900/40 border-yellow-600/70'
+                  : eloData.rank <= 3
+                    ? 'bg-gradient-to-r from-purple-900/40 via-violet-900/30 to-indigo-900/40 border-purple-600/70'
+                    : 'bg-gradient-to-r from-cyan-900/40 via-blue-900/30 to-indigo-900/40 border-cyan-600/70'
+                : 'bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-yellow-700/50'
+              }
+            `}>
               <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <div className="text-yellow-400/80 text-xs sm:text-sm mb-1">Ranked ELO</div>
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-3xl sm:text-4xl font-bold text-yellow-400">{eloData.elo}</span>
-                    {eloData.eloChange7Days !== 0 && (
-                      <span className={`text-lg sm:text-xl font-semibold ${eloData.eloChange7Days > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {eloData.eloChange7Days > 0 ? '▲' : '▼'} {eloData.eloChange7Days > 0 ? '+' : ''}{eloData.eloChange7Days}
-                        <span className="text-xs sm:text-sm text-gray-400 ml-1">7d</span>
-                      </span>
-                    )}
-                    {eloData.eloChange7Days === 0 && eloData.recentHistory.length > 0 && (
-                      <span className="text-lg text-gray-400">
-                        ─ <span className="text-xs sm:text-sm">7d</span>
-                      </span>
-                    )}
+                <div className="flex items-center gap-4">
+                  {/* Grandmaster Badge for top 10 */}
+                  {eloData.rank !== null && eloData.rank <= 10 && (
+                    <GrandmasterBadge rank={eloData.rank} />
+                  )}
+                  
+                  <div>
+                    <div className="text-yellow-400/80 text-xs sm:text-sm mb-1">
+                      Ranked ELO
+                      {eloData.rank !== null && (
+                        <span className="text-gray-400 ml-2">
+                          #{eloData.rank}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-3xl sm:text-4xl font-bold text-yellow-400">{eloData.elo}</span>
+                      {eloData.eloChange7Days !== 0 && (
+                        <span className={`text-lg sm:text-xl font-semibold ${eloData.eloChange7Days > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {eloData.eloChange7Days > 0 ? '▲' : '▼'} {eloData.eloChange7Days > 0 ? '+' : ''}{eloData.eloChange7Days}
+                          <span className="text-xs sm:text-sm text-gray-400 ml-1">7d</span>
+                        </span>
+                      )}
+                      {eloData.eloChange7Days === 0 && eloData.recentHistory.length > 0 && (
+                        <span className="text-lg text-gray-400">
+                          ─ <span className="text-xs sm:text-sm">7d</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

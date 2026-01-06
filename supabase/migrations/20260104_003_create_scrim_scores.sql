@@ -40,3 +40,4 @@ CREATE POLICY "Users can update their own submissions" ON public.scrim_score_sub
 COMMENT ON TABLE public.scrim_score_submissions IS 'Score submissions from players after scrim ends';
 
 
+
