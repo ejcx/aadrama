@@ -442,11 +442,12 @@ export default function ScrimClient() {
           .select('*')
           .in('status', ['waiting', 'ready_check', 'in_progress', 'scoring'])
           .order('created_at', { ascending: false }),
-        // Fetch recent scrims
+        // Fetch recent scrims (only finalized 4v4+ games)
         supabase
           .from('scrims_with_counts')
           .select('*')
-          .in('status', ['finalized', 'cancelled', 'expired'])
+          .eq('status', 'finalized')
+          .gte('player_count', 8)
           .order('created_at', { ascending: false })
           .limit(5),
         // Fetch distinct maps
