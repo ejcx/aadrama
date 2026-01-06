@@ -89,7 +89,8 @@ export default function ScrimDetailClient() {
   const [scrim, setScrim] = useState<ScrimWithCounts | null>(null);
   const [players, setPlayers] = useState<ScrimPlayer[]>([]);
     const [scoreSubmissions, setScoreSubmissions] = useState<ScrimScoreSubmission[]>([]);
-    const [eloChanges, setEloChanges] = useState<Map<string, { change: number; newElo: number }>>(new Map());
+    const [eloChanges, setEloChanges] = useState<Map<string, { change: number; eloBefore: number; eloAfter: number }>>(new Map());
+    const [playerElos, setPlayerElos] = useState<Map<string, number>>(new Map()); // gameNameLower -> current elo (for non-finalized scrims)
     const [userGameNames, setUserGameNames] = useState<Map<string, string>>(new Map()); // userId -> gameNameLower
     const [eloDebugInfo, setEloDebugInfo] = useState<{
         sessionPlayers: string[]
@@ -157,10 +158,10 @@ export default function ScrimDetailClient() {
           supabase
               .from('user_game_names')
               .select('user_id, game_name_lower'),
-          // Fetch ELO history for this scrim
+          // Fetch ELO history for this scrim (includes elo_before for historical accuracy)
           supabase
               .from('elo_history')
-              .select('game_name_lower, elo_change, elo_after')
+              .select('game_name_lower, elo_change, elo_before, elo_after')
               .eq('scrim_id', scrimId),
       ]);
 
@@ -180,23 +181,42 @@ export default function ScrimDetailClient() {
 
         // Filter and set user game names for players in this scrim
         const userIds = new Set((playersRes.data || []).map(p => p.user_id));
+        const gameNameLowers: string[] = [];
         if (gameNamesRes.data) {
             const gameNameMap = new Map<string, string>();
           for (const gn of gameNamesRes.data) {
               if (userIds.has(gn.user_id) && !gameNameMap.has(gn.user_id)) {
                   gameNameMap.set(gn.user_id, gn.game_name_lower);
+                  gameNameLowers.push(gn.game_name_lower);
               }
           }
           setUserGameNames(gameNameMap);
       }
 
-        // Set ELO changes for finalized ranked scrims
+        // Fetch current ELO ratings for all players with linked game names
+        if (gameNameLowers.length > 0) {
+          const { data: eloData } = await supabase
+            .from('player_elo')
+            .select('game_name_lower, elo')
+            .in('game_name_lower', gameNameLowers);
+          
+          if (eloData) {
+            const eloMap = new Map<string, number>();
+            for (const pe of eloData) {
+              eloMap.set(pe.game_name_lower, pe.elo);
+            }
+            setPlayerElos(eloMap);
+          }
+        }
+
+        // Set ELO changes for finalized ranked scrims (use elo_before for historical accuracy)
         if (scrimData.status === "finalized" && scrimData.is_ranked && eloHistoryRes.data) {
-            const eloMap = new Map<string, { change: number; newElo: number }>();
+            const eloMap = new Map<string, { change: number; eloBefore: number; eloAfter: number }>();
           for (const entry of eloHistoryRes.data) {
               eloMap.set(entry.game_name_lower, {
                   change: entry.elo_change,
-                  newElo: entry.elo_after,
+                  eloBefore: entry.elo_before,
+                  eloAfter: entry.elo_after,
               });
           }
           setEloChanges(eloMap);
@@ -425,46 +445,100 @@ export default function ScrimDetailClient() {
           {(scrim.status === "in_progress" || scrim.status === "scoring" || scrim.status === "finalized") && (
             <>
               <h2 className="text-white text-xl font-semibold mb-4">Teams</h2>
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-blue-400 font-semibold mb-3 text-lg">Team A</h3>
-                  <div className="space-y-2">
-                                      {teamA.map(p => {
-                                          const gameNameLower = userGameNames.get(p.user_id);
-                                          const elo = gameNameLower ? eloChanges.get(gameNameLower) : null;
-                                          return (
-                                              <div key={p.id} className="bg-blue-900/30 border border-blue-800 rounded px-3 py-2 text-white flex items-center justify-between">
-                                                  <span>{p.user_name}</span>
-                                                  {elo && (
-                                                      <span className={`text-sm font-medium ${elo.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                          {elo.change >= 0 ? '▲' : '▼'} {elo.change >= 0 ? '+' : ''}{elo.change}
-                                                      </span>
-                                                  )}
-                                              </div>
-                        );
-                    })}
+              {(() => {
+                // Get player ELO - use historical elo_before for finalized scrims, current elo otherwise
+                const isFinalized = scrim.status === "finalized";
+                const getPlayerElo = (userId: string): number | undefined => {
+                  const gameNameLower = userGameNames.get(userId);
+                  if (!gameNameLower) return undefined;
+                  
+                  // For finalized scrims, use elo_before (ELO at time of scrim)
+                  if (isFinalized) {
+                    const eloData = eloChanges.get(gameNameLower);
+                    return eloData?.eloBefore;
+                  }
+                  // For in-progress scrims, use current ELO
+                  return playerElos.get(gameNameLower);
+                };
+                
+                const teamAElos = teamA.map(p => getPlayerElo(p.user_id)).filter((e): e is number => e !== undefined);
+                const teamBElos = teamB.map(p => getPlayerElo(p.user_id)).filter((e): e is number => e !== undefined);
+                const teamATotal = teamAElos.reduce((sum, e) => sum + e, 0);
+                const teamBTotal = teamBElos.reduce((sum, e) => sum + e, 0);
+                const teamAAvg = teamAElos.length > 0 ? Math.round(teamATotal / teamAElos.length) : 0;
+                const teamBAvg = teamBElos.length > 0 ? Math.round(teamBTotal / teamBElos.length) : 0;
+                
+                return (
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-blue-400 font-semibold text-lg">Team A</h3>
+                        {teamATotal > 0 && (
+                          <div className="text-right">
+                            <span className="text-blue-300 text-sm font-mono">{teamATotal} ELO</span>
+                            <span className="text-gray-500 text-xs ml-2">(avg: {teamAAvg})</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {teamA.map(p => {
+                          const gameNameLower = userGameNames.get(p.user_id);
+                          const displayElo = getPlayerElo(p.user_id);
+                          const eloChange = gameNameLower ? eloChanges.get(gameNameLower) : null;
+                          return (
+                            <div key={p.id} className="bg-blue-900/30 border border-blue-800 rounded px-3 py-2 text-white flex items-center justify-between">
+                              <span>{p.user_name}</span>
+                              <div className="flex items-center gap-2">
+                                {displayElo !== undefined && (
+                                  <span className="text-gray-400 text-sm font-mono">{displayElo}</span>
+                                )}
+                                {eloChange && (
+                                  <span className={`text-sm font-medium ${eloChange.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {eloChange.change >= 0 ? '+' : ''}{eloChange.change}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-red-400 font-semibold text-lg">Team B</h3>
+                        {teamBTotal > 0 && (
+                          <div className="text-right">
+                            <span className="text-red-300 text-sm font-mono">{teamBTotal} ELO</span>
+                            <span className="text-gray-500 text-xs ml-2">(avg: {teamBAvg})</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {teamB.map(p => {
+                          const gameNameLower = userGameNames.get(p.user_id);
+                          const displayElo = getPlayerElo(p.user_id);
+                          const eloChange = gameNameLower ? eloChanges.get(gameNameLower) : null;
+                          return (
+                            <div key={p.id} className="bg-red-900/30 border border-red-800 rounded px-3 py-2 text-white flex items-center justify-between">
+                              <span>{p.user_name}</span>
+                              <div className="flex items-center gap-2">
+                                {displayElo !== undefined && (
+                                  <span className="text-gray-400 text-sm font-mono">{displayElo}</span>
+                                )}
+                                {eloChange && (
+                                  <span className={`text-sm font-medium ${eloChange.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {eloChange.change >= 0 ? '+' : ''}{eloChange.change}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <h3 className="text-red-400 font-semibold mb-3 text-lg">Team B</h3>
-                  <div className="space-y-2">
-                                      {teamB.map(p => {
-                                          const gameNameLower = userGameNames.get(p.user_id);
-                                          const elo = gameNameLower ? eloChanges.get(gameNameLower) : null;
-                                          return (
-                                              <div key={p.id} className="bg-red-900/30 border border-red-800 rounded px-3 py-2 text-white flex items-center justify-between">
-                                                  <span>{p.user_name}</span>
-                                                  {elo && (
-                                                      <span className={`text-sm font-medium ${elo.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                          {elo.change >= 0 ? '▲' : '▼'} {elo.change >= 0 ? '+' : ''}{elo.change}
-                                                      </span>
-                                                  )}
-                                              </div>
-                        );
-                    })}
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* End Game button */}
               {scrim.status === "in_progress" && isParticipant && (

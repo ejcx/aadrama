@@ -13,3 +13,4 @@ export function createEdgeClient() {
   return createSupabaseClient(url, key)
 }
 
+

@@ -162,3 +162,4 @@ COMMENT ON FUNCTION assign_random_teams IS 'Randomly assigns ready players to te
 COMMENT ON FUNCTION check_score_consensus IS 'Checks if >50% of players submitted the same score';
 COMMENT ON FUNCTION finalize_scrim IS 'Finalizes a scrim if score consensus is reached';
 
+

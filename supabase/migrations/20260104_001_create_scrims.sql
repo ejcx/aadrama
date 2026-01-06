@@ -54,3 +54,4 @@ CREATE POLICY "Creator can update their scrim" ON public.scrims
 
 COMMENT ON TABLE public.scrims IS 'Competitive scrim matches that players can create and join';
 
+
