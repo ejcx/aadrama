@@ -973,3 +973,132 @@ export async function getScrimRankedStatus(scrimId: string): Promise<{
     }
 }
 
+// Admin user ID that can recalculate ELO
+const ADMIN_USER_ID = 'user_37oDN0YOSoKb4uypcjhU0Rgodzi'
+
+// Admin-only: Recalculate ELO for a scrim
+// This reverts the previous ELO changes and recalculates using ELO values as they were at the time
+export async function adminRecalculateElo(scrimId: string): Promise<{
+    success: boolean
+    error?: string
+    revertedChanges?: Array<{ gameName: string; revertedChange: number }>
+    newChanges?: Array<{ gameName: string; eloChange: number; newElo: number }>
+}> {
+    const { userId } = await getCurrentUser()
+    const supabase = await createClient()
+    
+    // Enforce admin-only access
+    if (userId !== ADMIN_USER_ID) {
+        return { success: false, error: 'Unauthorized: Admin access required' }
+    }
+    
+    // Get scrim details
+    const scrim = await getScrim(scrimId)
+    if (!scrim) {
+        return { success: false, error: 'Scrim not found' }
+    }
+    
+    if (scrim.status !== 'finalized') {
+        return { success: false, error: 'Scrim must be finalized' }
+    }
+    
+    if (!scrim.tracker_session_id) {
+        return { success: false, error: 'Scrim must have a linked tracker session' }
+    }
+    
+    // Get existing ELO history for this scrim
+    const { data: existingHistory } = await supabase
+        .from('elo_history')
+        .select('*')
+        .eq('scrim_id', scrimId)
+    
+    const revertedChanges: Array<{ gameName: string; revertedChange: number }> = []
+    
+    // Revert previous ELO changes if they exist
+    if (existingHistory && existingHistory.length > 0) {
+        for (const record of existingHistory) {
+            // Subtract the previous ELO change from the player's current ELO
+            const { error: updateError } = await supabase
+                .from('player_elo')
+                .update({
+                    elo: supabase.rpc ? undefined : record.elo_before, // Reset to elo_before
+                    games_played: supabase.rpc ? undefined : undefined, // Will handle separately
+                })
+                .eq('game_name_lower', record.game_name_lower)
+            
+            // Actually, let's use a direct update with the revert
+            await supabase.rpc('revert_player_elo', {
+                p_game_name_lower: record.game_name_lower,
+                p_elo_change: record.elo_change,
+                p_result: record.result,
+            }).catch(() => {
+                // If RPC doesn't exist, do it manually
+            })
+            
+            // Manual revert: subtract the change and adjust win/loss/draw counts
+            const { data: currentElo } = await supabase
+                .from('player_elo')
+                .select('*')
+                .eq('game_name_lower', record.game_name_lower)
+                .single()
+            
+            if (currentElo) {
+                await supabase
+                    .from('player_elo')
+                    .update({
+                        elo: currentElo.elo - record.elo_change,
+                        games_played: Math.max(0, currentElo.games_played - 1),
+                        wins: record.result === 'win' ? Math.max(0, currentElo.wins - 1) : currentElo.wins,
+                        losses: record.result === 'loss' ? Math.max(0, currentElo.losses - 1) : currentElo.losses,
+                        draws: record.result === 'draw' ? Math.max(0, currentElo.draws - 1) : currentElo.draws,
+                    })
+                    .eq('game_name_lower', record.game_name_lower)
+                
+                revertedChanges.push({
+                    gameName: record.game_name_lower,
+                    revertedChange: -record.elo_change,
+                })
+            }
+        }
+        
+        // Delete the old ELO history for this scrim
+        await supabase
+            .from('elo_history')
+            .delete()
+            .eq('scrim_id', scrimId)
+    }
+    
+    // Clear ranked_processed_at to allow reprocessing
+    await supabase
+        .from('scrims')
+        .update({ ranked_processed_at: null })
+        .eq('id', scrimId)
+    
+    // Now recalculate ELO fresh
+    const result = await processRankedScrim(scrimId)
+    
+    revalidatePath('/scrim')
+    revalidatePath(`/scrim/${scrimId}`)
+    
+    return {
+        success: result.success,
+        error: result.error,
+        revertedChanges,
+        newChanges: result.eloChanges?.map(c => ({
+            gameName: c.gameName,
+            eloChange: c.eloChange,
+            newElo: c.newElo,
+        })),
+    }
+}
+
+// Check if current user is admin
+export async function isCurrentUserAdmin(): Promise<boolean> {
+    try {
+        const { userId } = await getCurrentUser()
+        return userId === ADMIN_USER_ID
+    } catch {
+        return false
+    }
+}
+

@@ -13,10 +13,12 @@ import {
   endGame,
   submitScore,
   cancelScrim,
-    setTrackerSessionId,
-    retryEloProcessing,
-    debugEloValidation,
-    setScrimRanked,
+  setTrackerSessionId,
+  retryEloProcessing,
+  debugEloValidation,
+  setScrimRanked,
+  adminRecalculateElo,
+  isCurrentUserAdmin,
 } from "../actions";
 import type { ScrimWithCounts, ScrimPlayer, ScrimScoreSubmission } from "@/lib/supabase/types";
 import { SessionContent } from "../../tracker/session/SessionContent";
@@ -105,6 +107,7 @@ export default function ScrimDetailClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Form states
   const [scoreA, setScoreA] = useState("");
