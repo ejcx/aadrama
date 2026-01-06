@@ -1017,25 +1017,7 @@ export async function adminRecalculateElo(scrimId: string): Promise<{
     // Revert previous ELO changes if they exist
     if (existingHistory && existingHistory.length > 0) {
         for (const record of existingHistory) {
-            // Subtract the previous ELO change from the player's current ELO
-            const { error: updateError } = await supabase
-                .from('player_elo')
-                .update({
-                    elo: supabase.rpc ? undefined : record.elo_before, // Reset to elo_before
-                    games_played: supabase.rpc ? undefined : undefined, // Will handle separately
-                })
-                .eq('game_name_lower', record.game_name_lower)
-            
-            // Actually, let's use a direct update with the revert
-            await supabase.rpc('revert_player_elo', {
-                p_game_name_lower: record.game_name_lower,
-                p_elo_change: record.elo_change,
-                p_result: record.result,
-            }).catch(() => {
-                // If RPC doesn't exist, do it manually
-            })
-            
-            // Manual revert: subtract the change and adjust win/loss/draw counts
+            // Get current ELO for this player
             const { data: currentElo } = await supabase
                 .from('player_elo')
                 .select('*')
@@ -1043,6 +1025,7 @@ export async function adminRecalculateElo(scrimId: string): Promise<{
                 .single()
             
             if (currentElo) {
+                // Revert: subtract the change and adjust win/loss/draw counts
                 await supabase
                     .from('player_elo')
                     .update({
