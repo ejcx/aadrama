@@ -717,12 +717,17 @@ export async function processRankedScrim(scrimId: string): Promise<{
         result: 'win' | 'loss' | 'draw'
     }> = []
 
+    // Calculate total kills per team for performance adjustment
+    const teamATotalKills = teamAPlayers.reduce((sum, p) => sum + (p.kills || 0), 0)
+    const teamBTotalKills = teamBPlayers.reduce((sum, p) => sum + (p.kills || 0), 0)
+
     // Process each matched player using the stored procedure
     for (const player of matchedPlayers) {
         const isTeamA = player.team === 'team_a'
         const roundsFor = isTeamA ? teamAScore : teamBScore
         const roundsAgainst = isTeamA ? teamBScore : teamAScore
         const opponentAvgElo = isTeamA ? teamBAvgElo : teamAAvgElo
+        const teamTotalKills = isTeamA ? teamATotalKills : teamBTotalKills
 
         // Call the stored procedure with simplified interface
         const { data, error } = await supabase.rpc('process_player_elo', {
@@ -732,6 +737,7 @@ export async function processRankedScrim(scrimId: string): Promise<{
             p_rounds_against: roundsAgainst,
             p_kills: player.kills || 0,
             p_opponent_avg_elo: opponentAvgElo,
+            p_team_total_kills: teamTotalKills,
         })
 
         if (error) {

@@ -9,6 +9,7 @@ interface TrackerLayoutProps {
 }
 
 const tabs = [
+  { name: "ELO Rankings", href: "/tracker/elo" },
   { name: "Top Players", href: "/tracker/top-players" },
   { name: "Top by Map", href: "/tracker/top-by-map" },
   { name: "Sessions", href: "/tracker/sessions" },
