@@ -136,7 +136,8 @@ export default function ScrimDetailClient() {
   async function loadScrimData() {
     try {
       // Use browser client for read operations (edge runtime compatible)
-      const [scrimRes, playersRes] = await Promise.all([
+        // Run ALL queries in parallel for maximum speed
+        const [scrimRes, playersRes, submissionsRes, gameNamesRes, eloHistoryRes] = await Promise.all([
         supabase
           .from('scrims_with_counts')
           .select('*')
@@ -147,6 +148,20 @@ export default function ScrimDetailClient() {
           .select('*')
           .eq('scrim_id', scrimId)
           .order('joined_at', { ascending: true }),
+          // Always fetch submissions (will be empty if not in scoring/finalized)
+          supabase
+              .from('scrim_score_submissions')
+              .select('*')
+              .eq('scrim_id', scrimId),
+          // Fetch all user game names (we'll filter by userIds client-side)
+          supabase
+              .from('user_game_names')
+              .select('user_id, game_name_lower'),
+          // Fetch ELO history for this scrim
+          supabase
+              .from('elo_history')
+              .select('game_name_lower, elo_change, elo_after')
+              .eq('scrim_id', scrimId),
       ]);
 
       if (scrimRes.error || !scrimRes.data) {
@@ -158,52 +173,34 @@ export default function ScrimDetailClient() {
       setScrim(scrimData);
       setPlayers(playersRes.data || []);
 
-      // Load score submissions if in scoring phase
+        // Set score submissions
       if (scrimData.status === "scoring" || scrimData.status === "finalized") {
-        const { data: submissions } = await supabase
-          .from('scrim_score_submissions')
-          .select('*')
-          .eq('scrim_id', scrimId);
-        setScoreSubmissions(submissions || []);
+          setScoreSubmissions(submissionsRes.data || []);
       }
 
-        // Load user game names for all players
-        const userIds = (playersRes.data || []).map(p => p.user_id);
-        if (userIds.length > 0) {
-            const { data: gameNames } = await supabase
-                .from('user_game_names')
-                .select('user_id, game_name_lower')
-                .in('user_id', userIds);
+        // Filter and set user game names for players in this scrim
+        const userIds = new Set((playersRes.data || []).map(p => p.user_id));
+        if (gameNamesRes.data) {
+            const gameNameMap = new Map<string, string>();
+          for (const gn of gameNamesRes.data) {
+              if (userIds.has(gn.user_id) && !gameNameMap.has(gn.user_id)) {
+                  gameNameMap.set(gn.user_id, gn.game_name_lower);
+              }
+          }
+          setUserGameNames(gameNameMap);
+      }
 
-            if (gameNames) {
-                const gameNameMap = new Map<string, string>();
-                for (const gn of gameNames) {
-                    if (!gameNameMap.has(gn.user_id)) {
-                        gameNameMap.set(gn.user_id, gn.game_name_lower);
-                    }
-                }
-                setUserGameNames(gameNameMap);
-            }
-        }
-
-        // Load ELO changes for finalized ranked scrims
-        if (scrimData.status === "finalized" && scrimData.is_ranked) {
-            const { data: eloHistory } = await supabase
-                .from('elo_history')
-                .select('game_name_lower, elo_change, elo_after')
-                .eq('scrim_id', scrimId);
-
-            if (eloHistory) {
-                const eloMap = new Map<string, { change: number; newElo: number }>();
-                for (const entry of eloHistory) {
-                    eloMap.set(entry.game_name_lower, {
-                        change: entry.elo_change,
-                        newElo: entry.elo_after,
-                    });
-                }
-                setEloChanges(eloMap);
-            }
-        }
+        // Set ELO changes for finalized ranked scrims
+        if (scrimData.status === "finalized" && scrimData.is_ranked && eloHistoryRes.data) {
+            const eloMap = new Map<string, { change: number; newElo: number }>();
+          for (const entry of eloHistoryRes.data) {
+              eloMap.set(entry.game_name_lower, {
+                  change: entry.elo_change,
+                  newElo: entry.elo_after,
+              });
+          }
+          setEloChanges(eloMap);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load scrim");
     } finally {
