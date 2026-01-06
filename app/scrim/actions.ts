@@ -180,21 +180,52 @@ async function checkAndStartGame(scrimId: string): Promise<void> {
   const supabase = await createClient()
   
   const scrim = await getScrim(scrimId)
-  if (!scrim || scrim.status !== 'waiting') return
+
+  console.log(`[Scrim ${scrimId}] checkAndStartGame called, status: ${scrim?.status}`)
+
+  if (!scrim) {
+    console.log(`[Scrim ${scrimId}] Scrim not found`)
+    return
+  }
+
+  if (scrim.status !== 'waiting') {
+    console.log(`[Scrim ${scrimId}] Status is '${scrim.status}', not 'waiting' - skipping`)
+    return
+  }
   
   const players = await getScrimPlayers(scrimId)
   const readyCount = players.filter(p => p.is_ready).length
   const totalCount = players.length
+  const minRequired = scrim.min_players_per_team * 2
+
+  console.log(`[Scrim ${scrimId}] Players: ${totalCount}, Ready: ${readyCount}, Min required: ${minRequired}, Even: ${totalCount % 2 === 0}`)
   
   // Need at least min_players_per_team * 2, all ready, and even count
-  if (
-    totalCount >= scrim.min_players_per_team * 2 &&
-    readyCount === totalCount &&
-    totalCount % 2 === 0
-  ) {
-    // All conditions met - assign teams and start!
-    await supabase.rpc('assign_random_teams', { p_scrim_id: scrimId })
+  if (totalCount < minRequired) {
+    console.log(`[Scrim ${scrimId}] Not enough players (${totalCount} < ${minRequired})`)
+    return
   }
+
+  if (readyCount !== totalCount) {
+    console.log(`[Scrim ${scrimId}] Not all players ready (${readyCount}/${totalCount})`)
+    return
+  }
+
+  if (totalCount % 2 !== 0) {
+    console.log(`[Scrim ${scrimId}] Odd number of players (${totalCount})`)
+    return
+  }
+
+  // All conditions met - assign teams and start!
+  console.log(`[Scrim ${scrimId}] All conditions met! Calling assign_random_teams...`)
+  const { error } = await supabase.rpc('assign_random_teams', { p_scrim_id: scrimId })
+
+  if (error) {
+    console.error(`[Scrim ${scrimId}] assign_random_teams failed:`, error)
+    throw new Error(`Failed to start game: ${error.message}`)
+  }
+
+  console.log(`[Scrim ${scrimId}] Teams assigned successfully! Game started.`)
 }
 
 // End the game and move to scoring phase
