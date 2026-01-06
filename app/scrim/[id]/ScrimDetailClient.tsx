@@ -126,6 +126,8 @@ export default function ScrimDetailClient() {
 
   useEffect(() => {
     loadScrimData();
+    // Check if user is admin
+    isCurrentUserAdmin().then(setIsAdmin);
     // Poll every 5 seconds for real-time updates
     const interval = setInterval(loadScrimData, 5000);
     return () => clearInterval(interval);
@@ -737,6 +739,34 @@ export default function ScrimDetailClient() {
                       )}
                   </div>
               )}
+
+        {/* Admin: Recalculate ELO */}
+        {isAdmin && scrim.status === "finalized" && scrim.tracker_session_id && (
+          <div className="bg-purple-900/20 border border-purple-700 rounded-lg p-4 mb-6">
+            <h3 className="text-purple-400 font-semibold mb-2">🔧 Admin Tools</h3>
+            <p className="text-gray-400 text-sm mb-3">
+              Recalculate ELO will revert any existing ELO changes from this scrim and recalculate fresh.
+            </p>
+            <button
+              onClick={async () => {
+                if (!confirm('Are you sure you want to recalculate ELO for this scrim? This will revert existing changes and recalculate.')) {
+                  return;
+                }
+                const result = await adminRecalculateElo(scrimId);
+                if (result.success) {
+                  alert(`ELO recalculated!\n\nReverted: ${result.revertedChanges?.length || 0} changes\nNew: ${result.newChanges?.length || 0} changes\n\n${result.newChanges?.map(c => `${c.gameName}: ${c.eloChange >= 0 ? '+' : ''}${c.eloChange} → ${c.newElo}`).join('\n') || ''}`);
+                  await loadScrimData();
+                } else {
+                  alert(`Failed to recalculate ELO: ${result.error}`);
+                }
+              }}
+              disabled={isPending}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-lg font-medium"
+            >
+              Recalculate ELO
+            </button>
+          </div>
+        )}
 
         {/* Share Link */}
         <div className="bg-gray-800 rounded-lg p-4 text-center">
