@@ -77,35 +77,47 @@ BEGIN
   
   -- Performance modifier based on kill contribution
   -- Average contribution is 1/4 = 0.25 (assuming 4 players per team on average)
-  -- If you got more kills than average, you performed above expectations
+  -- Kill performance has significant impact on ELO changes
   v_performance_modifier := 1.0;
   v_kill_contribution := 0.0;
   
-  IF p_team_total_kills > 0 AND p_kills > 0 THEN
+  IF p_team_total_kills > 0 THEN
     -- Calculate what % of team kills this player got
     v_kill_contribution := p_kills::float / p_team_total_kills::float;
     
-    -- Expected contribution (assuming roughly equal distribution)
-    -- If team has 4 players, expected = 0.25. If 5 players, expected = 0.20, etc.
-    -- We'll use 0.25 as baseline (4 player teams)
-    
     IF v_result = 'loss' THEN
-      -- For losses: reduce the loss if player performed above average
-      -- If player got 40% of team kills (0.40), that's 1.6x the expected (0.25)
-      -- Reduce their loss by up to 40% for top performers
-      IF v_kill_contribution > 0.25 THEN
-        -- Scale: 0.25 -> 1.0 (no reduction), 0.50 -> 0.6 (40% reduction)
-        v_performance_modifier := GREATEST(0.5, 1.0 - (v_kill_contribution - 0.25) * 1.6);
-      END IF;
-    ELSIF v_result = 'win' THEN
-      -- For wins: boost ELO for top performers, reduce for underperformers
-      IF v_kill_contribution > 0.30 THEN
-        -- Top performer on winning team gets up to 30% bonus
-        v_performance_modifier := LEAST(1.3, 1.0 + (v_kill_contribution - 0.25) * 0.8);
+      -- LOSING TEAM:
+      -- High kill % = you tried to carry, significantly reduce loss
+      -- Low kill % = you didn't contribute, increase loss
+      IF v_kill_contribution >= 0.40 THEN
+        -- Star performer (40%+ of kills): lose only 30-40% of normal
+        v_performance_modifier := GREATEST(0.3, 0.7 - (v_kill_contribution - 0.40) * 2.0);
+      ELSIF v_kill_contribution >= 0.25 THEN
+        -- Above average (25-40%): moderate reduction
+        v_performance_modifier := 1.0 - (v_kill_contribution - 0.25) * 2.0; -- 0.70 to 1.0
       ELSIF v_kill_contribution < 0.15 THEN
-        -- Underperformer on winning team gets reduced gains (but still positive)
-        v_performance_modifier := GREATEST(0.7, 0.7 + (v_kill_contribution / 0.15) * 0.3);
+        -- Very low contribution (<15%): lose MORE ELO
+        -- Scale: 0% -> 1.5x loss, 15% -> 1.0x loss
+        v_performance_modifier := 1.5 - (v_kill_contribution / 0.15) * 0.5;
       END IF;
+      -- Between 0.15 and 0.25 stays at 1.0 (average)
+      
+    ELSIF v_result = 'win' THEN
+      -- WINNING TEAM:
+      -- High kill % = you carried, get bonus ELO
+      -- Low kill % = got carried, slight reduction but still positive
+      IF v_kill_contribution >= 0.40 THEN
+        -- Star performer (40%+ of kills): up to 60% bonus
+        v_performance_modifier := LEAST(1.6, 1.3 + (v_kill_contribution - 0.40) * 1.5);
+      ELSIF v_kill_contribution >= 0.30 THEN
+        -- Good performer (30-40%): 10-30% bonus
+        v_performance_modifier := 1.1 + (v_kill_contribution - 0.30) * 2.0;
+      ELSIF v_kill_contribution < 0.10 THEN
+        -- Very low contribution (<10%): reduced gains (but not punishing)
+        -- Scale: 0% -> 0.7x, 10% -> 1.0x
+        v_performance_modifier := 0.7 + (v_kill_contribution / 0.10) * 0.3;
+      END IF;
+      -- Between 0.10 and 0.30 stays at 1.0 (average)
     END IF;
   END IF;
   

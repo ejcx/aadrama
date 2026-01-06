@@ -432,15 +432,16 @@ export default function ScrimClient() {
   async function loadScrims() {
     try {
       // Use browser client for read operations (edge runtime compatible)
-      const [activeRes, recentRes, mapsRes] = await Promise.all([
-        // Expire stale scrims first, then fetch active
-        supabase.rpc('expire_stale_scrims').then(() =>
-          supabase
-            .from('scrims_with_counts')
-            .select('*')
-            .in('status', ['waiting', 'ready_check', 'in_progress', 'scoring'])
-            .order('created_at', { ascending: false })
-        ),
+      // Run expire_stale_scrims in parallel with other queries for faster load
+      const [expireRes, activeRes, recentRes, mapsRes] = await Promise.all([
+        // Fire and forget - expire stale scrims
+        supabase.rpc('expire_stale_scrims'),
+        // Fetch active scrims
+        supabase
+          .from('scrims_with_counts')
+          .select('*')
+          .in('status', ['waiting', 'ready_check', 'in_progress', 'scoring'])
+          .order('created_at', { ascending: false }),
         // Fetch recent scrims
         supabase
           .from('scrims_with_counts')
@@ -451,6 +452,12 @@ export default function ScrimClient() {
         // Fetch distinct maps
         supabase.rpc('get_distinct_maps'),
       ]);
+      
+      // Log any errors from individual queries
+      if (expireRes.error) console.error("expire_stale_scrims error:", expireRes.error);
+      if (activeRes.error) console.error("active scrims error:", activeRes.error);
+      if (recentRes.error) console.error("recent scrims error:", recentRes.error);
+      if (mapsRes.error) console.error("maps error:", mapsRes.error);
       
       setActiveScrims(activeRes.data || []);
       setRecentScrims(recentRes.data || []);
