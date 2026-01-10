@@ -146,8 +146,8 @@ const EloRankingsPage = () => {
                           </Link>
                           {player.game_name_lower.includes('mediocre') && (
                             <span 
-                              className="px-1.5 py-0.5 text-[10px] font-bold uppercase bg-red-900/80 text-red-300 border border-red-700 rounded"
-                              title="Banned from scrims until Saturday 8:00 PM"
+                              className="px-1.5 py-0.5 text-[10px] font-bold uppercase bg-red-900/80 text-red-300 border border-red-700 rounded cursor-help"
+                              title="Banned until Saturday 8:00 PM — Player intentionally losing rounds on insurgent camp"
                             >
                               🚫 Banned
                             </span>
