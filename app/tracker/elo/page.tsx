@@ -137,12 +137,22 @@ const EloRankingsPage = () => {
                         </span>
                       </td>
                       <td className="py-2 sm:py-3 px-2 sm:px-4">
-                        <Link
-                          href={`/tracker/player/${encodeURIComponent(player.game_name)}`}
-                          className="text-blue-400 hover:text-blue-300 hover:underline font-medium"
-                        >
-                          {player.game_name}
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/tracker/player/${encodeURIComponent(player.game_name)}`}
+                            className="text-blue-400 hover:text-blue-300 hover:underline font-medium"
+                          >
+                            {player.game_name}
+                          </Link>
+                          {player.game_name_lower.includes('mediocre') && (
+                            <span 
+                              className="px-1.5 py-0.5 text-[10px] font-bold uppercase bg-red-900/80 text-red-300 border border-red-700 rounded"
+                              title="Banned from scrims until Saturday 8:00 PM"
+                            >
+                              🚫 Banned
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
                         <span className="text-yellow-400 font-bold text-base">{player.elo}</span>
