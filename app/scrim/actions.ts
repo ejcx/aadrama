@@ -1131,3 +1131,82 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
     }
 }
 
+// ==================== READ OPERATIONS FOR CLIENT COMPONENTS ====================
+
+// Get all user game names (for matching users to in-game names)
+export async function getAllUserGameNames() {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('user_game_names')
+    .select('*')
+
+  if (error) throw new Error(`Failed to fetch game names: ${error.message}`)
+  return data || []
+}
+
+// Get ELO history for a specific scrim
+export async function getScrimEloHistory(scrimId: string) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('elo_history')
+    .select('*')
+    .eq('scrim_id', scrimId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(`Failed to fetch ELO history: ${error.message}`)
+  return data || []
+}
+
+// Get player ELO records for players in a scrim
+export async function getScrimPlayerElos(scrimId: string) {
+  const supabase = await createClient()
+
+  // Get scrim players first
+  const players = await getScrimPlayers(scrimId)
+
+  // Get all game names for these users
+  const userIds = players.map(p => p.user_id)
+  const { data: gameNames } = await supabase
+    .from('user_game_names')
+    .select('user_id, game_name_lower')
+    .in('user_id', userIds)
+
+  if (!gameNames || gameNames.length === 0) return []
+
+  // Get ELO for all these game names
+  const gameName_lowers = gameNames.map(gn => gn.game_name_lower)
+  const { data: eloData, error } = await supabase
+    .from('player_elo')
+    .select('*')
+    .in('game_name_lower', gameName_lowers)
+
+  if (error) throw new Error(`Failed to fetch player ELOs: ${error.message}`)
+  return eloData || []
+}
+
+// Get complete scrim details (combined query for efficiency)
+export async function getScrimDetails(scrimId: string) {
+  const supabase = await createClient()
+
+  // Fetch all data in parallel
+  const [scrim, players, submissions, gameNames, eloHistory, playerElos] = await Promise.all([
+    getScrim(scrimId),
+    getScrimPlayers(scrimId),
+    getScoreSubmissions(scrimId),
+    getAllUserGameNames(),
+    getScrimEloHistory(scrimId),
+    getScrimPlayerElos(scrimId),
+  ])
+
+  return {
+    scrim,
+    players,
+    submissions,
+    gameNames,
+    eloHistory,
+    playerElos,
+  }
+}
+

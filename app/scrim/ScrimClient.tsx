@@ -1,19 +1,22 @@
 "use client";
 
-import { useState, useEffect, useTransition, useMemo } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { UserButton, useUser, SignInButton } from "@clerk/nextjs";
 import SidebarLayout from "../components/SidebarLayout";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
-import { 
-  createScrim, 
-  joinScrim, 
-  leaveScrim, 
+import {
+  createScrim,
+  joinScrim,
+  leaveScrim,
   toggleReady,
   endGame,
   submitScore,
   cancelScrim,
   setTrackerSessionId,
+  getActiveScrims,
+  getRecentScrims,
+  getTrackerMaps,
+  getScrimPlayers,
 } from "./actions";
 import type { ScrimWithCounts, ScrimPlayer } from "@/lib/supabase/types";
 
@@ -89,37 +92,30 @@ function ScrimCard({
   const [scoreA, setScoreA] = useState("");
   const [scoreB, setScoreB] = useState("");
   const [trackerInput, setTrackerInput] = useState("");
-  const supabase = useMemo(() => createClient(), []);
-  
+
   const isParticipant = players.some(p => p.user_id === userId);
   const isCreator = scrim.created_by === userId;
   const myPlayer = players.find(p => p.user_id === userId);
   const allReady = players.length > 0 && players.every(p => p.is_ready);
-  const canStart = players.length >= scrim.min_players_per_team * 2 && 
-                   players.length % 2 === 0 && 
+  const canStart = players.length >= scrim.min_players_per_team * 2 &&
+                   players.length % 2 === 0 &&
                    allReady;
-  
+
   // Team assignment display
   const teamA = players.filter(p => p.team === "team_a");
   const teamB = players.filter(p => p.team === "team_b");
   const unassigned = players.filter(p => !p.team);
-  
+
   useEffect(() => {
     if (expanded) {
       loadPlayers();
     }
   }, [expanded, scrim.id]);
-  
+
   async function loadPlayers() {
     try {
-      const { data, error } = await supabase
-        .from('scrim_players')
-        .select('*')
-        .eq('scrim_id', scrim.id)
-        .order('joined_at', { ascending: true });
-      
-      if (error) throw error;
-      setPlayers(data || []);
+      const data = await getScrimPlayers(scrim.id);
+      setPlayers(data);
     } catch (err) {
       console.error("Failed to load players:", err);
     }
@@ -420,49 +416,26 @@ export default function ScrimClient() {
   const [isPending, startTransition] = useTransition();
   const [selectedMap, setSelectedMap] = useState("");
   const [isRanked, setIsRanked] = useState(true);
-  const supabase = useMemo(() => createClient(), []);
-  
+
   useEffect(() => {
     loadScrims();
     // Poll for updates every 10 seconds
     const interval = setInterval(loadScrims, 10000);
     return () => clearInterval(interval);
   }, []);
-  
+
   async function loadScrims() {
     try {
-      // Use browser client for read operations (edge runtime compatible)
-      // Run expire_stale_scrims in parallel with other queries for faster load
-      const [expireRes, activeRes, recentRes, mapsRes] = await Promise.all([
-        // Fire and forget - expire stale scrims
-        supabase.rpc('expire_stale_scrims'),
-        // Fetch active scrims
-        supabase
-          .from('scrims_with_counts')
-          .select('*')
-          .in('status', ['waiting', 'ready_check', 'in_progress', 'scoring'])
-          .order('created_at', { ascending: false }),
-        // Fetch recent scrims (only finalized 4v4+ games)
-        supabase
-          .from('scrims_with_counts')
-          .select('*')
-          .eq('status', 'finalized')
-          .gte('player_count', 8)
-          .order('created_at', { ascending: false })
-          .limit(5),
-        // Fetch distinct maps
-        supabase.rpc('get_distinct_maps'),
+      // Fetch all data using server actions
+      const [activeScrims, recentScrims, maps] = await Promise.all([
+        getActiveScrims(),
+        getRecentScrims(5),
+        getTrackerMaps(),
       ]);
-      
-      // Log any errors from individual queries
-      if (expireRes.error) console.error("expire_stale_scrims error:", expireRes.error);
-      if (activeRes.error) console.error("active scrims error:", activeRes.error);
-      if (recentRes.error) console.error("recent scrims error:", recentRes.error);
-      if (mapsRes.error) console.error("maps error:", mapsRes.error);
-      
-      setActiveScrims(activeRes.data || []);
-      setRecentScrims(recentRes.data || []);
-      setAvailableMaps(mapsRes.data?.map((row: { map: string }) => row.map) || []);
+
+      setActiveScrims(activeScrims);
+      setRecentScrims(recentScrims);
+      setAvailableMaps(maps);
     } catch (err) {
       console.error("Failed to load scrims:", err);
     } finally {

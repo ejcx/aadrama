@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import SidebarLayout from "../../../components/SidebarLayout";
 import Link from "next/link";
 import { SessionHoverPopover } from "../../../components/SessionHoverPopover";
-import { createClient } from "@/lib/supabase/client";
+import { getPlayerElo, getPlayerEloHistory, getPlayerRank } from "../../actions";
 
 const API_BASE = "https://server-details.ej.workers.dev";
 
@@ -204,7 +204,6 @@ const getDefaultDates = () => {
 const PlayerDetailClient = () => {
   const params = useParams();
   const playerName = decodeURIComponent(params.name as string);
-  const supabase = useMemo(() => createClient(), []);
   
   const [playerStats, setPlayerStats] = useState<PlayerStats | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -271,41 +270,22 @@ const PlayerDetailClient = () => {
     const fetchEloData = async () => {
       try {
         setEloLoading(true);
-        const playerNameLower = playerName.toLowerCase();
 
-        // Fetch current ELO
-        const { data: eloRecord } = await supabase
-          .from('player_elo')
-          .select('*')
-          .eq('game_name_lower', playerNameLower)
-          .single();
+        // Fetch current ELO using server action
+        const eloRecord = await getPlayerElo(playerName);
 
         if (!eloRecord) {
           setEloData(null);
           return;
         }
 
-        // Fetch ELO history and rank in parallel
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-        const [historyResult, rankResult] = await Promise.all([
-          supabase
-            .from('elo_history')
-            .select('scrim_id, elo_change, elo_after, result, created_at')
-            .eq('game_name_lower', playerNameLower)
-            .gte('created_at', sevenDaysAgo.toISOString())
-            .order('created_at', { ascending: false }),
-          // Count how many players have higher ELO to determine rank
-          supabase
-            .from('player_elo')
-            .select('id', { count: 'exact', head: true })
-            .gt('elo', eloRecord.elo)
+        // Fetch ELO history and rank in parallel using server actions
+        const [historyRecords, rankData] = await Promise.all([
+          getPlayerEloHistory(playerName, 7),
+          getPlayerRank(playerName),
         ]);
 
-        const historyRecords = historyResult.data;
-        // Rank is 1 + number of players with higher ELO
-        const rank = rankResult.count !== null ? rankResult.count + 1 : null;
+        const rank = rankData?.rank || null;
 
         // Calculate 7-day ELO change
         const eloChange7Days = (historyRecords || []).reduce(
@@ -332,7 +312,7 @@ const PlayerDetailClient = () => {
     };
 
     fetchEloData();
-  }, [playerName, supabase]);
+  }, [playerName]);
 
   // Fetch player stats (all-time)
   useEffect(() => {
