@@ -406,41 +406,108 @@ function ScrimCard({
   );
 }
 
+type TimeRange = "7d" | "30d" | "90d" | "all" | "custom";
+
 export default function ScrimClient() {
   const { user, isLoaded } = useUser();
   const [activeScrims, setActiveScrims] = useState<ScrimWithCounts[]>([]);
   const [recentScrims, setRecentScrims] = useState<ScrimWithCounts[]>([]);
   const [availableMaps, setAvailableMaps] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recentLoading, setRecentLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [selectedMap, setSelectedMap] = useState("");
   const [isRanked, setIsRanked] = useState(true);
 
+  // Time range state for recent scrims
+  const [timeRange, setTimeRange] = useState<TimeRange>("30d");
+  const [startTime, setStartTime] = useState<string>(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30);
+    return date.toISOString().slice(0, 16);
+  });
+  const [endTime, setEndTime] = useState<string>(() => {
+    return new Date().toISOString().slice(0, 16);
+  });
+  const [recentLimit, setRecentLimit] = useState<number>(25);
+
+  // Update time range based on preset selection
+  const handleTimeRangeChange = (range: TimeRange) => {
+    setTimeRange(range);
+    const now = new Date();
+    const end = now.toISOString().slice(0, 16);
+    setEndTime(end);
+
+    if (range === "7d") {
+      const start = new Date();
+      start.setDate(start.getDate() - 7);
+      setStartTime(start.toISOString().slice(0, 16));
+    } else if (range === "30d") {
+      const start = new Date();
+      start.setDate(start.getDate() - 30);
+      setStartTime(start.toISOString().slice(0, 16));
+    } else if (range === "90d") {
+      const start = new Date();
+      start.setDate(start.getDate() - 90);
+      setStartTime(start.toISOString().slice(0, 16));
+    } else if (range === "all") {
+      setStartTime("");
+    }
+    // "custom" keeps current values
+  };
+
   useEffect(() => {
-    loadScrims();
-    // Poll for updates every 10 seconds
-    const interval = setInterval(loadScrims, 10000);
+    loadActiveScrims();
+    loadMaps();
+    // Poll for active scrims every 10 seconds
+    const interval = setInterval(loadActiveScrims, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  async function loadScrims() {
-    try {
-      // Fetch all data using server actions
-      const [activeScrims, recentScrims, maps] = await Promise.all([
-        getActiveScrims(),
-        getRecentScrims(5),
-        getTrackerMaps(),
-      ]);
+  // Load recent scrims when time range changes
+  useEffect(() => {
+    loadRecentScrims();
+  }, [timeRange, startTime, endTime, recentLimit]);
 
-      setActiveScrims(activeScrims);
-      setRecentScrims(recentScrims);
-      setAvailableMaps(maps);
+  async function loadActiveScrims() {
+    try {
+      const scrims = await getActiveScrims();
+      setActiveScrims(scrims);
     } catch (err) {
-      console.error("Failed to load scrims:", err);
+      console.error("Failed to load active scrims:", err);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadMaps() {
+    try {
+      const maps = await getTrackerMaps();
+      setAvailableMaps(maps);
+    } catch (err) {
+      console.error("Failed to load maps:", err);
+    }
+  }
+
+  async function loadRecentScrims() {
+    try {
+      setRecentLoading(true);
+      const scrims = await getRecentScrims({
+        limit: recentLimit,
+        startTime: timeRange !== "all" && startTime ? new Date(startTime).toISOString() : undefined,
+        endTime: timeRange !== "all" && endTime ? new Date(endTime).toISOString() : undefined,
+      });
+      setRecentScrims(scrims);
+    } catch (err) {
+      console.error("Failed to load recent scrims:", err);
+    } finally {
+      setRecentLoading(false);
+    }
+  }
+
+  async function loadScrims() {
+    await Promise.all([loadActiveScrims(), loadRecentScrims(), loadMaps()]);
   }
   
   function handleCreateScrim() {
@@ -565,17 +632,86 @@ export default function ScrimClient() {
           </div>
           
           {/* Recent Scrims */}
-          {recentScrims.length > 0 && (
-            <div className="w-full">
-              <h2 className="text-white text-xl font-bold mb-4">Recent Scrims</h2>
+          <div className="w-full">
+            <h2 className="text-white text-xl font-bold mb-4">Recent Scrims</h2>
+
+            {/* Time Range Filters */}
+            <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 sm:p-4 mb-4">
+              {/* Time Range Quick Buttons */}
+              <div className="mb-4">
+                <label className="block text-gray-300 text-xs sm:text-sm mb-2">Time Range</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: "7d", label: "7 Days" },
+                    { value: "30d", label: "30 Days" },
+                    { value: "90d", label: "90 Days" },
+                    { value: "all", label: "All Time" },
+                    { value: "custom", label: "Custom" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleTimeRangeChange(option.value as TimeRange)}
+                      className={`px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors ${timeRange === option.value
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600"
+                        }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Date Range */}
+              {timeRange === "custom" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
+                  <div>
+                    <label className="block text-gray-300 text-xs sm:text-sm mb-1">Start Time</label>
+                    <input
+                      type="datetime-local"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-300 text-xs sm:text-sm mb-1">End Time</label>
+                    <input
+                      type="datetime-local"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Limit */}
+              <div className="max-w-[150px]">
+                <label className="block text-gray-300 text-xs sm:text-sm mb-1">Limit</label>
+                <input
+                  type="number"
+                  value={recentLimit}
+                  onChange={(e) => setRecentLimit(parseInt(e.target.value) || 25)}
+                  min="1"
+                  max="100"
+                  className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Recent Scrims List */}
+            {recentLoading ? (
+              <div className="text-gray-400 text-center py-8">Loading scrims...</div>
+            ) : recentScrims.length > 0 ? (
               <div className="space-y-3">
                 {recentScrims.map(scrim => (
                   <Link
                     key={scrim.id}
                     href={`/scrim/${scrim.id}`}
-                    className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 flex justify-between items-center hover:bg-gray-800/50 transition-colors"
+                    className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 hover:bg-gray-800/50 transition-colors"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       {scrim.map && (
                         <span className="text-cyan-400">🗺️ {scrim.map}</span>
                       )}
@@ -586,6 +722,9 @@ export default function ScrimClient() {
                       )}
                       <span className="text-gray-500 text-sm">
                         {scrim.player_count} players
+                      </span>
+                      <span className="text-gray-600 text-xs">
+                        {new Date(scrim.created_at).toLocaleDateString()}
                       </span>
                       {scrim.tracker_session_id && (
                         <span className="text-blue-400 text-sm">📊 Stats</span>
@@ -602,8 +741,13 @@ export default function ScrimClient() {
                   </Link>
                 ))}
               </div>
-            </div>
-          )}
+              ) : (
+                <div className="py-8 border-2 border-dashed border-gray-600 rounded-lg text-center">
+                  <div className="text-gray-400 text-lg mb-2">No scrims found</div>
+                  <div className="text-gray-500 text-sm">Try adjusting the time range</div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </SidebarLayout>

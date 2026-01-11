@@ -495,14 +495,30 @@ export async function getTrackerMaps(): Promise<string[]> {
   return data?.map((row: { map: string }) => row.map) || []
 }
 
-// Get recent finished scrims
-export async function getRecentScrims(limit = 10): Promise<ScrimWithCounts[]> {
+// Get recent finished scrims with optional date filtering
+export async function getRecentScrims(options?: {
+  limit?: number
+  startTime?: string
+  endTime?: string
+}): Promise<ScrimWithCounts[]> {
   const supabase = await createClient()
+  const limit = options?.limit || 10
   
-  const { data, error } = await supabase
+  let query = supabase
     .from('scrims_with_counts')
     .select('*')
-    .in('status', ['finalized', 'cancelled', 'expired'])
+    .eq('status', 'finalized')
+    .gte('player_count', 8) // Only 4v4+ games
+  
+  // Apply date filters if provided
+  if (options?.startTime) {
+    query = query.gte('created_at', options.startTime)
+  }
+  if (options?.endTime) {
+    query = query.lte('created_at', options.endTime)
+  }
+  
+  const { data, error } = await query
     .order('created_at', { ascending: false })
     .limit(limit)
   
