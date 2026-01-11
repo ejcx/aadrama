@@ -42,3 +42,4 @@ COMMENT ON TABLE public.scrim_score_submissions IS 'Score submissions from playe
 
 
 
+

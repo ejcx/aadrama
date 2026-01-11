@@ -51,3 +51,4 @@ COMMENT ON TABLE public.scrim_players IS 'Players registered for a scrim waiting
 
 
 
+

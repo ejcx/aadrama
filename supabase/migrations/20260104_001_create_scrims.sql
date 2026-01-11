@@ -57,3 +57,4 @@ COMMENT ON TABLE public.scrims IS 'Competitive scrim matches that players can cr
 
 
 
+

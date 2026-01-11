@@ -21,11 +21,6 @@ export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
   const { userId, userName } = await getCurrentUser()
   const supabase = await createClient()
   
-  // Check for banned names
-  if (userName.toLowerCase().includes('mediocre')) {
-    throw new Error('You have been banned from scrims. You may rejoin on Saturday at 8:00 PM.')
-  }
-  
   const { data, error } = await supabase
     .from('scrims')
     .insert({
@@ -98,11 +93,6 @@ export async function getScrimPlayers(scrimId: string): Promise<ScrimPlayer[]> {
 export async function joinScrim(scrimId: string): Promise<ScrimPlayer> {
   const { userId, userName } = await getCurrentUser()
   const supabase = await createClient()
-  
-  // Check for banned names
-  if (userName.toLowerCase().includes('mediocre')) {
-    throw new Error('You have been banned from scrims. You may rejoin on Saturday at 8:00 PM.')
-  }
   
   // Check if scrim is still in waiting status
   const scrim = await getScrim(scrimId)
