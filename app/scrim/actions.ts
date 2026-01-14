@@ -552,6 +552,113 @@ export async function getScrimMaps(): Promise<string[]> {
   return uniqueMaps.sort()
 }
 
+// Get scrims for a specific player (by game name)
+export interface PlayerScrimResult {
+  id: string
+  map: string | null
+  team_a_score: number | null
+  team_b_score: number | null
+  created_at: string
+  finished_at: string | null
+  player_team: 'team_a' | 'team_b' | null
+  result: 'win' | 'loss' | 'draw' | null
+  elo_change: number | null
+  tracker_session_id: string | null
+}
+
+export async function getPlayerScrims(options: {
+  gameName: string
+  limit?: number
+  startTime?: string
+  endTime?: string
+  map?: string
+}): Promise<PlayerScrimResult[]> {
+  const supabase = await createClient()
+  const gameNameLower = options.gameName.toLowerCase()
+  
+  // Get ELO history for this player to find their scrims
+  let query = supabase
+    .from('elo_history')
+    .select(`
+      scrim_id,
+      result,
+      elo_change,
+      created_at,
+      scrims!inner(
+        id,
+        map,
+        team_a_score,
+        team_b_score,
+        created_at,
+        finished_at,
+        tracker_session_id
+      )
+    `)
+    .eq('game_name_lower', gameNameLower)
+    .order('created_at', { ascending: false })
+  
+  // Apply date filters
+  if (options.startTime) {
+    query = query.gte('created_at', options.startTime)
+  }
+  if (options.endTime) {
+    query = query.lte('created_at', options.endTime)
+  }
+  
+  // Apply map filter
+  if (options.map) {
+    query = query.eq('scrims.map', options.map)
+  }
+  
+  // Apply limit
+  query = query.limit(options.limit || 25)
+  
+  const { data, error } = await query
+  
+  if (error) {
+    console.error('Failed to fetch player scrims:', error)
+    return []
+  }
+  
+  // Transform the data
+  return (data || []).map(record => {
+    const scrim = record.scrims as unknown as {
+      id: string
+      map: string | null
+      team_a_score: number | null
+      team_b_score: number | null
+      created_at: string
+      finished_at: string | null
+      tracker_session_id: string | null
+    }
+    
+    // Determine player's team based on result and scores
+    let playerTeam: 'team_a' | 'team_b' | null = null
+    if (scrim.team_a_score !== null && scrim.team_b_score !== null) {
+      if (record.result === 'win') {
+        playerTeam = scrim.team_a_score > scrim.team_b_score ? 'team_a' : 'team_b'
+      } else if (record.result === 'loss') {
+        playerTeam = scrim.team_a_score < scrim.team_b_score ? 'team_a' : 'team_b'
+      } else {
+        playerTeam = 'team_a' // Draw, doesn't matter
+      }
+    }
+    
+    return {
+      id: scrim.id,
+      map: scrim.map,
+      team_a_score: scrim.team_a_score,
+      team_b_score: scrim.team_b_score,
+      created_at: scrim.created_at,
+      finished_at: scrim.finished_at,
+      player_team: playerTeam,
+      result: record.result as 'win' | 'loss' | 'draw' | null,
+      elo_change: record.elo_change,
+      tracker_session_id: scrim.tracker_session_id,
+    }
+  })
+}
+
 // Check if current user is in a scrim
 export async function getCurrentUserScrimStatus(scrimId: string): Promise<{
   isParticipant: boolean

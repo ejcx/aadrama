@@ -5,6 +5,7 @@ import SidebarLayout from "../../../components/SidebarLayout";
 import Link from "next/link";
 import { SessionHoverPopover } from "../../../components/SessionHoverPopover";
 import { getPlayerElo, getPlayerEloHistory, getPlayerRank } from "../../actions";
+import { getPlayerScrims, getScrimMaps, type PlayerScrimResult } from "../../../scrim/actions";
 
 const API_BASE = "https://server-details.ej.workers.dev";
 
@@ -224,6 +225,16 @@ const PlayerDetailClient = () => {
   const [startTime, setStartTime] = useState<string>(defaultDates.start);
   const [endTime, setEndTime] = useState<string>(defaultDates.end);
   const [limit, setLimit] = useState<number>(25);
+  const [sessionMapFilter, setSessionMapFilter] = useState<string>("");
+
+  // Scrim results state
+  const [scrimResults, setScrimResults] = useState<PlayerScrimResult[]>([]);
+  const [scrimsLoading, setScrimsLoading] = useState(true);
+  const [scrimMaps, setScrimMaps] = useState<string[]>([]);
+  const [scrimStartTime, setScrimStartTime] = useState<string>(defaultDates.start);
+  const [scrimEndTime, setScrimEndTime] = useState<string>(defaultDates.end);
+  const [scrimMapFilter, setScrimMapFilter] = useState<string>("");
+  const [scrimLimit, setScrimLimit] = useState<number>(25);
 
   // Toggle session selection
   const toggleSessionSelection = (sessionId: string) => {
@@ -264,6 +275,43 @@ const PlayerDetailClient = () => {
       console.error("Failed to copy:", err);
     }
   };
+
+  // Fetch scrim maps
+  useEffect(() => {
+    const fetchScrimMaps = async () => {
+      try {
+        const maps = await getScrimMaps();
+        setScrimMaps(maps);
+      } catch (err) {
+        console.error('Failed to fetch scrim maps:', err);
+      }
+    };
+    fetchScrimMaps();
+  }, []);
+
+  // Fetch player scrims
+  useEffect(() => {
+    const fetchPlayerScrims = async () => {
+      // Need to get the player's game name from ELO data or use playerName
+      try {
+        setScrimsLoading(true);
+        const scrims = await getPlayerScrims({
+          gameName: playerName,
+          limit: scrimLimit,
+          startTime: scrimStartTime ? new Date(scrimStartTime).toISOString() : undefined,
+          endTime: scrimEndTime ? new Date(scrimEndTime).toISOString() : undefined,
+          map: scrimMapFilter || undefined,
+        });
+        setScrimResults(scrims);
+      } catch (err) {
+        console.error('Failed to fetch player scrims:', err);
+        setScrimResults([]);
+      } finally {
+        setScrimsLoading(false);
+      }
+    };
+    fetchPlayerScrims();
+  }, [playerName, scrimStartTime, scrimEndTime, scrimMapFilter, scrimLimit]);
 
   // Fetch player ELO data
   useEffect(() => {
@@ -413,13 +461,19 @@ const PlayerDetailClient = () => {
         );
         const data = await response.json();
         
+        let sessionsData: Session[] = [];
         if (Array.isArray(data)) {
-          setSessions(data);
+          sessionsData = data;
         } else if (data.sessions && Array.isArray(data.sessions)) {
-          setSessions(data.sessions);
-        } else {
-          setSessions([]);
+          sessionsData = data.sessions;
         }
+        
+        // Apply client-side map filter if set
+        if (sessionMapFilter) {
+          sessionsData = sessionsData.filter(s => s.map === sessionMapFilter);
+        }
+        
+        setSessions(sessionsData);
         setError(null);
       } catch (err) {
         console.error('Failed to fetch sessions:', err);
@@ -431,7 +485,7 @@ const PlayerDetailClient = () => {
     };
 
     fetchSessions();
-  }, [playerName, startTime, endTime, limit]);
+  }, [playerName, startTime, endTime, limit, sessionMapFilter]);
 
   const formatDate = (dateString: string) => {
     try {
@@ -668,13 +722,151 @@ const PlayerDetailClient = () => {
             )}
           </div>
 
+          {/* Scrim Results Section */}
+          <div className="mb-6">
+            <h2 className="text-white text-lg sm:text-xl font-bold mb-4">Scrim Results</h2>
+
+            {/* Scrim filters */}
+            <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 sm:p-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div>
+                  <label className="block text-gray-300 text-xs sm:text-sm mb-1">Start Time</label>
+                  <input
+                    type="datetime-local"
+                    value={scrimStartTime}
+                    onChange={(e) => setScrimStartTime(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-300 text-xs sm:text-sm mb-1">End Time</label>
+                  <input
+                    type="datetime-local"
+                    value={scrimEndTime}
+                    onChange={(e) => setScrimEndTime(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-300 text-xs sm:text-sm mb-1">Map</label>
+                  <select
+                    value={scrimMapFilter}
+                    onChange={(e) => setScrimMapFilter(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+                  >
+                    <option value="">All Maps</option>
+                    {scrimMaps.map((map) => (
+                      <option key={map} value={map}>{map}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-gray-300 text-xs sm:text-sm mb-1">Limit</label>
+                  <input
+                    type="number"
+                    value={scrimLimit}
+                    onChange={(e) => setScrimLimit(parseInt(e.target.value) || 25)}
+                    min="1"
+                    max="100"
+                    className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Scrim Results Table */}
+            {scrimsLoading ? (
+              <div className="text-white text-center py-8">Loading scrim results...</div>
+            ) : scrimResults.length > 0 ? (
+              <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-white text-xs sm:text-sm min-w-[500px]">
+                    <thead>
+                      <tr className="border-b border-gray-700 bg-gray-800">
+                        <th className="text-left py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Date</th>
+                        <th className="text-left py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Map</th>
+                        <th className="text-center py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Result</th>
+                        <th className="text-center py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Score</th>
+                        <th className="text-center py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">ELO</th>
+                        <th className="text-center py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scrimResults.map((scrim) => (
+                        <tr
+                          key={scrim.id}
+                          className="border-b border-gray-800 hover:bg-gray-800"
+                        >
+                          <td className="py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap text-gray-400">
+                            {new Date(scrim.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-4">
+                            <span className="text-cyan-400">{scrim.map || 'Unknown'}</span>
+                          </td>
+                          <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                              scrim.result === 'win' 
+                                ? 'bg-green-900/50 text-green-400' 
+                                : scrim.result === 'loss' 
+                                  ? 'bg-red-900/50 text-red-400' 
+                                  : 'bg-gray-700/50 text-gray-400'
+                            }`}>
+                              {scrim.result === 'win' ? 'WIN' : scrim.result === 'loss' ? 'LOSS' : 'DRAW'}
+                            </span>
+                          </td>
+                          <td className="text-center py-2 sm:py-3 px-2 sm:px-4 font-mono">
+                            {scrim.team_a_score !== null && scrim.team_b_score !== null ? (
+                              <span>
+                                <span className={scrim.player_team === 'team_a' ? 'text-white font-bold' : 'text-gray-400'}>
+                                  {scrim.team_a_score}
+                                </span>
+                                <span className="text-gray-500"> - </span>
+                                <span className={scrim.player_team === 'team_b' ? 'text-white font-bold' : 'text-gray-400'}>
+                                  {scrim.team_b_score}
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-gray-500">-</span>
+                            )}
+                          </td>
+                          <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
+                            {scrim.elo_change !== null ? (
+                              <span className={`font-semibold ${scrim.elo_change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {scrim.elo_change >= 0 ? '+' : ''}{scrim.elo_change}
+                              </span>
+                            ) : (
+                              <span className="text-gray-500">-</span>
+                            )}
+                          </td>
+                          <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
+                            <Link
+                              href={`/scrim/${scrim.id}`}
+                              className="text-blue-400 hover:text-blue-300 hover:underline text-xs"
+                            >
+                              View →
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-900 border border-gray-700 rounded-lg p-8 text-center text-gray-400">
+                <div className="text-lg mb-2">No scrim results found</div>
+                <div className="text-sm">This player hasn&apos;t played any ranked scrims in the selected time range.</div>
+              </div>
+            )}
+          </div>
+
           {/* Sessions Section */}
           <div className="mb-4">
             <h2 className="text-white text-lg sm:text-xl font-bold mb-4">Recent Sessions</h2>
 
             {/* Time filters */}
             <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 sm:p-4 mb-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-gray-300 text-xs sm:text-sm mb-1">Start Time</label>
                   <input
@@ -692,6 +884,19 @@ const PlayerDetailClient = () => {
                     onChange={(e) => setEndTime(e.target.value)}
                     className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
                   />
+                </div>
+                <div>
+                  <label className="block text-gray-300 text-xs sm:text-sm mb-1">Map</label>
+                  <select
+                    value={sessionMapFilter}
+                    onChange={(e) => setSessionMapFilter(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+                  >
+                    <option value="">All Maps</option>
+                    {scrimMaps.map((map) => (
+                      <option key={map} value={map}>{map}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-gray-300 text-xs sm:text-sm mb-1">Limit</label>
