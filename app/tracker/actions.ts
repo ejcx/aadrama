@@ -99,3 +99,89 @@ export async function getPlayerRank(playerName: string) {
     totalPlayers: null // We can calculate this separately if needed
   }
 }
+
+// Get maps that have been played in ranked scrims (for ELO filtering)
+export async function getRankedScrimMaps() {
+  const supabase = await createClient()
+
+  // Get distinct maps from scrims that have ELO history
+  const { data, error } = await supabase
+    .from('scrims')
+    .select('map')
+    .not('map', 'is', null)
+    .eq('status', 'finalized')
+    .eq('is_ranked', true)
+
+  if (error) throw new Error(`Failed to fetch ranked maps: ${error.message}`)
+
+  // Get unique maps
+  const uniqueMaps = [...new Set(data?.map(s => s.map).filter(Boolean) as string[])]
+  return uniqueMaps.sort()
+}
+
+// Get player stats filtered by map (for map-specific leaderboard)
+export interface MapPlayerStats {
+  game_name: string
+  game_name_lower: string
+  wins: number
+  losses: number
+  draws: number
+  games_played: number
+  map_elo: number // Calculated as 1200 + sum of all ELO changes on this map
+}
+
+export async function getPlayerStatsByMap(map: string): Promise<MapPlayerStats[]> {
+  const supabase = await createClient()
+
+  // Join elo_history with scrims to filter by map, include elo_change
+  const { data, error } = await supabase
+    .from('elo_history')
+    .select(`
+      game_name_lower,
+      result,
+      elo_change,
+      scrims!inner(map)
+    `)
+    .eq('scrims.map', map)
+
+  if (error) throw new Error(`Failed to fetch map stats: ${error.message}`)
+
+  // Aggregate stats per player
+  const playerMap = new Map<string, { wins: number; losses: number; draws: number; eloSum: number }>()
+  
+  for (const record of data || []) {
+    const existing = playerMap.get(record.game_name_lower) || { wins: 0, losses: 0, draws: 0, eloSum: 0 }
+    if (record.result === 'win') existing.wins++
+    else if (record.result === 'loss') existing.losses++
+    else existing.draws++
+    existing.eloSum += record.elo_change || 0
+    playerMap.set(record.game_name_lower, existing)
+  }
+
+  // Get display names from player_elo
+  const gameNames = Array.from(playerMap.keys())
+  if (gameNames.length === 0) return []
+
+  const { data: eloRecords } = await supabase
+    .from('player_elo')
+    .select('game_name, game_name_lower')
+    .in('game_name_lower', gameNames)
+
+  const nameMap = new Map(eloRecords?.map(r => [r.game_name_lower, r.game_name]) || [])
+
+  // Build result array
+  const results: MapPlayerStats[] = Array.from(playerMap.entries()).map(([gameNameLower, stats]) => ({
+    game_name: nameMap.get(gameNameLower) || gameNameLower,
+    game_name_lower: gameNameLower,
+    wins: stats.wins,
+    losses: stats.losses,
+    draws: stats.draws,
+    games_played: stats.wins + stats.losses + stats.draws,
+    map_elo: 1200 + stats.eloSum,
+  }))
+
+  // Sort by map_elo descending
+  results.sort((a, b) => b.map_elo - a.map_elo)
+
+  return results
+}

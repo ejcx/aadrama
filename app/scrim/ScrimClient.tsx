@@ -17,6 +17,7 @@ import {
   getRecentScrims,
   getTrackerMaps,
   getScrimPlayers,
+  getScrimMaps,
 } from "./actions";
 import type { ScrimWithCounts, ScrimPlayer } from "@/lib/supabase/types";
 
@@ -431,6 +432,8 @@ export default function ScrimClient() {
     return new Date().toISOString().slice(0, 16);
   });
   const [recentLimit, setRecentLimit] = useState<number>(25);
+  const [filterMap, setFilterMap] = useState<string>("");
+  const [scrimMaps, setScrimMaps] = useState<string[]>([]);
 
   // Update time range based on preset selection
   const handleTimeRangeChange = (range: TimeRange) => {
@@ -460,15 +463,16 @@ export default function ScrimClient() {
   useEffect(() => {
     loadActiveScrims();
     loadMaps();
+    loadScrimMaps();
     // Poll for active scrims every 10 seconds
     const interval = setInterval(loadActiveScrims, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  // Load recent scrims when time range changes
+  // Load recent scrims when time range or map filter changes
   useEffect(() => {
     loadRecentScrims();
-  }, [timeRange, startTime, endTime, recentLimit]);
+  }, [timeRange, startTime, endTime, recentLimit, filterMap]);
 
   async function loadActiveScrims() {
     try {
@@ -490,6 +494,15 @@ export default function ScrimClient() {
     }
   }
 
+  async function loadScrimMaps() {
+    try {
+      const maps = await getScrimMaps();
+      setScrimMaps(maps);
+    } catch (err) {
+      console.error("Failed to load scrim maps:", err);
+    }
+  }
+
   async function loadRecentScrims() {
     try {
       setRecentLoading(true);
@@ -497,6 +510,7 @@ export default function ScrimClient() {
         limit: recentLimit,
         startTime: timeRange !== "all" && startTime ? new Date(startTime).toISOString() : undefined,
         endTime: timeRange !== "all" && endTime ? new Date(endTime).toISOString() : undefined,
+        map: filterMap || undefined,
       });
       setRecentScrims(scrims);
     } catch (err) {
@@ -686,17 +700,34 @@ export default function ScrimClient() {
                 </div>
               )}
 
-              {/* Limit */}
-              <div className="max-w-[150px]">
-                <label className="block text-gray-300 text-xs sm:text-sm mb-1">Limit</label>
-                <input
-                  type="number"
-                  value={recentLimit}
-                  onChange={(e) => setRecentLimit(parseInt(e.target.value) || 25)}
-                  min="1"
-                  max="100"
-                  className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
-                />
+              {/* Map Filter and Limit */}
+              <div className="flex flex-wrap gap-4">
+                <div className="flex-1 min-w-[200px] max-w-xs">
+                  <label className="block text-gray-300 text-xs sm:text-sm mb-1">Map</label>
+                  <select
+                    value={filterMap}
+                    onChange={(e) => setFilterMap(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+                  >
+                    <option value="">All Maps</option>
+                    {scrimMaps.map((map) => (
+                      <option key={map} value={map}>
+                        {map}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="max-w-[150px]">
+                  <label className="block text-gray-300 text-xs sm:text-sm mb-1">Limit</label>
+                  <input
+                    type="number"
+                    value={recentLimit}
+                    onChange={(e) => setRecentLimit(parseInt(e.target.value) || 25)}
+                    min="1"
+                    max="100"
+                    className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+                  />
+                </div>
               </div>
             </div>
 

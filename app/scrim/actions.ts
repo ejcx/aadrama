@@ -495,11 +495,12 @@ export async function getTrackerMaps(): Promise<string[]> {
   return data?.map((row: { map: string }) => row.map) || []
 }
 
-// Get recent finished scrims with optional date filtering
+// Get recent finished scrims with optional date and map filtering
 export async function getRecentScrims(options?: {
   limit?: number
   startTime?: string
   endTime?: string
+  map?: string
 }): Promise<ScrimWithCounts[]> {
   const supabase = await createClient()
   const limit = options?.limit || 10
@@ -518,12 +519,37 @@ export async function getRecentScrims(options?: {
     query = query.lte('created_at', options.endTime)
   }
   
+  // Apply map filter if provided
+  if (options?.map) {
+    query = query.eq('map', options.map)
+  }
+  
   const { data, error } = await query
     .order('created_at', { ascending: false })
     .limit(limit)
   
   if (error) throw new Error(`Failed to fetch recent scrims: ${error.message}`)
   return data || []
+}
+
+// Get unique maps from scrims (for filtering)
+export async function getScrimMaps(): Promise<string[]> {
+  const supabase = await createClient()
+  
+  const { data, error } = await supabase
+    .from('scrims')
+    .select('map')
+    .not('map', 'is', null)
+    .eq('status', 'finalized')
+  
+  if (error) {
+    console.error('Failed to fetch scrim maps:', error)
+    return []
+  }
+  
+  // Get unique maps
+  const uniqueMaps = [...new Set(data?.map(s => s.map).filter(Boolean) as string[])]
+  return uniqueMaps.sort()
 }
 
 // Check if current user is in a scrim
