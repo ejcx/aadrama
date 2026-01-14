@@ -119,6 +119,120 @@ export async function getRankedScrimMaps() {
   return uniqueMaps.sort()
 }
 
+// Get daily kills for a player (for chart)
+export interface DailyKillsData {
+  date: string
+  kills: number
+}
+
+export interface DailyKillsResult {
+  data: DailyKillsData[]
+  availableMaps: string[]
+}
+
+export async function getPlayerDailyKills(
+  playerName: string,
+  options: {
+    days?: number | null  // null = all time
+    map?: string | null
+  } = {}
+): Promise<DailyKillsResult> {
+  const supabase = await createClient()
+  const playerNameLower = playerName.toLowerCase()
+  
+  // Build the query
+  let query = supabase
+    .from('player_stats')
+    .select('time, kills, map')
+    .ilike('name', playerNameLower)
+  
+  // Calculate start date for time filter
+  const now = new Date()
+  let startDate: Date | null = null
+  
+  if (options.days) {
+    startDate = new Date()
+    startDate.setDate(startDate.getDate() - options.days)
+    query = query.gte('time', startDate.toISOString())
+  }
+  
+  // Apply map filter
+  if (options.map) {
+    query = query.eq('map', options.map)
+  }
+  
+  const { data, error } = await query.order('time', { ascending: true })
+  
+  if (error) throw new Error(`Failed to fetch daily kills: ${error.message}`)
+  
+  // Group by date
+  const dateMap = new Map<string, number>()
+  const mapsSet = new Set<string>()
+  
+  for (const row of data || []) {
+    // Get date portion (YYYY-MM-DD)
+    const dateKey = new Date(row.time).toISOString().split('T')[0]
+    dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + row.kills)
+    if (row.map) mapsSet.add(row.map)
+  }
+  
+  // Fill in all days in the range
+  const dailyData: DailyKillsData[] = []
+  
+  if (options.days && startDate) {
+    // Specific day range: fill from startDate to today
+    const current = new Date(startDate)
+    current.setHours(0, 0, 0, 0)
+    const endDate = new Date(now)
+    endDate.setHours(0, 0, 0, 0)
+    
+    while (current <= endDate) {
+      const dateKey = current.toISOString().split('T')[0]
+      dailyData.push({
+        date: dateKey,
+        kills: dateMap.get(dateKey) || 0
+      })
+      current.setDate(current.getDate() + 1)
+    }
+  } else {
+    // "All time" - start from first kill date, fill to today (cap at 30 days of fill)
+    const sortedDates = Array.from(dateMap.keys()).sort()
+    
+    if (sortedDates.length > 0) {
+      const firstDate = new Date(sortedDates[0])
+      firstDate.setHours(0, 0, 0, 0)
+      const endDate = new Date(now)
+      endDate.setHours(0, 0, 0, 0)
+      
+      // Calculate total days in range
+      const totalDays = Math.ceil((endDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+      
+      if (totalDays <= 30) {
+        // Small range: fill all days
+        const current = new Date(firstDate)
+        while (current <= endDate) {
+          const dateKey = current.toISOString().split('T')[0]
+          dailyData.push({
+            date: dateKey,
+            kills: dateMap.get(dateKey) || 0
+          })
+          current.setDate(current.getDate() + 1)
+        }
+      } else {
+        // Large range: only show days with actual data (no filling)
+        for (const date of sortedDates) {
+          dailyData.push({ date, kills: dateMap.get(date) || 0 })
+        }
+      }
+    }
+  }
+  
+  return {
+    data: dailyData,
+    availableMaps: Array.from(mapsSet).sort()
+  }
+}
+
 // Get player stats filtered by map (for map-specific leaderboard)
 export interface MapPlayerStats {
   game_name: string

@@ -4,10 +4,24 @@ import { useParams } from "next/navigation";
 import SidebarLayout from "../../../components/SidebarLayout";
 import Link from "next/link";
 import { SessionHoverPopover } from "../../../components/SessionHoverPopover";
-import { getPlayerElo, getPlayerEloHistory, getPlayerRank } from "../../actions";
+import { getPlayerElo, getPlayerEloHistory, getPlayerRank, getPlayerDailyKills } from "../../actions";
 import { getPlayerScrims, getScrimMaps, type PlayerScrimResult } from "../../../scrim/actions";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 const API_BASE = "https://server-details.ej.workers.dev";
+
+interface ChartDataPoint {
+  date: string;
+  kills: number;
+}
 
 interface PlayerStats {
   player_name: string;
@@ -236,6 +250,16 @@ const PlayerDetailClient = () => {
   const [scrimMapFilter, setScrimMapFilter] = useState<string>("");
   const [scrimLimit, setScrimLimit] = useState<number>(25);
 
+  // Daily kills chart state
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [dailyStatsLoading, setDailyStatsLoading] = useState(true);
+  const [chartMapFilter, setChartMapFilter] = useState<string>("");
+  const [availableChartMaps, setAvailableChartMaps] = useState<string[]>([]);
+  
+  // Chart time range state
+  type ChartTimeRange = "30d" | "60d" | "90d" | "all";
+  const [chartTimeRange, setChartTimeRange] = useState<ChartTimeRange>("30d");
+
   // Toggle session selection
   const toggleSessionSelection = (sessionId: string) => {
     setSelectedSessions((prev) => {
@@ -441,6 +465,40 @@ const PlayerDetailClient = () => {
 
     fetchMapStats();
   }, [playerName]);
+
+  // Fetch daily stats for chart - using server action
+  useEffect(() => {
+    const fetchDailyStats = async () => {
+      try {
+        setDailyStatsLoading(true);
+        
+        // Calculate days for time range
+        let days: number | null = null;
+        if (chartTimeRange === "30d") days = 30;
+        else if (chartTimeRange === "60d") days = 60;
+        else if (chartTimeRange === "90d") days = 90;
+        // "all" = null (no limit)
+        
+        const result = await getPlayerDailyKills(playerName, {
+          days,
+          map: chartMapFilter || null,
+        });
+        
+        setChartData(result.data);
+        // Only update available maps if no filter (so we keep the full list)
+        if (!chartMapFilter) {
+          setAvailableChartMaps(result.availableMaps);
+        }
+      } catch (err) {
+        console.error('Failed to fetch daily stats:', err);
+        setChartData([]);
+      } finally {
+        setDailyStatsLoading(false);
+      }
+    };
+
+    fetchDailyStats();
+  }, [playerName, chartTimeRange, chartMapFilter]);
 
   // Fetch player sessions
   useEffect(() => {
@@ -675,6 +733,153 @@ const PlayerDetailClient = () => {
               No player stats found
             </div>
           )}
+
+          {/* Kills Per Day Chart Section */}
+          <div className="mb-6">
+            <h2 className="text-white text-lg sm:text-xl font-bold mb-4">Kills Over Time</h2>
+            
+            <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6">
+              {/* Controls row */}
+              <div className="flex flex-wrap items-center gap-4 mb-4">
+                {/* Time range selector */}
+                <div className="flex items-center gap-2">
+                  <label className="text-gray-300 text-sm">Time Range:</label>
+                  <div className="flex rounded-lg overflow-hidden border border-gray-600">
+                    {(["30d", "60d", "90d", "all"] as const).map((range) => (
+                      <button
+                        key={range}
+                        onClick={() => setChartTimeRange(range)}
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                          chartTimeRange === range
+                            ? "bg-cyan-600 text-white"
+                            : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                        }`}
+                      >
+                        {range === "all" ? "All Time" : range.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Map filter */}
+                <div className="flex items-center gap-2">
+                  <label className="text-gray-300 text-sm">Map:</label>
+                  <select
+                    value={chartMapFilter}
+                    onChange={(e) => setChartMapFilter(e.target.value)}
+                    className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm min-w-[140px]"
+                  >
+                    <option value="">All Maps</option>
+                    {availableChartMaps.map((map) => (
+                      <option key={map} value={map}>{map}</option>
+                    ))}
+                  </select>
+                  {chartMapFilter && (
+                    <button
+                      onClick={() => setChartMapFilter("")}
+                      className="text-gray-400 hover:text-white text-sm flex items-center gap-1"
+                      title="Clear filter"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {dailyStatsLoading ? (
+                <div className="h-[300px] sm:h-[400px] flex items-center justify-center text-gray-400">
+                  <div className="flex flex-col items-center gap-3">
+                    <svg className="w-8 h-8 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span>Loading chart data...</span>
+                  </div>
+                </div>
+              ) : chartData.length > 0 ? (
+                <>
+                {/* Chart */}
+                <div className="h-[300px] sm:h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis 
+                        dataKey="date" 
+                        tick={{ fill: '#9ca3af', fontSize: 11 }}
+                        tickFormatter={(value) => {
+                          const date = new Date(value);
+                          return `${date.getMonth() + 1}/${date.getDate()}`;
+                        }}
+                        stroke="#4b5563"
+                      />
+                      <YAxis 
+                        tick={{ fill: '#9ca3af', fontSize: 11 }}
+                        stroke="#4b5563"
+                        allowDecimals={false}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#1f2937', 
+                          border: '1px solid #374151',
+                          borderRadius: '8px',
+                          color: '#fff'
+                        }}
+                        labelFormatter={(value) => {
+                          const date = new Date(value);
+                          return date.toLocaleDateString('en-US', { 
+                            weekday: 'short', 
+                            month: 'short', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          });
+                        }}
+                        formatter={(value) => [`${value} kills`, 'Kills']}
+                      />
+                      <Bar
+                        dataKey="kills"
+                        fill="#22c55e"
+                        radius={[4, 4, 0, 0]}
+                        name="Kills"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Summary stats */}
+                <div className="mt-4 pt-4 border-t border-gray-700 flex flex-wrap gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-400">Total: </span>
+                    <span className="text-green-400 font-semibold">
+                      {chartData.reduce((sum, d) => sum + d.kills, 0)} kills
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Avg/day: </span>
+                    <span className="text-white font-semibold">
+                      {chartData.length > 0 
+                        ? (chartData.reduce((sum, d) => sum + d.kills, 0) / chartData.length).toFixed(1)
+                        : 0
+                      }
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Days played: </span>
+                    <span className="text-white font-semibold">{chartData.length}</span>
+                  </div>
+                </div>
+                </>
+              ) : (
+                <div className="h-[300px] sm:h-[400px] flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <div className="text-lg mb-2">No data for this time range</div>
+                    <div className="text-sm">Try selecting a different time period or play some games!</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Per-Map Stats Section */}
           <div className="mb-6">
