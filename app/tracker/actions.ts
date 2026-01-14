@@ -115,7 +115,7 @@ export async function getRankedScrimMaps() {
   if (error) throw new Error(`Failed to fetch ranked maps: ${error.message}`)
 
   // Get unique maps
-  const uniqueMaps = [...new Set(data?.map(s => s.map).filter(Boolean) as string[])]
+  const uniqueMaps = Array.from(new Set(data?.map(s => s.map).filter(Boolean) as string[]))
   return uniqueMaps.sort()
 }
 
