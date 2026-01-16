@@ -18,6 +18,9 @@ import {
   getTrackerMaps,
   getScrimPlayers,
   getScrimMaps,
+  voteReroll,
+  getRerollStatus,
+  type RerollStatus,
 } from "./actions";
 import type { ScrimWithCounts, ScrimPlayer } from "@/lib/supabase/types";
 
@@ -93,6 +96,7 @@ function ScrimCard({
   const [scoreA, setScoreA] = useState("");
   const [scoreB, setScoreB] = useState("");
   const [trackerInput, setTrackerInput] = useState("");
+  const [rerollStatus, setRerollStatus] = useState<RerollStatus | null>(null);
 
   const isParticipant = players.some(p => p.user_id === userId);
   const isCreator = scrim.created_by === userId;
@@ -110,8 +114,11 @@ function ScrimCard({
   useEffect(() => {
     if (expanded) {
       loadPlayers();
+      if (scrim.status === "in_progress") {
+        loadRerollStatus();
+      }
     }
-  }, [expanded, scrim.id]);
+  }, [expanded, scrim.id, scrim.status]);
 
   async function loadPlayers() {
     try {
@@ -119,6 +126,15 @@ function ScrimCard({
       setPlayers(data);
     } catch (err) {
       console.error("Failed to load players:", err);
+    }
+  }
+
+  async function loadRerollStatus() {
+    try {
+      const status = await getRerollStatus(scrim.id);
+      setRerollStatus(status);
+    } catch (err) {
+      console.error("Failed to load reroll status:", err);
     }
   }
   
@@ -253,6 +269,54 @@ function ScrimCard({
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+          
+          {/* Reroll Teams (in_progress only) */}
+          {scrim.status === "in_progress" && rerollStatus && (
+            <div className="p-3 bg-yellow-900/20 border border-yellow-700/50 rounded-lg mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-yellow-400 text-sm font-medium">🎲 Reroll Teams</span>
+                <span className="text-xs">
+                  <span className={`font-mono ${rerollStatus.votesForReroll >= rerollStatus.votesNeeded ? 'text-green-400' : 'text-gray-400'}`}>
+                    {rerollStatus.votesForReroll}/{rerollStatus.votesNeeded}
+                  </span>
+                  <span className="text-gray-500 ml-1">votes</span>
+                </span>
+              </div>
+              {rerollStatus.voters.length > 0 && (
+                <div className="text-xs text-gray-400 mb-2">
+                  Voted: {rerollStatus.voters.join(", ")}
+                </div>
+              )}
+              {isParticipant && (
+                <button
+                  onClick={async () => {
+                    setLoading(true);
+                    try {
+                      const result = await voteReroll(scrim.id);
+                      setRerollStatus(result.status);
+                      if (result.rerolled) {
+                        alert("Teams have been rerolled!");
+                        await loadPlayers();
+                        onRefresh();
+                      }
+                    } catch (err) {
+                      alert(err instanceof Error ? err.message : "Failed to vote");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading || isPending}
+                  className={`px-3 py-1 rounded text-sm ${
+                    rerollStatus.myVote
+                      ? "bg-gray-600 hover:bg-gray-500 text-white"
+                      : "bg-yellow-600 hover:bg-yellow-500 text-white"
+                  }`}
+                >
+                  {rerollStatus.myVote ? "Remove Vote" : "Vote to Reroll"}
+                </button>
+              )}
             </div>
           )}
           

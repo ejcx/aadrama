@@ -39,6 +39,7 @@ export interface Scrim {
 export interface ScrimWithCounts extends Scrim {
   player_count: number
   ready_count: number
+  reroll_votes: number
   score_submission_count: number
 }
 
@@ -49,6 +50,7 @@ export interface ScrimPlayer {
   user_name: string
   is_ready: boolean
   team: Team | null
+  voted_reroll: boolean
   joined_at: string
   ready_at: string | null
 }

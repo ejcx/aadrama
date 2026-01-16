@@ -685,6 +685,116 @@ export async function getCurrentUserScrimStatus(scrimId: string): Promise<{
   }
 }
 
+// ==================== REROLL TEAMS ====================
+
+export interface RerollStatus {
+  totalPlayers: number
+  votesForReroll: number
+  votesNeeded: number
+  canReroll: boolean
+  voters: string[] // user names of those who voted
+  myVote: boolean
+}
+
+// Get reroll status for a scrim
+export async function getRerollStatus(scrimId: string): Promise<RerollStatus> {
+  const supabase = await createClient()
+  
+  // Get reroll status from database function
+  const { data: status, error: statusError } = await supabase.rpc('get_reroll_status', { p_scrim_id: scrimId })
+  
+  if (statusError) {
+    console.error('Failed to get reroll status:', statusError)
+    throw new Error(`Failed to get reroll status: ${statusError.message}`)
+  }
+  
+  // Get players who voted for reroll
+  const { data: players, error: playersError } = await supabase
+    .from('scrim_players')
+    .select('user_id, user_name, voted_reroll')
+    .eq('scrim_id', scrimId)
+    .not('team', 'is', null)
+  
+  if (playersError) {
+    throw new Error(`Failed to get players: ${playersError.message}`)
+  }
+  
+  // Get current user's vote status
+  let myVote = false
+  try {
+    const { userId } = await getCurrentUser()
+    const myPlayer = players?.find(p => p.user_id === userId)
+    myVote = myPlayer?.voted_reroll || false
+  } catch {
+    // Not logged in, that's fine
+  }
+  
+  const statusRow = status?.[0] || { total_players: 0, votes_for_reroll: 0, votes_needed: 1, can_reroll: false }
+  
+  return {
+    totalPlayers: statusRow.total_players,
+    votesForReroll: statusRow.votes_for_reroll,
+    votesNeeded: statusRow.votes_needed,
+    canReroll: statusRow.can_reroll,
+    voters: players?.filter(p => p.voted_reroll).map(p => p.user_name) || [],
+    myVote,
+  }
+}
+
+// Vote for reroll (toggle vote)
+export async function voteReroll(scrimId: string): Promise<{ rerolled: boolean; status: RerollStatus }> {
+  const { userId } = await getCurrentUser()
+  const supabase = await createClient()
+  
+  // Verify scrim is in progress
+  const scrim = await getScrim(scrimId)
+  if (!scrim) throw new Error('Scrim not found')
+  if (scrim.status !== 'in_progress') {
+    throw new Error('Can only vote for reroll during in_progress phase')
+  }
+  
+  // Get current player
+  const { data: player } = await supabase
+    .from('scrim_players')
+    .select('*')
+    .eq('scrim_id', scrimId)
+    .eq('user_id', userId)
+    .single()
+  
+  if (!player) throw new Error('You are not a participant in this scrim')
+  if (!player.team) throw new Error('You must be assigned to a team to vote for reroll')
+  
+  // Toggle vote
+  const newVote = !player.voted_reroll
+  
+  const { error: updateError } = await supabase
+    .from('scrim_players')
+    .update({ voted_reroll: newVote })
+    .eq('id', player.id)
+  
+  if (updateError) throw new Error(`Failed to update vote: ${updateError.message}`)
+  
+  // Check if reroll threshold is met and execute if so
+  let rerolled = false
+  if (newVote) {
+    const { data: rerollResult, error: rerollError } = await supabase.rpc('check_and_execute_reroll', { p_scrim_id: scrimId })
+    
+    if (rerollError) {
+      console.error('Failed to check/execute reroll:', rerollError)
+    } else {
+      rerolled = rerollResult === true
+    }
+  }
+  
+  // Get updated status
+  const status = await getRerollStatus(scrimId)
+  
+  revalidatePath('/scrim')
+  revalidatePath(`/scrim/${scrimId}`)
+  
+  return { rerolled, status }
+}
+
 // ==================== RANKED / ELO SYSTEM ====================
 
 export interface RankedValidationResult {

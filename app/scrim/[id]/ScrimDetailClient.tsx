@@ -19,6 +19,9 @@ import {
   adminRecalculateElo,
   isCurrentUserAdmin,
   getScrimDetails,
+  voteReroll,
+  getRerollStatus,
+  type RerollStatus,
 } from "../actions";
 import type { ScrimWithCounts, ScrimPlayer, ScrimScoreSubmission } from "@/lib/supabase/types";
 import { SessionContent } from "../../tracker/session/SessionContent";
@@ -88,6 +91,7 @@ export default function ScrimDetailClient() {
   const [scrim, setScrim] = useState<ScrimWithCounts | null>(null);
   const [players, setPlayers] = useState<ScrimPlayer[]>([]);
     const [scoreSubmissions, setScoreSubmissions] = useState<ScrimScoreSubmission[]>([]);
+    const [rerollStatus, setRerollStatus] = useState<RerollStatus | null>(null);
     const [eloChanges, setEloChanges] = useState<Map<string, { change: number; eloBefore: number; eloAfter: number }>>(new Map());
     const [playerElos, setPlayerElos] = useState<Map<string, number>>(new Map()); // gameNameLower -> current elo (for non-finalized scrims)
     const [userGameNames, setUserGameNames] = useState<Map<string, string>>(new Map()); // userId -> gameNameLower
@@ -185,6 +189,18 @@ export default function ScrimDetailClient() {
               });
           }
           setEloChanges(eloMap);
+      }
+
+      // Load reroll status for in_progress scrims
+      if (scrimData.status === "in_progress") {
+        try {
+          const status = await getRerollStatus(scrimId);
+          setRerollStatus(status);
+        } catch (err) {
+          console.error("Failed to load reroll status:", err);
+        }
+      } else {
+        setRerollStatus(null);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load scrim");
@@ -504,6 +520,67 @@ export default function ScrimDetailClient() {
                   </div>
                 );
               })()}
+
+              {/* Reroll Teams Section */}
+              {scrim.status === "in_progress" && rerollStatus && (
+                <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-yellow-400 font-semibold">🎲 Reroll Teams</h3>
+                    <div className="text-sm">
+                      <span className={`font-mono ${rerollStatus.votesForReroll >= rerollStatus.votesNeeded ? 'text-green-400' : 'text-gray-400'}`}>
+                        {rerollStatus.votesForReroll}/{rerollStatus.votesNeeded}
+                      </span>
+                      <span className="text-gray-500 ml-1">votes needed</span>
+                    </div>
+                  </div>
+                  
+                  <p className="text-gray-400 text-sm mb-3">
+                    If teams seem unfair, players can vote to randomly reroll them.
+                    <span className="text-yellow-500"> Warning: Rerolled teams are completely random and may be even more unbalanced!</span>
+                  </p>
+                  
+                  {/* Progress bar */}
+                  <div className="h-2 bg-gray-700 rounded-full mb-3 overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-300 ${rerollStatus.votesForReroll >= rerollStatus.votesNeeded ? 'bg-green-500' : 'bg-yellow-500'}`}
+                      style={{ width: `${Math.min(100, (rerollStatus.votesForReroll / rerollStatus.votesNeeded) * 100)}%` }}
+                    />
+                  </div>
+                  
+                  {/* Voters list */}
+                  {rerollStatus.voters.length > 0 && (
+                    <div className="text-sm text-gray-400 mb-3">
+                      Voted: {rerollStatus.voters.join(", ")}
+                    </div>
+                  )}
+                  
+                  {/* Vote button */}
+                  {isParticipant && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const result = await voteReroll(scrimId);
+                          setRerollStatus(result.status);
+                          if (result.rerolled) {
+                            alert("Teams have been rerolled! Check the new team assignments.");
+                            await loadScrimData();
+                          }
+                        } catch (err) {
+                          alert(err instanceof Error ? err.message : "Failed to vote");
+                        }
+                      }}
+                      disabled={isPending}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        rerollStatus.myVote
+                          ? "bg-gray-600 hover:bg-gray-500 text-white"
+                          : "bg-yellow-600 hover:bg-yellow-500 text-white"
+                      }`}
+                    >
+                      {rerollStatus.myVote ? "Remove Vote" : "Vote to Reroll"}
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* End Game button */}
               {scrim.status === "in_progress" && isParticipant && (
