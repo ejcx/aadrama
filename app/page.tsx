@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import ServerDetails from "./components/ServerDetails";
 import SidebarLayout from "./components/SidebarLayout";
+import PlayerSearch from "./components/PlayerSearch";
 
 interface Server {
   ipAddress: string;
@@ -157,6 +158,14 @@ const Home = () => {
                 <p className="text-white text-sm sm:text-base md:text-lg leading-relaxed">
                   A group of competitive players is scrimming regularly. Email discord@aadrama.com with subject "AADrama" and your old AA / AADrama name for a Discord invite.
                 </p>
+              </div>
+            </div>
+
+            {/* Player Search */}
+            <div className="w-full">
+              <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6">
+                <label className="block text-gray-300 text-sm sm:text-base mb-2 font-medium">Search Player</label>
+                <PlayerSearch placeholder="Search for a player..." />
               </div>
             </div>
 
@@ -336,7 +345,7 @@ const Home = () => {
                                 </tr>
                               </thead>
                               <tbody>
-                                {engineerServerInfo.player_list.map((player, index) => (
+                                {[...engineerServerInfo.player_list].sort((a, b) => b.kills - a.kills).map((player, index) => (
                                   <tr key={index} className="border-b border-gray-800 hover:bg-gray-800">
                                     <td className="py-2 px-1 sm:px-2">
                                       <Link

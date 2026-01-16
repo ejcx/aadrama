@@ -118,7 +118,7 @@ const ServerDetails = ({ server }: ServerDetailsProps) => {
                 </tr>
               </thead>
               <tbody>
-                {serverInfo.player_list.map((player, index) => (
+                {[...serverInfo.player_list].sort((a, b) => b.kills - a.kills).map((player, index) => (
                   <tr key={index} className="border-b border-gray-800 hover:bg-gray-800">
                     <td className="py-2 px-1 sm:px-2">
                       <Link

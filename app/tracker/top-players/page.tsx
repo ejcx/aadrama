@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import TrackerLayout from "../TrackerLayout";
+import PlayerSearch from "@/app/components/PlayerSearch";
 
 const API_BASE = "https://server-details.ej.workers.dev";
 
@@ -105,6 +106,12 @@ const TopPlayersPage = () => {
 
   return (
     <TrackerLayout>
+      {/* Player Search */}
+      <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+        <label className="block text-gray-300 text-xs sm:text-sm mb-2">Search Player</label>
+        <PlayerSearch placeholder="Search for a player..." />
+      </div>
+
       {/* Filters */}
       <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
         {/* Time Range Quick Buttons */}

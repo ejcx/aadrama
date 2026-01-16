@@ -2,6 +2,67 @@
 
 import { createClient } from '@/lib/supabase/server'
 
+// Search for players by name (case-insensitive substring match)
+export interface PlayerSearchResult {
+  name: string
+  total_kills: number
+  total_deaths: number
+}
+
+export async function searchPlayers(query: string, limit = 10): Promise<PlayerSearchResult[]> {
+  if (!query || query.trim().length === 0) {
+    return []
+  }
+
+  const supabase = await createClient()
+  const searchTerm = query.toLowerCase().trim()
+
+  // Search in player_stats, aggregate by name, filter by substring match
+  // Using a raw query approach with ilike for substring matching
+  const { data, error } = await supabase
+    .from('player_stats')
+    .select('name, kills, deaths')
+    .ilike('name', `%${searchTerm}%`)
+    .order('kills', { ascending: false })
+    .limit(500) // Get enough records to aggregate
+
+  if (error) {
+    console.error('Failed to search players:', error)
+    return []
+  }
+
+  // Aggregate by player name (case-insensitive)
+  const playerMap = new Map<string, { displayName: string; kills: number; deaths: number }>()
+  
+  for (const row of data || []) {
+    const lowerName = row.name.toLowerCase()
+    const existing = playerMap.get(lowerName)
+    if (existing) {
+      existing.kills += row.kills
+      existing.deaths += row.deaths
+      // Keep the most common casing (first seen)
+    } else {
+      playerMap.set(lowerName, {
+        displayName: row.name,
+        kills: row.kills,
+        deaths: row.deaths,
+      })
+    }
+  }
+
+  // Convert to array and sort by total kills
+  const results = Array.from(playerMap.values())
+    .map((p) => ({
+      name: p.displayName,
+      total_kills: p.kills,
+      total_deaths: p.deaths,
+    }))
+    .sort((a, b) => b.total_kills - a.total_kills)
+    .slice(0, limit)
+
+  return results
+}
+
 // Get ELO leaderboard with top players
 export async function getEloLeaderboard(limit = 100) {
   const supabase = await createClient()
