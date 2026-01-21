@@ -837,11 +837,11 @@ const PlayerDetailClient = () => {
                           });
                         }}
                         content={({ active, payload, label }) => {
-                          if (active && payload && payload.length) {
+                          if (active && payload && payload.length && label) {
                             const kills = payload.find(p => p.dataKey === 'kills')?.value as number || 0;
                             const deaths = payload.find(p => p.dataKey === 'deaths')?.value as number || 0;
                             const fragRate = deaths > 0 ? (kills / deaths).toFixed(2) : kills > 0 ? '∞' : '0.00';
-                            const date = new Date(label);
+                            const date = new Date(label as string);
                             const dateStr = date.toLocaleDateString('en-US', { 
                               weekday: 'short', 
                               month: 'short', 
