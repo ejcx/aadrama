@@ -21,6 +21,7 @@ const API_BASE = "https://server-details.ej.workers.dev";
 interface ChartDataPoint {
   date: string;
   kills: number;
+  deaths: number;
 }
 
 interface PlayerStats {
@@ -734,9 +735,9 @@ const PlayerDetailClient = () => {
             </div>
           )}
 
-          {/* Kills Per Day Chart Section */}
+          {/* Daily Stats Chart Section */}
           <div className="mb-6">
-            <h2 className="text-white text-lg sm:text-xl font-bold mb-4">Kills Over Time</h2>
+            <h2 className="text-white text-lg sm:text-xl font-bold mb-4">Stats Over Time</h2>
             
             <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6">
               {/* Controls row */}
@@ -835,13 +836,49 @@ const PlayerDetailClient = () => {
                             year: 'numeric'
                           });
                         }}
-                        formatter={(value) => [`${value} kills`, 'Kills']}
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const kills = payload.find(p => p.dataKey === 'kills')?.value as number || 0;
+                            const deaths = payload.find(p => p.dataKey === 'deaths')?.value as number || 0;
+                            const fragRate = deaths > 0 ? (kills / deaths).toFixed(2) : kills > 0 ? '∞' : '0.00';
+                            const date = new Date(label);
+                            const dateStr = date.toLocaleDateString('en-US', { 
+                              weekday: 'short', 
+                              month: 'short', 
+                              day: 'numeric',
+                              year: 'numeric'
+                            });
+                            return (
+                              <div className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 shadow-lg">
+                                <p className="text-gray-300 text-sm mb-2 font-medium">{dateStr}</p>
+                                <div className="space-y-1">
+                                  <p className="text-green-400 text-sm">
+                                    <span className="text-gray-400">Kills:</span> {kills}
+                                  </p>
+                                  <p className="text-red-400 text-sm">
+                                    <span className="text-gray-400">Deaths:</span> {deaths}
+                                  </p>
+                                  <p className={`text-sm font-semibold ${Number(fragRate) >= 1 || fragRate === '∞' ? 'text-green-400' : 'text-red-400'}`}>
+                                    <span className="text-gray-400">Frag Rate:</span> {fragRate}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
                       />
                       <Bar
                         dataKey="kills"
                         fill="#22c55e"
                         radius={[4, 4, 0, 0]}
                         name="Kills"
+                      />
+                      <Bar
+                        dataKey="deaths"
+                        fill="#ef4444"
+                        radius={[4, 4, 0, 0]}
+                        name="Deaths"
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -850,23 +887,33 @@ const PlayerDetailClient = () => {
                 {/* Summary stats */}
                 <div className="mt-4 pt-4 border-t border-gray-700 flex flex-wrap gap-4 text-sm">
                   <div>
-                    <span className="text-gray-400">Total: </span>
+                    <span className="text-gray-400">Total Kills: </span>
                     <span className="text-green-400 font-semibold">
-                      {chartData.reduce((sum, d) => sum + d.kills, 0)} kills
+                      {chartData.reduce((sum, d) => sum + d.kills, 0)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-400">Avg/day: </span>
-                    <span className="text-white font-semibold">
-                      {chartData.length > 0 
-                        ? (chartData.reduce((sum, d) => sum + d.kills, 0) / chartData.length).toFixed(1)
-                        : 0
-                      }
+                    <span className="text-gray-400">Total Deaths: </span>
+                    <span className="text-red-400 font-semibold">
+                      {chartData.reduce((sum, d) => sum + d.deaths, 0)}
                     </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Frag Rate: </span>
+                    {(() => {
+                      const totalKills = chartData.reduce((sum, d) => sum + d.kills, 0);
+                      const totalDeaths = chartData.reduce((sum, d) => sum + d.deaths, 0);
+                      const fragRate = totalDeaths > 0 ? totalKills / totalDeaths : totalKills > 0 ? Infinity : 0;
+                      return (
+                        <span className={`font-semibold ${fragRate >= 1 ? 'text-green-400' : 'text-red-400'}`}>
+                          {fragRate === Infinity ? '∞' : fragRate.toFixed(2)}
+                        </span>
+                      );
+                    })()}
                   </div>
                   <div>
                     <span className="text-gray-400">Days played: </span>
-                    <span className="text-white font-semibold">{chartData.length}</span>
+                    <span className="text-white font-semibold">{chartData.filter(d => d.kills > 0 || d.deaths > 0).length}</span>
                   </div>
                 </div>
                 </>

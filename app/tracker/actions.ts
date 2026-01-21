@@ -180,14 +180,18 @@ export async function getRankedScrimMaps() {
   return uniqueMaps.sort()
 }
 
-// Get daily kills for a player (for chart)
-export interface DailyKillsData {
+// Get daily stats for a player (for chart)
+export interface DailyStatsData {
   date: string
   kills: number
+  deaths: number
 }
 
+// Alias for backward compatibility
+export type DailyKillsData = DailyStatsData
+
 export interface DailyKillsResult {
-  data: DailyKillsData[]
+  data: DailyStatsData[]
   availableMaps: string[]
 }
 
@@ -204,7 +208,7 @@ export async function getPlayerDailyKills(
   // Build the query
   let query = supabase
     .from('player_stats')
-    .select('time, kills, map')
+    .select('time, kills, deaths, map')
     .ilike('name', playerNameLower)
   
   // Calculate start date for time filter
@@ -224,21 +228,24 @@ export async function getPlayerDailyKills(
   
   const { data, error } = await query.order('time', { ascending: true })
   
-  if (error) throw new Error(`Failed to fetch daily kills: ${error.message}`)
+  if (error) throw new Error(`Failed to fetch daily stats: ${error.message}`)
   
-  // Group by date
-  const dateMap = new Map<string, number>()
+  // Group by date - track both kills and deaths
+  const dateMap = new Map<string, { kills: number; deaths: number }>()
   const mapsSet = new Set<string>()
   
   for (const row of data || []) {
     // Get date portion (YYYY-MM-DD)
     const dateKey = new Date(row.time).toISOString().split('T')[0]
-    dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + row.kills)
+    const existing = dateMap.get(dateKey) || { kills: 0, deaths: 0 }
+    existing.kills += row.kills
+    existing.deaths += row.deaths
+    dateMap.set(dateKey, existing)
     if (row.map) mapsSet.add(row.map)
   }
   
   // Fill in all days in the range
-  const dailyData: DailyKillsData[] = []
+  const dailyData: DailyStatsData[] = []
   
   if (options.days && startDate) {
     // Specific day range: fill from startDate to today
@@ -249,14 +256,16 @@ export async function getPlayerDailyKills(
     
     while (current <= endDate) {
       const dateKey = current.toISOString().split('T')[0]
+      const stats = dateMap.get(dateKey) || { kills: 0, deaths: 0 }
       dailyData.push({
         date: dateKey,
-        kills: dateMap.get(dateKey) || 0
+        kills: stats.kills,
+        deaths: stats.deaths
       })
       current.setDate(current.getDate() + 1)
     }
   } else {
-    // "All time" - start from first kill date, fill to today (cap at 30 days of fill)
+    // "All time" - start from first data date, fill to today (cap at 30 days of fill)
     const sortedDates = Array.from(dateMap.keys()).sort()
     
     if (sortedDates.length > 0) {
@@ -273,16 +282,19 @@ export async function getPlayerDailyKills(
         const current = new Date(firstDate)
         while (current <= endDate) {
           const dateKey = current.toISOString().split('T')[0]
+          const stats = dateMap.get(dateKey) || { kills: 0, deaths: 0 }
           dailyData.push({
             date: dateKey,
-            kills: dateMap.get(dateKey) || 0
+            kills: stats.kills,
+            deaths: stats.deaths
           })
           current.setDate(current.getDate() + 1)
         }
       } else {
         // Large range: only show days with actual data (no filling)
         for (const date of sortedDates) {
-          dailyData.push({ date, kills: dateMap.get(date) || 0 })
+          const stats = dateMap.get(date) || { kills: 0, deaths: 0 }
+          dailyData.push({ date, kills: stats.kills, deaths: stats.deaths })
         }
       }
     }
