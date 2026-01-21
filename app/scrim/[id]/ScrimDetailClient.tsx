@@ -17,6 +17,7 @@ import {
   debugEloValidation,
   setScrimRanked,
   adminRecalculateElo,
+  adminUpdateTrackerSessionId,
   isCurrentUserAdmin,
   getScrimDetails,
   voteReroll,
@@ -117,6 +118,7 @@ export default function ScrimDetailClient() {
   const [scoreA, setScoreA] = useState("");
   const [scoreB, setScoreB] = useState("");
   const [trackerInput, setTrackerInput] = useState("");
+  const [adminTrackerInput, setAdminTrackerInput] = useState("");
 
   // Derived state
   const isParticipant = players.some(p => p.user_id === user?.id);
@@ -853,31 +855,80 @@ export default function ScrimDetailClient() {
                   </div>
               )}
 
-        {/* Admin: Recalculate ELO */}
-        {isAdmin && scrim.status === "finalized" && scrim.tracker_session_id && (
+        {/* Admin Tools Section */}
+        {isAdmin && scrim.status === "finalized" && (
           <div className="bg-purple-900/20 border border-purple-700 rounded-lg p-4 mb-6">
-            <h3 className="text-purple-400 font-semibold mb-2">🔧 Admin Tools</h3>
-            <p className="text-gray-400 text-sm mb-3">
-              Recalculate ELO will revert any existing ELO changes from this scrim and recalculate fresh.
-            </p>
-            <button
-              onClick={async () => {
-                if (!confirm('Are you sure you want to recalculate ELO for this scrim? This will revert existing changes and recalculate.')) {
-                  return;
-                }
-                const result = await adminRecalculateElo(scrimId);
-                if (result.success) {
-                  alert(`ELO recalculated!\n\nReverted: ${result.revertedChanges?.length || 0} changes\nNew: ${result.newChanges?.length || 0} changes\n\n${result.newChanges?.map(c => `${c.gameName}: ${c.eloChange >= 0 ? '+' : ''}${c.eloChange} → ${c.newElo}`).join('\n') || ''}`);
-                  await loadScrimData();
-                } else {
-                  alert(`Failed to recalculate ELO: ${result.error}`);
-                }
-              }}
-              disabled={isPending}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-lg font-medium"
-            >
-              Recalculate ELO
-            </button>
+            <h3 className="text-purple-400 font-semibold mb-4">🔧 Admin Tools</h3>
+            
+            {/* Update Session Link */}
+            <div className="mb-4 pb-4 border-b border-purple-700/50">
+              <h4 className="text-gray-300 font-medium mb-2">Update Session Link</h4>
+              <p className="text-gray-400 text-sm mb-3">
+                Fix broken tracker session links. Accepts session IDs or full aadrama URLs.
+              </p>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={adminTrackerInput}
+                  onChange={(e) => setAdminTrackerInput(e.target.value)}
+                  placeholder={scrim.tracker_session_id || "e.g. 1.2.3.4:1234_12345 or full URL"}
+                  className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                />
+                <button
+                  onClick={async () => {
+                    if (!adminTrackerInput.trim()) {
+                      alert('Please enter a session ID or URL');
+                      return;
+                    }
+                    const result = await adminUpdateTrackerSessionId(scrimId, adminTrackerInput);
+                    if (result.success) {
+                      alert(`Session link updated to: ${result.sessionId}`);
+                      setAdminTrackerInput("");
+                      await loadScrimData();
+                    } else {
+                      alert(`Failed: ${result.error}`);
+                    }
+                  }}
+                  disabled={isPending || !adminTrackerInput.trim()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg font-medium text-sm"
+                >
+                  Update
+                </button>
+              </div>
+              {scrim.tracker_session_id && (
+                <p className="text-gray-500 text-xs mt-2">
+                  Current: <code className="text-gray-400">{scrim.tracker_session_id}</code>
+                </p>
+              )}
+            </div>
+            
+            {/* Recalculate ELO */}
+            {scrim.tracker_session_id && (
+              <div>
+                <h4 className="text-gray-300 font-medium mb-2">Recalculate ELO</h4>
+                <p className="text-gray-400 text-sm mb-3">
+                  Revert any existing ELO changes from this scrim and recalculate fresh.
+                </p>
+                <button
+                  onClick={async () => {
+                    if (!confirm('Are you sure you want to recalculate ELO for this scrim? This will revert existing changes and recalculate.')) {
+                      return;
+                    }
+                    const result = await adminRecalculateElo(scrimId);
+                    if (result.success) {
+                      alert(`ELO recalculated!\n\nReverted: ${result.revertedChanges?.length || 0} changes\nNew: ${result.newChanges?.length || 0} changes\n\n${result.newChanges?.map(c => `${c.gameName}: ${c.eloChange >= 0 ? '+' : ''}${c.eloChange} → ${c.newElo}`).join('\n') || ''}`);
+                      await loadScrimData();
+                    } else {
+                      alert(`Failed to recalculate ELO: ${result.error}`);
+                    }
+                  }}
+                  disabled={isPending}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-lg font-medium"
+                >
+                  Recalculate ELO
+                </button>
+              </div>
+            )}
           </div>
         )}
 

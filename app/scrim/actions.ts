@@ -343,8 +343,44 @@ export async function cancelScrim(scrimId: string): Promise<void> {
   revalidatePath('/scrim')
 }
 
+// Helper function to extract session ID from input
+// Handles full aadrama URLs and extracts/decodes the session ID
+function extractSessionId(input: string): string {
+  const trimmed = input.trim()
+  
+  // Check if it's a full aadrama URL
+  const aadramaPatterns = [
+    /https?:\/\/(?:www\.)?aadrama\.com\/tracker\/session\/(.+)/i,
+    /aadrama\.com\/tracker\/session\/(.+)/i,
+  ]
+  
+  for (const pattern of aadramaPatterns) {
+    const match = trimmed.match(pattern)
+    if (match && match[1]) {
+      // Extract the session ID part and decode URL encoding
+      const sessionPart = match[1]
+      // Remove any trailing slashes or query params
+      const cleanSession = sessionPart.split('?')[0].replace(/\/+$/, '')
+      // Decode URL encoding (e.g., %3A -> :)
+      return decodeURIComponent(cleanSession)
+    }
+  }
+  
+  // Not an aadrama URL, return as-is (but decode if it looks URL-encoded)
+  if (trimmed.includes('%')) {
+    try {
+      return decodeURIComponent(trimmed)
+    } catch {
+      // If decoding fails, return as-is
+      return trimmed
+    }
+  }
+  
+  return trimmed
+}
+
 // Set tracker session ID for a scrim (participants only, during scoring or after)
-export async function setTrackerSessionId(scrimId: string, sessionId: string): Promise<void> {
+export async function setTrackerSessionId(scrimId: string, sessionIdInput: string): Promise<void> {
   const { userId } = await getCurrentUser()
   const supabase = await createClient()
   
@@ -362,6 +398,9 @@ export async function setTrackerSessionId(scrimId: string, sessionId: string): P
   if (!isParticipant && scrim.created_by !== userId) {
     throw new Error('Only participants can set the tracker link')
   }
+  
+  // Extract and clean the session ID
+  const sessionId = extractSessionId(sessionIdInput)
   
   const { data, error } = await supabase
     .from('scrims')
@@ -1378,6 +1417,47 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
     } catch {
         return false
     }
+}
+
+// Admin-only: Update tracker session ID (allows updating even when one exists)
+export async function adminUpdateTrackerSessionId(scrimId: string, sessionIdInput: string): Promise<{
+    success: boolean
+    error?: string
+    sessionId?: string
+}> {
+    const { userId } = await getCurrentUser()
+    const supabase = await createClient()
+    
+    // Enforce admin-only access
+    if (userId !== ADMIN_USER_ID) {
+        return { success: false, error: 'Unauthorized: Admin access required' }
+    }
+    
+    const scrim = await getScrim(scrimId)
+    if (!scrim) {
+        return { success: false, error: 'Scrim not found' }
+    }
+    
+    // Extract and clean the session ID
+    const sessionId = extractSessionId(sessionIdInput)
+    
+    if (!sessionId) {
+        return { success: false, error: 'Session ID cannot be empty' }
+    }
+    
+    const { error } = await supabase
+        .from('scrims')
+        .update({ tracker_session_id: sessionId })
+        .eq('id', scrimId)
+    
+    if (error) {
+        return { success: false, error: `Failed to update tracker link: ${error.message}` }
+    }
+    
+    revalidatePath('/scrim')
+    revalidatePath(`/scrim/${scrimId}`)
+    
+    return { success: true, sessionId }
 }
 
 // ==================== READ OPERATIONS FOR CLIENT COMPONENTS ====================
