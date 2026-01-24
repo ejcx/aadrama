@@ -603,6 +603,9 @@ export interface PlayerScrimResult {
   result: 'win' | 'loss' | 'draw' | null
   elo_change: number | null
   tracker_session_id: string | null
+  kills: number | null
+  deaths: number | null
+  kd_ratio: number | null
 }
 
 export async function getPlayerScrims(options: {
@@ -623,6 +626,7 @@ export async function getPlayerScrims(options: {
       result,
       elo_change,
       created_at,
+      kills,
       scrims!inner(
         id,
         map,
@@ -659,8 +663,10 @@ export async function getPlayerScrims(options: {
     return []
   }
   
-  // Transform the data
-  return (data || []).map(record => {
+  // Transform the data and fetch deaths from player_stats
+  const results: PlayerScrimResult[] = []
+  
+  for (const record of data || []) {
     const scrim = record.scrims as unknown as {
       id: string
       map: string | null
@@ -683,7 +689,40 @@ export async function getPlayerScrims(options: {
       }
     }
     
-    return {
+    // Get kills from elo_history
+    const kills = record.kills ?? null
+    
+    // Get deaths from player_stats if tracker_session_id exists
+    let deaths: number | null = null
+    if (scrim.tracker_session_id) {
+      try {
+        // Parse session IDs (can be multiple separated by +)
+        const sessionIds = scrim.tracker_session_id.split(/[+~\s]+/).filter(id => id.trim())
+        
+        // Query player_stats for deaths across all sessions
+        let deathsQuery = supabase
+          .from('player_stats')
+          .select('deaths')
+          .ilike('name', gameNameLower)
+          .in('session_id', sessionIds)
+        
+        const { data: deathsData, error: deathsError } = await deathsQuery
+        
+        if (!deathsError && deathsData && deathsData.length > 0) {
+          deaths = deathsData.reduce((sum, row) => sum + (row.deaths || 0), 0)
+        }
+      } catch (err) {
+        console.error(`Failed to fetch deaths for scrim ${scrim.id}:`, err)
+      }
+    }
+    
+    // Calculate k/d ratio
+    let kd_ratio: number | null = null
+    if (kills !== null && deaths !== null) {
+      kd_ratio = deaths > 0 ? kills / deaths : kills > 0 ? Infinity : 0
+    }
+    
+    results.push({
       id: scrim.id,
       map: scrim.map,
       team_a_score: scrim.team_a_score,
@@ -694,8 +733,13 @@ export async function getPlayerScrims(options: {
       result: record.result as 'win' | 'loss' | 'draw' | null,
       elo_change: record.elo_change,
       tracker_session_id: scrim.tracker_session_id,
-    }
-  })
+      kills,
+      deaths,
+      kd_ratio,
+    })
+  }
+  
+  return results
 }
 
 // Check if current user is in a scrim

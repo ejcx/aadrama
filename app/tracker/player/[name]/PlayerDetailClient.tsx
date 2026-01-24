@@ -250,6 +250,13 @@ const PlayerDetailClient = () => {
   const [scrimEndTime, setScrimEndTime] = useState<string>(defaultDates.end);
   const [scrimMapFilter, setScrimMapFilter] = useState<string>("");
   const [scrimLimit, setScrimLimit] = useState<number>(25);
+  
+  // All-time scrim stats (for totals in top bar)
+  const [allTimeScrimStats, setAllTimeScrimStats] = useState<{
+    totalKills: number;
+    totalDeaths: number;
+    kdRatio: number | null;
+  } | null>(null);
 
   // Daily kills chart state
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
@@ -313,6 +320,33 @@ const PlayerDetailClient = () => {
     };
     fetchScrimMaps();
   }, []);
+
+  // Fetch all-time scrim stats for totals
+  useEffect(() => {
+    const fetchAllTimeScrimStats = async () => {
+      try {
+        const allScrims = await getPlayerScrims({
+          gameName: playerName,
+          limit: 1000, // Get all scrims for totals
+        });
+        
+        const totalKills = allScrims.reduce((sum, s) => sum + (s.kills || 0), 0);
+        const totalDeaths = allScrims.reduce((sum, s) => sum + (s.deaths || 0), 0);
+        const kdRatio = totalDeaths > 0 ? totalKills / totalDeaths : totalKills > 0 ? Infinity : 0;
+        
+        setAllTimeScrimStats({
+          totalKills,
+          totalDeaths,
+          kdRatio: kdRatio === Infinity ? Infinity : kdRatio,
+        });
+      } catch (err) {
+        console.error('Failed to fetch all-time scrim stats:', err);
+        setAllTimeScrimStats(null);
+      }
+    };
+    
+    fetchAllTimeScrimStats();
+  }, [playerName]);
 
   // Fetch player scrims
   useEffect(() => {
@@ -661,6 +695,38 @@ const PlayerDetailClient = () => {
                       </div>
                     </div>
                   )}
+                  {(() => {
+                    // Use all-time scrim stats if available, otherwise calculate from visible scrims
+                    const stats = allTimeScrimStats || (() => {
+                      const totalKills = scrimResults.reduce((sum, s) => sum + (s.kills || 0), 0);
+                      const totalDeaths = scrimResults.reduce((sum, s) => sum + (s.deaths || 0), 0);
+                      const kdRatio = totalDeaths > 0 ? totalKills / totalDeaths : totalKills > 0 ? Infinity : 0;
+                      return {
+                        totalKills,
+                        totalDeaths,
+                        kdRatio: kdRatio === Infinity ? Infinity : kdRatio,
+                      };
+                    })();
+                    
+                    return (
+                      <>
+                        <div>
+                          <div className="text-gray-400 text-xs mb-1">Kills</div>
+                          <div className="text-green-400 text-lg sm:text-xl font-semibold">{stats.totalKills}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-400 text-xs mb-1">Deaths</div>
+                          <div className="text-red-400 text-lg sm:text-xl font-semibold">{stats.totalDeaths}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-400 text-xs mb-1">K/D Ratio</div>
+                          <div className={`text-lg sm:text-xl font-semibold ${stats.kdRatio !== null && stats.kdRatio !== Infinity && stats.kdRatio >= 1 ? 'text-green-400' : stats.kdRatio === Infinity ? 'text-green-400' : 'text-red-400'}`}>
+                            {stats.kdRatio === null ? '-' : stats.kdRatio === Infinity ? '∞' : stats.kdRatio.toFixed(2)}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1032,13 +1098,14 @@ const PlayerDetailClient = () => {
             ) : scrimResults.length > 0 ? (
               <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-white text-xs sm:text-sm min-w-[500px]">
+                  <table className="w-full text-white text-xs sm:text-sm min-w-[700px]">
                     <thead>
                       <tr className="border-b border-gray-700 bg-gray-800">
                         <th className="text-left py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Date</th>
                         <th className="text-left py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Map</th>
                         <th className="text-center py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Result</th>
                         <th className="text-center py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Score</th>
+                        <th className="text-center py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">K/D</th>
                         <th className="text-center py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">ELO</th>
                         <th className="text-center py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Details</th>
                       </tr>
@@ -1077,6 +1144,24 @@ const PlayerDetailClient = () => {
                                   {scrim.team_b_score}
                                 </span>
                               </span>
+                            ) : (
+                              <span className="text-gray-500">-</span>
+                            )}
+                          </td>
+                          <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
+                            {scrim.kills !== null && scrim.deaths !== null ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <div className="text-xs">
+                                  <span className="text-green-400">{scrim.kills}</span>
+                                  <span className="text-gray-500">/</span>
+                                  <span className="text-red-400">{scrim.deaths}</span>
+                                </div>
+                                {scrim.kd_ratio !== null && (
+                                  <div className={`text-xs font-semibold ${scrim.kd_ratio >= 1 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {scrim.kd_ratio === Infinity ? '∞' : scrim.kd_ratio.toFixed(2)}
+                                  </div>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-gray-500">-</span>
                             )}
