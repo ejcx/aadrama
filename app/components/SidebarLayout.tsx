@@ -9,18 +9,7 @@ interface SidebarLayoutProps {
 
 const SidebarLayout = ({ children }: SidebarLayoutProps) => {
   const pathname = usePathname();
-  const [showAnnouncement, setShowAnnouncement] = useState(true);
-  const [announcementExpired, setAnnouncementExpired] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    // Check if announcement should be hidden (after January 5th, 2026)
-    const expirationDate = new Date('2026-01-05T23:59:59');
-    const now = new Date();
-    if (now > expirationDate) {
-      setAnnouncementExpired(true);
-    }
-  }, []);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -50,7 +39,7 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
   return (
     <div className="w-full min-h-screen bg-black">
       {/* Mobile Header */}
-      <div className={`lg:hidden fixed left-0 right-0 z-40 bg-gray-900 border-b border-gray-700 px-4 py-3 flex items-center justify-between ${showAnnouncement && !announcementExpired ? 'top-10' : 'top-0'}`}>
+      <div className="lg:hidden fixed left-0 right-0 top-0 z-40 bg-gray-900 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
         <a href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
           <Image
             src="/aa.jpg"
@@ -82,46 +71,9 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
       {mobileMenuOpen && (
         <div
           className="lg:hidden fixed inset-0 bg-black/60 z-40"
-          style={{ top: showAnnouncement && !announcementExpired ? '88px' : '48px' }}
+          style={{ top: '48px' }}
           onClick={() => setMobileMenuOpen(false)}
         />
-      )}
-
-      {/* Tournament Announcement Banner */}
-      {showAnnouncement && !announcementExpired && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-blue-600 via-cyan-600 to-blue-600 text-white py-2 px-4 shadow-lg">
-          <div className="flex items-center justify-center gap-2 sm:gap-4 lg:ml-64 pr-6 sm:pr-8">
-            <a
-              href="/2025-winter-classic"
-              className="flex items-center gap-2 sm:gap-4 min-w-0"
-            >
-              <span className="text-xs sm:text-sm md:text-base font-medium truncate">
-                <span className="font-bold">AA25 Winter Championship</span>
-                <span className="hidden xs:inline"> — Jan 3 @ 4PM ET</span>
-              </span>
-              <span className="shrink-0 inline-flex items-center gap-1 px-2 sm:px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-[10px] sm:text-xs font-semibold transition-colors whitespace-nowrap">
-                View
-                <span className="hidden sm:inline"> Details</span>
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </span>
-            </a>
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowAnnouncement(false);
-              }}
-              className="absolute right-2 sm:right-4 text-white/70 hover:text-white transition-colors p-1"
-              aria-label="Dismiss announcement"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
       )}
 
       {/* Sidebar - Desktop always visible, Mobile slides in */}
@@ -130,7 +82,7 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
         transition-transform duration-300 ease-in-out
         lg:translate-x-0
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-        ${showAnnouncement && !announcementExpired ? 'top-[88px] lg:top-10' : 'top-12 lg:top-0'}
+        top-12 lg:top-0
       `}>
         <div className="sticky top-6">
           {/* Logo - only show on desktop since mobile has it in the header */}
@@ -239,7 +191,7 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
       </div>
 
       {/* Main Content */}
-      <div className={`flex-1 lg:ml-64 transition-all ${showAnnouncement && !announcementExpired ? 'pt-[88px] lg:pt-10' : 'pt-12 lg:pt-0'}`}>
+      <div className="flex-1 lg:ml-64 transition-all pt-12 lg:pt-0">
         {children}
       </div>
     </div>
