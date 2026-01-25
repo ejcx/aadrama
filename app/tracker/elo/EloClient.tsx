@@ -20,6 +20,9 @@ interface EloPlayer {
   draws: number;
   eloChange7Days: number;
   recentMatches: number;
+  total_kills: number;
+  total_deaths: number;
+  kd_ratio: number;
 }
 
 interface InitialData {
@@ -192,7 +195,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-white text-xs sm:text-sm min-w-[600px]">
+              <table className="w-full text-white text-xs sm:text-sm min-w-[800px]">
                 <thead>
                   <tr className="border-b border-gray-700 bg-gray-800">
                     <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Rank</th>
@@ -202,6 +205,9 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Games</th>
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">W-L-D</th>
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Win%</th>
+                    <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Scrim Kills</th>
+                    <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Scrim Deaths</th>
+                    <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Scrim K/D</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -277,6 +283,29 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                         ) : (
                           <span className="text-gray-500">─</span>
                         )}
+                      </td>
+                      <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
+                        <span className="text-cyan-400 font-medium">
+                          {player.total_kills.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
+                        <span className="text-red-300">
+                          {player.total_deaths.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
+                        <span
+                          className={`font-bold ${
+                            player.kd_ratio >= 1.5
+                              ? "text-green-400"
+                              : player.kd_ratio >= 1.0
+                              ? "text-yellow-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          {player.kd_ratio === 999.99 ? "∞" : player.kd_ratio.toFixed(2)}
+                        </span>
                       </td>
                     </tr>
                   ))}

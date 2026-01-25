@@ -663,9 +663,47 @@ export async function getPlayerScrims(options: {
     return []
   }
   
-  // Transform the data and fetch deaths from player_stats
+  // Collect all unique session IDs from all scrims first (eliminates N+1 query pattern)
+  const allSessionIds = new Set<string>()
+  const scrimSessionMap = new Map<string, string[]>() // scrim_id -> session_ids
+
+  for (const record of data || []) {
+    const scrim = record.scrims as unknown as {
+      id: string
+      tracker_session_id: string | null
+    }
+
+    if (scrim.tracker_session_id) {
+      // Parse session IDs (can be multiple separated by +, ~, or spaces)
+      const sessionIds = scrim.tracker_session_id.split(/[+~\s]+/).filter(id => id.trim())
+      scrimSessionMap.set(scrim.id, sessionIds)
+      sessionIds.forEach(id => allSessionIds.add(id.trim()))
+    }
+  }
+
+  // Fetch all deaths in a single query (instead of N queries in a loop)
+  const deathsMap = new Map<string, number>() // session_id -> deaths
+  if (allSessionIds.size > 0) {
+    try {
+      const { data: statsData, error: statsError } = await supabase
+        .from('player_stats')
+        .select('session_id, deaths')
+        .ilike('name', gameNameLower)
+        .in('session_id', Array.from(allSessionIds))
+
+      if (!statsError && statsData) {
+        for (const stat of statsData) {
+          deathsMap.set(stat.session_id, (deathsMap.get(stat.session_id) || 0) + (stat.deaths || 0))
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch deaths for scrims:', err)
+    }
+  }
+
+  // Transform the data using the pre-fetched deaths
   const results: PlayerScrimResult[] = []
-  
+
   for (const record of data || []) {
     const scrim = record.scrims as unknown as {
       id: string
@@ -676,7 +714,7 @@ export async function getPlayerScrims(options: {
       finished_at: string | null
       tracker_session_id: string | null
     }
-    
+
     // Determine player's team based on result and scores
     let playerTeam: 'team_a' | 'team_b' | null = null
     if (scrim.team_a_score !== null && scrim.team_b_score !== null) {
@@ -688,40 +726,25 @@ export async function getPlayerScrims(options: {
         playerTeam = 'team_a' // Draw, doesn't matter
       }
     }
-    
+
     // Get kills from elo_history
     const kills = record.kills ?? null
-    
-    // Get deaths from player_stats if tracker_session_id exists
+
+    // Get deaths from pre-fetched map (O(1) lookup instead of N queries)
     let deaths: number | null = null
-    if (scrim.tracker_session_id) {
-      try {
-        // Parse session IDs (can be multiple separated by +)
-        const sessionIds = scrim.tracker_session_id.split(/[+~\s]+/).filter(id => id.trim())
-        
-        // Query player_stats for deaths across all sessions
-        let deathsQuery = supabase
-          .from('player_stats')
-          .select('deaths')
-          .ilike('name', gameNameLower)
-          .in('session_id', sessionIds)
-        
-        const { data: deathsData, error: deathsError } = await deathsQuery
-        
-        if (!deathsError && deathsData && deathsData.length > 0) {
-          deaths = deathsData.reduce((sum, row) => sum + (row.deaths || 0), 0)
-        }
-      } catch (err) {
-        console.error(`Failed to fetch deaths for scrim ${scrim.id}:`, err)
-      }
+    const sessionIds = scrimSessionMap.get(scrim.id)
+    if (sessionIds) {
+      deaths = sessionIds.reduce((sum, sessionId) => {
+        return sum + (deathsMap.get(sessionId) || 0)
+      }, 0)
     }
-    
+
     // Calculate k/d ratio
     let kd_ratio: number | null = null
     if (kills !== null && deaths !== null) {
       kd_ratio = deaths > 0 ? kills / deaths : kills > 0 ? Infinity : 0
     }
-    
+
     results.push({
       id: scrim.id,
       map: scrim.map,
@@ -738,7 +761,7 @@ export async function getPlayerScrims(options: {
       kd_ratio,
     })
   }
-  
+
   return results
 }
 

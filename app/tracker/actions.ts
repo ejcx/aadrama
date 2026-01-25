@@ -17,64 +17,76 @@ export async function searchPlayers(query: string, limit = 10): Promise<PlayerSe
   const supabase = await createClient()
   const searchTerm = query.toLowerCase().trim()
 
-  // Search in player_stats, aggregate by name, filter by substring match
-  // Using a raw query approach with ilike for substring matching
+  // Search in player_total_stats_mv (materialized view with pre-aggregated stats)
+  // This eliminates client-side aggregation and improves performance significantly
   const { data, error } = await supabase
-    .from('player_stats')
-    .select('name, kills, deaths')
-    .ilike('name', `%${searchTerm}%`)
-    .order('kills', { ascending: false })
-    .limit(500) // Get enough records to aggregate
+    .from('player_total_stats_mv')
+    .select('player_name, total_kills, total_deaths')
+    .ilike('player_name', `%${searchTerm}%`)
+    .order('total_kills', { ascending: false })
+    .limit(limit)
 
   if (error) {
     console.error('Failed to search players:', error)
     return []
   }
 
-  // Aggregate by player name (case-insensitive)
-  const playerMap = new Map<string, { displayName: string; kills: number; deaths: number }>()
-  
-  for (const row of data || []) {
-    const lowerName = row.name.toLowerCase()
-    const existing = playerMap.get(lowerName)
-    if (existing) {
-      existing.kills += row.kills
-      existing.deaths += row.deaths
-      // Keep the most common casing (first seen)
-    } else {
-      playerMap.set(lowerName, {
-        displayName: row.name,
-        kills: row.kills,
-        deaths: row.deaths,
-      })
-    }
-  }
-
-  // Convert to array and sort by total kills
-  const results = Array.from(playerMap.values())
-    .map((p) => ({
-      name: p.displayName,
-      total_kills: p.kills,
-      total_deaths: p.deaths,
-    }))
-    .sort((a, b) => b.total_kills - a.total_kills)
-    .slice(0, limit)
-
-  return results
+  // Map to expected return type
+  return data?.map(p => ({
+    name: p.player_name,
+    total_kills: p.total_kills,
+    total_deaths: p.total_deaths,
+  })) || []
 }
 
-// Get ELO leaderboard with top players
+// Get ELO leaderboard with top players (includes scrim kills/deaths)
 export async function getEloLeaderboard(limit = 100) {
   const supabase = await createClient()
 
-  const { data: eloRecords, error } = await supabase
+  // Fetch ELO data first (required)
+  const eloResult = await supabase
     .from('player_elo')
     .select('*')
     .order('elo', { ascending: false })
     .limit(limit)
 
-  if (error) throw new Error(`Failed to fetch ELO leaderboard: ${error.message}`)
-  return eloRecords || []
+  if (eloResult.error) throw new Error(`Failed to fetch ELO leaderboard: ${eloResult.error.message}`)
+
+  // Try to fetch scrim stats (optional, gracefully handle failure)
+  let statsResult
+  try {
+    statsResult = await supabase
+      .from('player_scrim_stats_mv')
+      .select('player_name_lower, total_scrim_kills, total_scrim_deaths, scrim_kd_ratio')
+  } catch (err) {
+    console.error('Failed to fetch player stats from materialized view:', err)
+    statsResult = { data: null, error: err }
+  }
+
+  // Create a map of player scrim stats for quick lookup
+  const statsMap = new Map<string, { total_kills: number; total_deaths: number; kd_ratio: number }>()
+  if (statsResult?.data && !statsResult.error) {
+    for (const stat of statsResult.data) {
+      statsMap.set(stat.player_name_lower, {
+        total_kills: stat.total_scrim_kills,
+        total_deaths: stat.total_scrim_deaths,
+        kd_ratio: stat.scrim_kd_ratio,
+      })
+    }
+  }
+
+  // Merge ELO data with scrim stats (use defaults if stats not available)
+  const enrichedData = (eloResult.data || []).map(player => {
+    const stats = statsMap.get(player.game_name_lower)
+    return {
+      ...player,
+      total_kills: stats?.total_kills || 0,
+      total_deaths: stats?.total_deaths || 0,
+      kd_ratio: stats?.kd_ratio || 0,
+    }
+  })
+
+  return enrichedData
 }
 
 // Get 7-day ELO changes for multiple players

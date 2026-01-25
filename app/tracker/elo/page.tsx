@@ -12,6 +12,9 @@ interface EloPlayer {
   draws: number;
   eloChange7Days: number;
   recentMatches: number;
+  total_kills: number;
+  total_deaths: number;
+  kd_ratio: number;
 }
 
 export default async function EloRankingsPage() {
@@ -45,6 +48,9 @@ export default async function EloRankingsPage() {
     draws: p.draws,
     eloChange7Days: changeMap.get(p.game_name_lower)?.change || 0,
     recentMatches: changeMap.get(p.game_name_lower)?.matches || 0,
+    total_kills: p.total_kills,
+    total_deaths: p.total_deaths,
+    kd_ratio: p.kd_ratio,
   }));
 
   return (
