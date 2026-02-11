@@ -1,6 +1,6 @@
 -- ELO-balanced team assignment with punitive matchmaking for hill and will
 -- If both hill and will are playing, they are forced together on the same team
--- with the single lowest ELO player, and the 4th player is chosen by the algorithm
+-- and automatically matched with the single lowest ELO player
 CREATE OR REPLACE FUNCTION assign_balanced_teams(p_scrim_id UUID)
 RETURNS VOID AS $$
 DECLARE
@@ -35,19 +35,44 @@ BEGIN
   
   half_count := player_count / 2;
   
-  -- If both hill and will are present, apply punitive matchmaking
+  -- If both hill and will are present, apply simple punitive matchmaking
   IF hill_present AND will_present THEN
-    -- Strategy: 
-    -- 1. Assign hill and will to team_a
-    -- 2. Assign the single lowest ELO player to team_a (if there's room)
-    -- 3. Use snake draft algorithm on remaining players to fill team_a to half_count
-    -- 4. Assign all other remaining players to team_b
+    -- First, assign hill and will to team_a
+    UPDATE public.scrim_players
+    SET team = 'team_a'
+    WHERE scrim_id = p_scrim_id 
+      AND is_ready = TRUE
+      AND user_id IN (hill_user_id, will_user_id);
     
-    -- Ensure we have at least 4 players (hill, will, and 2 others minimum)
-    IF player_count < 4 THEN
-      RAISE EXCEPTION 'Cannot assign teams with hill and will: need at least 4 players, got %', player_count;
-    END IF;
+    -- Find the single lowest ELO player (excluding hill and will)
+    WITH player_elos AS (
+      SELECT DISTINCT ON (sp.id)
+        sp.id as player_id,
+        COALESCE(pe.elo, 1200) as elo
+      FROM public.scrim_players sp
+      LEFT JOIN public.user_game_names ugn ON sp.user_id = ugn.user_id
+      LEFT JOIN public.player_elo pe ON ugn.game_name_lower = pe.game_name_lower
+      WHERE sp.scrim_id = p_scrim_id 
+        AND sp.is_ready = TRUE
+        AND sp.user_id NOT IN (hill_user_id, will_user_id)
+        AND sp.team IS NULL
+      ORDER BY sp.id, pe.elo ASC NULLS LAST
+    ),
+    lowest_one AS (
+      SELECT player_id
+      FROM player_elos
+      ORDER BY elo ASC, random()
+      LIMIT 1
+    )
+    UPDATE public.scrim_players
+    SET team = 'team_a'
+    FROM lowest_one lo
+    WHERE scrim_players.id = lo.player_id;
     
+    -- Assign all remaining players to team_b (team_a already has 3: hill, will, lowest)
+    -- This ensures balance: if we have 8 players, team_a gets 3 + remaining/2, team_b gets remaining/2
+    -- Actually, we need to balance properly - team_a should have half_count total
+    -- So team_a needs (half_count - 3) more from remaining players
     WITH player_elos AS (
       SELECT DISTINCT ON (sp.id)
         sp.id as player_id,
@@ -56,88 +81,33 @@ BEGIN
       FROM public.scrim_players sp
       LEFT JOIN public.user_game_names ugn ON sp.user_id = ugn.user_id
       LEFT JOIN public.player_elo pe ON ugn.game_name_lower = pe.game_name_lower
-      WHERE sp.scrim_id = p_scrim_id AND sp.is_ready = TRUE
-        AND sp.user_id NOT IN (hill_user_id, will_user_id)
+      WHERE sp.scrim_id = p_scrim_id AND sp.is_ready = TRUE AND sp.team IS NULL
       ORDER BY sp.id, pe.elo DESC NULLS LAST
     ),
-    ranked_others AS (
+    ranked_players AS (
       SELECT 
         player_id,
         elo,
-        ROW_NUMBER() OVER (ORDER BY elo ASC, random()) as rank_asc,
-        ROW_NUMBER() OVER (ORDER BY elo DESC, random()) as rank_desc
+        ROW_NUMBER() OVER (ORDER BY elo DESC, random()) as rank
       FROM player_elos
     ),
-    lowest_one AS (
-      SELECT player_id
-      FROM ranked_others
-      WHERE rank_asc = 1
-    ),
-    snake_draft_precalc AS (
-      SELECT 
+    team_assignments AS (
+      SELECT
         player_id,
         elo,
-        rank_desc,
-        -- Apply snake draft pattern to all remaining players
+        rank,
+        -- Team_a already has 3 players, needs (half_count - 3) more
+        -- Use snake draft but ensure team_a gets exactly (half_count - 3) more
         CASE 
-          WHEN ((rank_desc - 1) / 2) % 2 = 0 THEN
-            CASE WHEN (rank_desc - 1) % 2 = 0 THEN 'team_a' ELSE 'team_b' END
-          ELSE
-            CASE WHEN (rank_desc - 1) % 2 = 0 THEN 'team_b' ELSE 'team_a' END
-        END as snake_team
-      FROM ranked_others
-      WHERE rank_asc > 1  -- Exclude the lowest one (will be assigned separately)
-    ),
-    snake_draft_assignments AS (
-      SELECT 
-        player_id,
-        elo,
-        rank_desc,
-        snake_team,
-        -- Create a global ordering: prioritize players snake draft assigned to team_a, then by ELO rank
-        ROW_NUMBER() OVER (ORDER BY 
-          CASE WHEN snake_team = 'team_a' THEN 0 ELSE 1 END,  -- team_a players first
-          rank_desc  -- then by ELO rank (descending, so higher ELO first)
-        ) as global_rank
-      FROM snake_draft_precalc
-    ),
-    final_assignments AS (
-      SELECT 
-        player_id,
-        CASE 
-          WHEN half_count > 2 AND (half_count - 3) > 0 THEN
-            -- Team_a needs exactly (half_count - 3) more players
-            -- Take the first (half_count - 3) players in global order (prioritizing snake_draft team_a assignments)
-            CASE 
-              WHEN global_rank <= (half_count - 3) THEN 'team_a'
-              ELSE 'team_b'
-            END
-          ELSE
-            -- half_count = 2, team_a is full with just hill+will, all remaining go to team_b
-            'team_b'
+          WHEN rank <= (half_count - 3) THEN 'team_a'
+          ELSE 'team_b'
         END as team
-      FROM snake_draft_assignments
+      FROM ranked_players
     )
-    -- First, assign hill and will to team_a
-    UPDATE public.scrim_players
-    SET team = 'team_a'
-    WHERE scrim_id = p_scrim_id 
-      AND is_ready = TRUE
-      AND user_id IN (hill_user_id, will_user_id);
-    
-    -- Assign the single lowest ELO player to team_a (only if there's room)
-    IF half_count > 2 THEN
-      UPDATE public.scrim_players
-      SET team = 'team_a'
-      FROM lowest_one lo
-      WHERE scrim_players.id = lo.player_id;
-    END IF;
-    
-    -- Assign remaining players using snake draft algorithm
     UPDATE public.scrim_players sp
-    SET team = fa.team
-    FROM final_assignments fa
-    WHERE sp.id = fa.player_id;
+    SET team = ta.team
+    FROM team_assignments ta
+    WHERE sp.id = ta.player_id;
     
   ELSE
     -- Normal ELO-balanced snake draft (no hill/will present)
@@ -257,5 +227,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-COMMENT ON FUNCTION assign_balanced_teams IS 'Assigns teams balanced by ELO using snake draft. If hill and will are both playing, they are forced together on the same team with the single lowest ELO player, and the remaining slots are filled by the algorithm';
+COMMENT ON FUNCTION assign_balanced_teams IS 'Assigns teams balanced by ELO using snake draft. If hill and will are both playing, they are forced together on the same team with the single lowest ELO player';
 COMMENT ON FUNCTION assign_purely_random_teams IS 'Assigns teams purely randomly without ELO balancing - used for rerolls';
