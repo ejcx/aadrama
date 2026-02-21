@@ -29,7 +29,7 @@ export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
       title: input?.title || null,
       map: input?.map || null,
       max_players_per_team: input?.max_players_per_team || 8,
-      min_players_per_team: input?.min_players_per_team || 1,
+      min_players_per_team: input?.min_players_per_team || 4, // 4v4 minimum
       is_ranked: input?.is_ranked !== false, // Default to ranked
     })
     .select()
@@ -195,11 +195,11 @@ async function checkAndStartGame(scrimId: string): Promise<void> {
   const players = await getScrimPlayers(scrimId)
   const readyCount = players.filter(p => p.is_ready).length
   const totalCount = players.length
-  const minRequired = scrim.min_players_per_team * 2
+  const minRequired = Math.max(scrim.min_players_per_team * 2, 8) // Enforce 4v4 minimum (8 players)
 
   console.log(`[Scrim ${scrimId}] Players: ${totalCount}, Ready: ${readyCount}, Min required: ${minRequired}, Even: ${totalCount % 2 === 0}`)
-  
-  // Need at least min_players_per_team * 2, all ready, and even count
+
+  // Need at least 8 players (4v4), all ready, and even count
   if (totalCount < minRequired) {
     console.log(`[Scrim ${scrimId}] Not enough players (${totalCount} < ${minRequired})`)
     return
