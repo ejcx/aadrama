@@ -7,8 +7,9 @@ import { SessionHoverPopover } from "../../../components/SessionHoverPopover";
 import { getPlayerElo, getPlayerEloHistory, getPlayerRank, getPlayerDailyKills } from "../../actions";
 import { getPlayerScrims, getScrimMaps, type PlayerScrimResult } from "../../../scrim/actions";
 import {
-  BarChart,
+  ComposedChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -22,6 +23,10 @@ interface ChartDataPoint {
   date: string;
   kills: number;
   deaths: number;
+  /** End-of-day ELO (from ranked scrims); carried forward on days with no ranked games */
+  elo?: number | null;
+  /** Net ELO change that day from ranked games */
+  eloChange?: number | null;
 }
 
 interface PlayerStats {
@@ -506,26 +511,60 @@ const PlayerDetailClient = () => {
     const fetchDailyStats = async () => {
       try {
         setDailyStatsLoading(true);
-        
+
         // Calculate days for time range
         let days: number | null = null;
         if (chartTimeRange === "30d") days = 30;
         else if (chartTimeRange === "60d") days = 60;
         else if (chartTimeRange === "90d") days = 90;
         // "all" = null (no limit)
-        
-        const result = await getPlayerDailyKills(playerName, {
-          days,
-          map: chartMapFilter || null,
+
+        const [result, eloHistory] = await Promise.all([
+          getPlayerDailyKills(playerName, {
+            days,
+            map: chartMapFilter || null,
+          }),
+          getPlayerEloHistory(
+            playerName,
+            chartTimeRange === "all" ? 730 : days ?? 30
+          ),
+        ]);
+
+        // Build daily ELO from history (last elo_after per day, sum elo_change per day)
+        const eloByDay = new Map<
+          string,
+          { eloAfter: number; change: number }
+        >();
+        const sorted = [...eloHistory].sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        for (const row of sorted) {
+          const dateKey = new Date(row.created_at).toISOString().split("T")[0];
+          const existing = eloByDay.get(dateKey);
+          const change = (existing?.change ?? 0) + (row.elo_change ?? 0);
+          eloByDay.set(dateKey, { eloAfter: row.elo_after, change });
+        }
+
+        // Merge ELO into chart data: carry forward end-of-day ELO on days with no ranked games
+        let lastElo: number | null = null;
+        const merged = result.data.map((row) => {
+          const day = eloByDay.get(row.date);
+          const elo = day?.eloAfter ?? lastElo ?? null;
+          if (day) lastElo = day.eloAfter;
+          return {
+            ...row,
+            elo: elo ?? undefined,
+            eloChange: day?.change ?? undefined,
+          };
         });
-        
-        setChartData(result.data);
-        // Only update available maps if no filter (so we keep the full list)
+
+        setChartData(merged);
         if (!chartMapFilter) {
           setAvailableChartMaps(result.availableMaps);
         }
       } catch (err) {
-        console.error('Failed to fetch daily stats:', err);
+        console.error("Failed to fetch daily stats:", err);
         setChartData([]);
       } finally {
         setDailyStatsLoading(false);
@@ -867,52 +906,79 @@ const PlayerDetailClient = () => {
                 </div>
               ) : chartData.length > 0 ? (
                 <>
-                {/* Chart */}
+                {/* Chart: bars = K/D, line = ELO by day */}
                 <div className="h-[300px] sm:h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <ComposedChart data={chartData} margin={{ top: 10, right: 50, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis 
-                        dataKey="date" 
-                        tick={{ fill: '#9ca3af', fontSize: 11 }}
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fill: "#9ca3af", fontSize: 11 }}
                         tickFormatter={(value) => {
                           const date = new Date(value);
                           return `${date.getMonth() + 1}/${date.getDate()}`;
                         }}
                         stroke="#4b5563"
                       />
-                      <YAxis 
-                        tick={{ fill: '#9ca3af', fontSize: 11 }}
+                      <YAxis
+                        yAxisId="left"
+                        tick={{ fill: "#9ca3af", fontSize: 11 }}
                         stroke="#4b5563"
                         allowDecimals={false}
                       />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#1f2937', 
-                          border: '1px solid #374151',
-                          borderRadius: '8px',
-                          color: '#fff'
+                      <YAxis
+                        yAxisId="elo"
+                        orientation="right"
+                        tick={{ fill: "#eab308", fontSize: 11 }}
+                        stroke="#a16207"
+                        allowDecimals={false}
+                        domain={(() => {
+                          const eloValues = chartData
+                            .map((d) => d.elo)
+                            .filter((e): e is number => e != null);
+                          if (eloValues.length === 0) return [1000, 1100];
+                          const dataMax = Math.max(...eloValues);
+                          const padding = Math.max(25, Math.round((dataMax - 1000) * 0.05));
+                          return [1000, dataMax + padding];
+                        })()}
+                        label={{
+                          value: "ELO",
+                          angle: 90,
+                          position: "insideRight",
+                          fill: "#eab308",
+                          style: { fontSize: 11 },
+                        }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#1f2937",
+                          border: "1px solid #374151",
+                          borderRadius: "8px",
+                          color: "#fff",
                         }}
                         labelFormatter={(value) => {
                           const date = new Date(value);
-                          return date.toLocaleDateString('en-US', { 
-                            weekday: 'short', 
-                            month: 'short', 
-                            day: 'numeric',
-                            year: 'numeric'
+                          return date.toLocaleDateString("en-US", {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
                           });
                         }}
                         content={({ active, payload, label }) => {
                           if (active && payload && payload.length && label) {
-                            const kills = payload.find(p => p.dataKey === 'kills')?.value as number || 0;
-                            const deaths = payload.find(p => p.dataKey === 'deaths')?.value as number || 0;
-                            const fragRate = deaths > 0 ? (kills / deaths).toFixed(2) : kills > 0 ? '∞' : '0.00';
+                            const kills = (payload.find((p) => p.dataKey === "kills")?.value as number) ?? 0;
+                            const deaths = (payload.find((p) => p.dataKey === "deaths")?.value as number) ?? 0;
+                            const fragRate = deaths > 0 ? (kills / deaths).toFixed(2) : kills > 0 ? "∞" : "0.00";
+                            const elo = payload.find((p) => p.dataKey === "elo")?.value as number | undefined;
+                            const point = chartData.find((d) => d.date === label);
+                            const eloChange = point?.eloChange;
                             const date = new Date(label as string);
-                            const dateStr = date.toLocaleDateString('en-US', { 
-                              weekday: 'short', 
-                              month: 'short', 
-                              day: 'numeric',
-                              year: 'numeric'
+                            const dateStr = date.toLocaleDateString("en-US", {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
                             });
                             return (
                               <div className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 shadow-lg">
@@ -924,9 +990,23 @@ const PlayerDetailClient = () => {
                                   <p className="text-red-400 text-sm">
                                     <span className="text-gray-400">Deaths:</span> {deaths}
                                   </p>
-                                  <p className={`text-sm font-semibold ${Number(fragRate) >= 1 || fragRate === '∞' ? 'text-green-400' : 'text-red-400'}`}>
+                                  <p className={`text-sm font-semibold ${Number(fragRate) >= 1 || fragRate === "∞" ? "text-green-400" : "text-red-400"}`}>
                                     <span className="text-gray-400">Frag Rate:</span> {fragRate}
                                   </p>
+                                  {(elo != null || (eloChange != null && eloChange !== 0)) && (
+                                    <div className="pt-1 mt-1 border-t border-gray-600">
+                                      {elo != null && (
+                                        <p className="text-amber-400 text-sm">
+                                          <span className="text-gray-400">ELO:</span> {elo}
+                                        </p>
+                                      )}
+                                      {eloChange != null && eloChange !== 0 && (
+                                        <p className={`text-sm ${eloChange > 0 ? "text-green-400" : "text-red-400"}`}>
+                                          <span className="text-gray-400">ELO change:</span> {eloChange > 0 ? "+" : ""}{eloChange}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             );
@@ -935,18 +1015,30 @@ const PlayerDetailClient = () => {
                         }}
                       />
                       <Bar
+                        yAxisId="left"
                         dataKey="kills"
                         fill="#22c55e"
                         radius={[4, 4, 0, 0]}
                         name="Kills"
                       />
                       <Bar
+                        yAxisId="left"
                         dataKey="deaths"
                         fill="#ef4444"
                         radius={[4, 4, 0, 0]}
                         name="Deaths"
                       />
-                    </BarChart>
+                      <Line
+                        yAxisId="elo"
+                        type="monotone"
+                        dataKey="elo"
+                        stroke="#eab308"
+                        strokeWidth={2}
+                        dot={{ fill: "#eab308", r: 3 }}
+                        connectNulls={false}
+                        name="ELO"
+                      />
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
 
