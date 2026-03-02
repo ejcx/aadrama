@@ -1,17 +1,20 @@
 // Database types for the scrim system
 
-export type ScrimStatus = 
-  | 'waiting' 
-  | 'ready_check' 
-  | 'in_progress' 
-  | 'scoring' 
-  | 'finalized' 
-  | 'expired' 
+export type ScrimStatus =
+  | 'waiting'
+  | 'ready_check'
+  | 'drafting'
+  | 'in_progress'
+  | 'scoring'
+  | 'finalized'
+  | 'expired'
   | 'cancelled'
 
 export type Team = 'team_a' | 'team_b'
 
 export type Winner = 'team_a' | 'team_b' | 'draw'
+
+export type SelectionMode = 'random' | 'elo_balanced' | 'captains'
 
 export interface Scrim {
   id: string
@@ -28,6 +31,13 @@ export interface Scrim {
   tracker_session_id: string | null
   is_ranked: boolean
   ranked_processed_at: string | null
+  selection_mode: SelectionMode
+  captain_a_user_id: string | null
+  captain_a_name: string | null
+  captain_b_user_id: string | null
+  captain_b_name: string | null
+  current_drafter: 'captain_a' | 'captain_b' | null
+  draft_position: number
   created_at: string
   expires_at: string
   ready_check_at: string | null
@@ -72,6 +82,7 @@ export interface CreateScrimInput {
   max_players_per_team?: number
   min_players_per_team?: number
   is_ranked?: boolean
+  selection_mode?: SelectionMode
 }
 
 // User Game Names - mapping user accounts to in-game names

@@ -125,29 +125,57 @@ export async function getPlayerElo(playerName: string) {
   return data
 }
 
-// Get ELO history for a player
-export async function getPlayerEloHistory(playerName: string, days = 7) {
+// ELO history row shape (no join) for player chart
+export type PlayerEloHistoryRow = {
+  scrim_id: string
+  elo_change: number
+  elo_after: number
+  result: string
+  created_at: string
+}
+
+// Get ELO history for a player (optionally filtered by map via scrims.map)
+export async function getPlayerEloHistory(
+  playerName: string,
+  days = 7,
+  options?: { map?: string | null }
+): Promise<PlayerEloHistoryRow[]> {
   const supabase = await createClient()
   const playerNameLower = playerName.toLowerCase()
 
   const daysAgo = new Date()
   daysAgo.setDate(daysAgo.getDate() - days)
 
-  const { data, error } = await supabase
+  const mapFilter = options?.map?.trim() || null
+
+  let scrimIds: string[] | null = null
+  if (mapFilter) {
+    const { data: scrimsData, error: scrimsError } = await supabase
+      .from('scrims')
+      .select('id')
+      .eq('map', mapFilter)
+      .not('finalized_at', 'is', null)
+      .gte('finalized_at', daysAgo.toISOString())
+    if (scrimsError) throw new Error(`Failed to fetch scrims by map: ${scrimsError.message}`)
+    scrimIds = (scrimsData ?? []).map((s) => s.id)
+    if (scrimIds.length === 0) return []
+  }
+
+  let query = supabase
     .from('elo_history')
-    .select(`
-      scrim_id,
-      elo_change,
-      elo_after,
-      result,
-      created_at
-    `)
+    .select('scrim_id, elo_change, elo_after, result, created_at')
     .eq('game_name_lower', playerNameLower)
     .gte('created_at', daysAgo.toISOString())
     .order('created_at', { ascending: false })
 
+  if (scrimIds !== null) {
+    query = query.in('scrim_id', scrimIds)
+  }
+
+  const { data, error } = await query
+
   if (error) throw new Error(`Failed to fetch player ELO history: ${error.message}`)
-  return data || []
+  return (data || []) as PlayerEloHistoryRow[]
 }
 
 // Get player rank (count of players with higher ELO)
@@ -327,6 +355,35 @@ export interface MapPlayerStats {
   draws: number
   games_played: number
   map_elo: number // Calculated as 1200 + sum of all ELO changes on this map
+}
+
+// Same derivation as getPlayerStatsByMap but for one player over time: 1200 + cumulative elo_change on that map.
+// Uses the same elo_history + scrims join so "which games count for this map" is identical to the ELO page.
+export type PlayerMapEloHistoryRow = { created_at: string; elo_change: number }
+
+export async function getPlayerMapEloHistory(
+  playerName: string,
+  map: string,
+  days: number
+): Promise<PlayerMapEloHistoryRow[]> {
+  const supabase = await createClient()
+  const playerNameLower = playerName.toLowerCase()
+  const daysAgo = new Date()
+  daysAgo.setDate(daysAgo.getDate() - days)
+
+  const { data, error } = await supabase
+    .from('elo_history')
+    .select('created_at, elo_change, scrims!inner(map)')
+    .eq('game_name_lower', playerNameLower)
+    .eq('scrims.map', map)
+    .gte('created_at', daysAgo.toISOString())
+    .order('created_at', { ascending: true })
+
+  if (error) throw new Error(`Failed to fetch player map ELO history: ${error.message}`)
+  return ((data || []) as { created_at: string; elo_change: number }[]).map((r) => ({
+    created_at: r.created_at,
+    elo_change: r.elo_change ?? 0,
+  }))
 }
 
 export async function getPlayerStatsByMap(map: string): Promise<MapPlayerStats[]> {

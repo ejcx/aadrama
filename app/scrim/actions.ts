@@ -20,7 +20,7 @@ async function getCurrentUser() {
 export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
   const { userId, userName } = await getCurrentUser()
   const supabase = await createClient()
-  
+
   const { data, error } = await supabase
     .from('scrims')
     .insert({
@@ -31,15 +31,16 @@ export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
       max_players_per_team: input?.max_players_per_team || 8,
       min_players_per_team: input?.min_players_per_team || 4, // 4v4 minimum
       is_ranked: input?.is_ranked !== false, // Default to ranked
+      selection_mode: input?.selection_mode || 'elo_balanced', // Default to ELO-balanced
     })
     .select()
     .single()
-  
+
   if (error) throw new Error(`Failed to create scrim: ${error.message}`)
-  
+
   // Auto-join the creator
   await joinScrim(data.id)
-  
+
   revalidatePath('/scrim')
   return data
 }
@@ -215,16 +216,43 @@ async function checkAndStartGame(scrimId: string): Promise<void> {
     return
   }
 
-  // All conditions met - assign teams and start!
-  console.log(`[Scrim ${scrimId}] All conditions met! Calling assign_random_teams...`)
-  const { error } = await supabase.rpc('assign_random_teams', { p_scrim_id: scrimId })
+  // All conditions met - check selection mode
+  console.log(`[Scrim ${scrimId}] All conditions met! Checking selection mode...`)
 
-  if (error) {
-    console.error(`[Scrim ${scrimId}] assign_random_teams failed:`, error)
-    throw new Error(`Failed to start game: ${error.message}`)
+  if (scrim.selection_mode === 'captains') {
+    // Captain pick mode - start draft
+    console.log(`[Scrim ${scrimId}] Captains mode - calling start_captain_draft...`)
+    const { error } = await supabase.rpc('start_captain_draft', { p_scrim_id: scrimId })
+
+    if (error) {
+      console.error(`[Scrim ${scrimId}] start_captain_draft failed:`, error)
+      throw new Error(`Failed to start draft: ${error.message}`)
+    }
+
+    console.log(`[Scrim ${scrimId}] Draft started successfully!`)
+  } else if (scrim.selection_mode === 'elo_balanced') {
+    // ELO-balanced mode - assign teams using ELO ratings
+    console.log(`[Scrim ${scrimId}] ELO-balanced mode - calling assign_elo_balanced_teams...`)
+    const { error } = await supabase.rpc('assign_elo_balanced_teams', { p_scrim_id: scrimId })
+
+    if (error) {
+      console.error(`[Scrim ${scrimId}] assign_elo_balanced_teams failed:`, error)
+      throw new Error(`Failed to start game: ${error.message}`)
+    }
+
+    console.log(`[Scrim ${scrimId}] ELO-balanced teams assigned successfully! Game started.`)
+  } else {
+    // Random mode - assign teams randomly
+    console.log(`[Scrim ${scrimId}] Random mode - calling assign_random_teams...`)
+    const { error } = await supabase.rpc('assign_random_teams', { p_scrim_id: scrimId })
+
+    if (error) {
+      console.error(`[Scrim ${scrimId}] assign_random_teams failed:`, error)
+      throw new Error(`Failed to start game: ${error.message}`)
+    }
+
+    console.log(`[Scrim ${scrimId}] Teams assigned successfully! Game started.`)
   }
-
-  console.log(`[Scrim ${scrimId}] Teams assigned successfully! Game started.`)
 }
 
 // End the game and move to scoring phase
@@ -899,6 +927,146 @@ export async function voteReroll(scrimId: string): Promise<{ rerolled: boolean; 
   revalidatePath(`/scrim/${scrimId}`)
   
   return { rerolled, status }
+}
+
+// ==================== CAPTAIN PICK MODE ====================
+
+// Set captains for a scrim (creator only, during 'waiting')
+export async function setCaptains(
+  scrimId: string,
+  captainAUserId: string,
+  captainBUserId: string
+): Promise<{ success: boolean; error?: string }> {
+  const { userId } = await getCurrentUser()
+  const supabase = await createClient()
+
+  const scrim = await getScrim(scrimId)
+  if (!scrim) return { success: false, error: 'Scrim not found' }
+
+  // Only creator can set captains
+  if (scrim.created_by !== userId) {
+    return { success: false, error: 'Only the creator can set captains' }
+  }
+
+  // Must be in waiting status
+  if (scrim.status !== 'waiting') {
+    return { success: false, error: 'Can only set captains during waiting phase' }
+  }
+
+  // Verify both captains are participants
+  const players = await getScrimPlayers(scrimId)
+  const captainA = players.find(p => p.user_id === captainAUserId)
+  const captainB = players.find(p => p.user_id === captainBUserId)
+
+  if (!captainA || !captainB) {
+    return { success: false, error: 'Both captains must be participants in the scrim' }
+  }
+
+  if (captainAUserId === captainBUserId) {
+    return { success: false, error: 'Captains must be different players' }
+  }
+
+  const { error } = await supabase
+    .from('scrims')
+    .update({
+      selection_mode: 'captains',
+      captain_a_user_id: captainAUserId,
+      captain_a_name: captainA.user_name,
+      captain_b_user_id: captainBUserId,
+      captain_b_name: captainB.user_name,
+    })
+    .eq('id', scrimId)
+
+  if (error) {
+    return { success: false, error: `Failed to set captains: ${error.message}` }
+  }
+
+  revalidatePath('/scrim')
+  revalidatePath(`/scrim/${scrimId}`)
+
+  return { success: true }
+}
+
+// Get draft status for a scrim
+export interface DraftStatus {
+  isDrafting: boolean
+  currentDrafter: 'captain_a' | 'captain_b' | null
+  captainAUserId: string | null
+  captainAName: string | null
+  captainBUserId: string | null
+  captainBName: string | null
+  teamA: ScrimPlayer[]
+  teamB: ScrimPlayer[]
+  undrafted: ScrimPlayer[]
+  draftPosition: number
+  isMyTurn: boolean
+}
+
+export async function getDraftStatus(scrimId: string): Promise<DraftStatus> {
+  const supabase = await createClient()
+
+  const scrim = await getScrim(scrimId)
+  if (!scrim) {
+    throw new Error('Scrim not found')
+  }
+
+  const players = await getScrimPlayers(scrimId)
+
+  const teamA = players.filter(p => p.team === 'team_a')
+  const teamB = players.filter(p => p.team === 'team_b')
+  const undrafted = players.filter(p => !p.team)
+
+  let isMyTurn = false
+  try {
+    const { userId } = await getCurrentUser()
+    isMyTurn = (scrim.current_drafter === 'captain_a' && userId === scrim.captain_a_user_id) ||
+               (scrim.current_drafter === 'captain_b' && userId === scrim.captain_b_user_id)
+  } catch {
+    // Not logged in
+  }
+
+  return {
+    isDrafting: scrim.status === 'drafting',
+    currentDrafter: scrim.current_drafter as 'captain_a' | 'captain_b' | null,
+    captainAUserId: scrim.captain_a_user_id || null,
+    captainAName: scrim.captain_a_name || null,
+    captainBUserId: scrim.captain_b_user_id || null,
+    captainBName: scrim.captain_b_name || null,
+    teamA,
+    teamB,
+    undrafted,
+    draftPosition: scrim.draft_position || 0,
+    isMyTurn,
+  }
+}
+
+// Pick a player during draft (captains only)
+export async function draftPlayer(scrimId: string, pickedUserId: string): Promise<{ success: boolean; error?: string }> {
+  const { userId } = await getCurrentUser()
+  const supabase = await createClient()
+
+  const scrim = await getScrim(scrimId)
+  if (!scrim) return { success: false, error: 'Scrim not found' }
+
+  if (scrim.status !== 'drafting') {
+    return { success: false, error: 'Scrim is not in drafting phase' }
+  }
+
+  // Call the database function to handle the pick
+  const { error } = await supabase.rpc('draft_pick_player', {
+    p_scrim_id: scrimId,
+    p_captain_user_id: userId,
+    p_picked_user_id: pickedUserId,
+  })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/scrim')
+  revalidatePath(`/scrim/${scrimId}`)
+
+  return { success: true }
 }
 
 // ==================== RANKED / ELO SYSTEM ====================

@@ -21,6 +21,10 @@ import {
   voteReroll,
   getRerollStatus,
   type RerollStatus,
+  setCaptains,
+  getDraftStatus,
+  draftPlayer,
+  type DraftStatus,
 } from "./actions";
 import type { ScrimWithCounts, ScrimPlayer } from "@/lib/supabase/types";
 
@@ -29,16 +33,18 @@ function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     waiting: "bg-yellow-600 text-yellow-100",
     ready_check: "bg-blue-600 text-blue-100",
+    drafting: "bg-purple-600 text-purple-100",
     in_progress: "bg-green-600 text-green-100",
     scoring: "bg-purple-600 text-purple-100",
     finalized: "bg-gray-600 text-gray-100",
     expired: "bg-red-900 text-red-200",
     cancelled: "bg-gray-700 text-gray-300",
   };
-  
+
   const labels: Record<string, string> = {
     waiting: "Waiting",
     ready_check: "Ready Check",
+    drafting: "Drafting",
     in_progress: "In Progress",
     scoring: "Scoring",
     finalized: "Finalized",
@@ -97,6 +103,9 @@ function ScrimCard({
   const [scoreB, setScoreB] = useState("");
   const [trackerInput, setTrackerInput] = useState("");
   const [rerollStatus, setRerollStatus] = useState<RerollStatus | null>(null);
+  const [draftStatus, setDraftStatus] = useState<DraftStatus | null>(null);
+  const [selectedCaptainA, setSelectedCaptainA] = useState("");
+  const [selectedCaptainB, setSelectedCaptainB] = useState("");
 
   const isParticipant = players.some(p => p.user_id === userId);
   const isCreator = scrim.created_by === userId;
@@ -117,6 +126,9 @@ function ScrimCard({
       if (scrim.status === "in_progress") {
         loadRerollStatus();
       }
+      if (scrim.status === "drafting") {
+        loadDraftStatus();
+      }
     }
   }, [expanded, scrim.id, scrim.status]);
 
@@ -135,6 +147,15 @@ function ScrimCard({
       setRerollStatus(status);
     } catch (err) {
       console.error("Failed to load reroll status:", err);
+    }
+  }
+
+  async function loadDraftStatus() {
+    try {
+      const status = await getDraftStatus(scrim.id);
+      setDraftStatus(status);
+    } catch (err) {
+      console.error("Failed to load draft status:", err);
     }
   }
   
@@ -231,11 +252,11 @@ function ScrimCard({
               <h4 className="text-white font-medium mb-2">Waiting Room</h4>
               <div className="flex flex-wrap gap-2">
                 {unassigned.map(p => (
-                  <div 
+                  <div
                     key={p.id}
                     className={`px-3 py-1 rounded text-sm ${
-                      p.is_ready 
-                        ? "bg-green-800 text-green-200" 
+                      p.is_ready
+                        ? "bg-green-800 text-green-200"
                         : "bg-gray-700 text-gray-300"
                     }`}
                   >
@@ -245,7 +266,192 @@ function ScrimCard({
               </div>
             </div>
           )}
+
+          {/* Captain Selection (for captains mode) */}
+          {scrim.status === "waiting" && scrim.selection_mode === "captains" && isCreator && (
+            <div className="mb-4 p-4 bg-blue-900/30 border border-blue-700 rounded-lg">
+              <h4 className="text-blue-400 font-medium mb-3">🎯 Select Team Captains</h4>
+              {!scrim.captain_a_user_id || !scrim.captain_b_user_id ? (
+                <>
+                  <p className="text-gray-300 text-sm mb-3">
+                    Choose two players to be team captains. They will draft teams in snake draft order.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-blue-300 text-sm block mb-2">Captain A</label>
+                      <select
+                        value={selectedCaptainA}
+                        onChange={(e) => setSelectedCaptainA(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm"
+                      >
+                        <option value="">Select Captain A...</option>
+                        {players.map(p => (
+                          <option key={p.id} value={p.user_id} disabled={p.user_id === selectedCaptainB}>
+                            {p.user_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-red-300 text-sm block mb-2">Captain B</label>
+                      <select
+                        value={selectedCaptainB}
+                        onChange={(e) => setSelectedCaptainB(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm"
+                      >
+                        <option value="">Select Captain B...</option>
+                        {players.map(p => (
+                          <option key={p.id} value={p.user_id} disabled={p.user_id === selectedCaptainA}>
+                            {p.user_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!selectedCaptainA || !selectedCaptainB) {
+                        alert("Please select both captains");
+                        return;
+                      }
+                      setLoading(true);
+                      try {
+                        const result = await setCaptains(scrim.id, selectedCaptainA, selectedCaptainB);
+                        if (result.success) {
+                          await loadPlayers();
+                          onRefresh();
+                        } else {
+                          alert(result.error || "Failed to set captains");
+                        }
+                      } catch (err) {
+                        alert(err instanceof Error ? err.message : "Failed to set captains");
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    disabled={loading || !selectedCaptainA || !selectedCaptainB}
+                    className="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-sm font-medium"
+                  >
+                    Set Captains
+                  </button>
+                </>
+              ) : (
+                <div className="text-sm">
+                  <p className="text-gray-300 mb-2">Captains selected:</p>
+                  <div className="flex gap-4">
+                    <span className="text-blue-400">🎯 {scrim.captain_a_name}</span>
+                    <span className="text-red-400">🎯 {scrim.captain_b_name}</span>
+                  </div>
+                  <p className="text-yellow-400 text-xs mt-2">
+                    Waiting for all players to ready up...
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
           
+          {/* Draft Interface */}
+          {scrim.status === "drafting" && draftStatus && (
+            <div className="mb-4 p-4 bg-purple-900/30 border border-purple-700 rounded-lg">
+              <h4 className="text-purple-400 font-medium mb-3">🎯 Captain Draft - Snake Pick</h4>
+
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                {/* Team A */}
+                <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-3">
+                  <h5 className="text-blue-400 font-medium mb-2 flex items-center gap-2">
+                    Team A
+                    {draftStatus.currentDrafter === "captain_a" && (
+                      <span className="text-xs bg-blue-600 px-2 py-1 rounded">Picking...</span>
+                    )}
+                  </h5>
+                  <div className="space-y-1">
+                    {draftStatus.teamA.map(p => (
+                      <div key={p.id} className="text-gray-300 text-sm flex items-center gap-1">
+                        {p.user_id === draftStatus.captainAUserId && "🎯 "}
+                        {p.user_name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Team B */}
+                <div className="bg-red-900/30 border border-red-700 rounded-lg p-3">
+                  <h5 className="text-red-400 font-medium mb-2 flex items-center gap-2">
+                    Team B
+                    {draftStatus.currentDrafter === "captain_b" && (
+                      <span className="text-xs bg-red-600 px-2 py-1 rounded">Picking...</span>
+                    )}
+                  </h5>
+                  <div className="space-y-1">
+                    {draftStatus.teamB.map(p => (
+                      <div key={p.id} className="text-gray-300 text-sm flex items-center gap-1">
+                        {p.user_id === draftStatus.captainBUserId && "🎯 "}
+                        {p.user_name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Available Players */}
+              {draftStatus.undrafted.length > 0 && (
+                <div className="mb-3">
+                  <h5 className="text-gray-400 text-sm font-medium mb-2">Available Players:</h5>
+                  <div className="flex flex-wrap gap-2">
+                    {draftStatus.undrafted.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={async () => {
+                          if (!draftStatus.isMyTurn) {
+                            alert("It's not your turn to pick!");
+                            return;
+                          }
+                          setLoading(true);
+                          try {
+                            const result = await draftPlayer(scrim.id, p.user_id);
+                            if (result.success) {
+                              await loadDraftStatus();
+                              await loadPlayers();
+                              onRefresh();
+                            } else {
+                              alert(result.error || "Failed to draft player");
+                            }
+                          } catch (err) {
+                            alert(err instanceof Error ? err.message : "Failed to draft player");
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        disabled={loading || !draftStatus.isMyTurn}
+                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                          draftStatus.isMyTurn
+                            ? "bg-purple-600 hover:bg-purple-500 text-white"
+                            : "bg-gray-700 text-gray-400 cursor-not-allowed"
+                        }`}
+                      >
+                        {p.user_name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {draftStatus.isMyTurn ? (
+                <p className="text-green-400 text-sm">
+                  ✓ Your turn to pick!
+                </p>
+              ) : (
+                <p className="text-gray-400 text-sm">
+                  Waiting for{" "}
+                  {draftStatus.currentDrafter === "captain_a"
+                    ? draftStatus.captainAName
+                    : draftStatus.captainBName}{" "}
+                  to pick...
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Team assignments (in_progress or scoring) */}
           {(scrim.status === "in_progress" || scrim.status === "scoring" || scrim.status === "finalized") && (
             <div className="grid grid-cols-2 gap-4 mb-4">
@@ -484,6 +690,7 @@ export default function ScrimClient() {
   const [isPending, startTransition] = useTransition();
   const [selectedMap, setSelectedMap] = useState("");
   const [isRanked, setIsRanked] = useState(true);
+  const [selectionMode, setSelectionMode] = useState<"random" | "elo_balanced" | "captains">("elo_balanced");
 
   // Time range state for recent scrims
   const [timeRange, setTimeRange] = useState<TimeRange>("30d");
@@ -596,7 +803,7 @@ export default function ScrimClient() {
     setCreating(true);
     startTransition(async () => {
       try {
-        await createScrim({ map: selectedMap, is_ranked: isRanked });
+        await createScrim({ map: selectedMap, is_ranked: isRanked, selection_mode: selectionMode });
         setSelectedMap("");
         await loadScrims();
       } catch (err) {
@@ -658,16 +865,67 @@ export default function ScrimClient() {
                     {creating ? "Creating..." : "Create Scrim"}
                   </button>
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isRanked}
-                    onChange={(e) => setIsRanked(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-white text-sm">Ranked</span>
-                  <span className="text-gray-400 text-xs">(ELO tracking)</span>
-                </label>
+                <div className="flex flex-col gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isRanked}
+                      onChange={(e) => setIsRanked(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-white text-sm">Ranked</span>
+                    <span className="text-gray-400 text-xs">(ELO tracking)</span>
+                  </label>
+
+                  <div>
+                    <label className="text-white text-sm font-medium mb-2 block">Team Selection:</label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectionMode("random")}
+                        className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                          selectionMode === "random"
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                        }`}
+                      >
+                        🎲 Random
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectionMode("elo_balanced")}
+                        className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                          selectionMode === "elo_balanced"
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                        }`}
+                      >
+                        ⚖️ ELO Balanced
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectionMode("captains")}
+                        className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                          selectionMode === "captains"
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                        }`}
+                      >
+                        🎯 Captains Pick
+                      </button>
+                    </div>
+                    {selectionMode === "captains" && (
+                      <p className="text-yellow-400 text-xs mt-2">
+                        💡 Creator will select captains before the draft starts
+                      </p>
+                    )}
+                    {selectionMode === "elo_balanced" && (
+                      <p className="text-blue-400 text-xs mt-2">
+                        ℹ️ Teams will be balanced based on player ELO ratings (default)
+                      </p>
+                    )}
+                  </div>
+                </div>
                 <p className="text-gray-400 text-sm mt-2">
                   Scrims expire after 20 minutes if not started.
                 </p>

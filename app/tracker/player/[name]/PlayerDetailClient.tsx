@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import SidebarLayout from "../../../components/SidebarLayout";
 import Link from "next/link";
 import { SessionHoverPopover } from "../../../components/SessionHoverPopover";
-import { getPlayerElo, getPlayerEloHistory, getPlayerRank, getPlayerDailyKills } from "../../actions";
+import { getPlayerElo, getPlayerEloHistory, getPlayerMapEloHistory, getPlayerRank, getPlayerDailyKills, getRankedScrimMaps } from "../../actions";
 import { getPlayerScrims, getScrimMaps, type PlayerScrimResult } from "../../../scrim/actions";
 import {
   ComposedChart,
@@ -507,51 +507,60 @@ const PlayerDetailClient = () => {
   }, [playerName]);
 
   // Fetch daily stats for chart - using server action
+  // ELO progression uses same derivation as /tracker/elo: per-map = 1200 + sum(elo_change) on that map via elo_history + scrims join
   useEffect(() => {
     const fetchDailyStats = async () => {
       try {
         setDailyStatsLoading(true);
 
-        // Calculate days for time range
-        let days: number | null = null;
-        if (chartTimeRange === "30d") days = 30;
-        else if (chartTimeRange === "60d") days = 60;
-        else if (chartTimeRange === "90d") days = 90;
-        // "all" = null (no limit)
+        const daysNum = chartTimeRange === "all" ? 730 : chartTimeRange === "30d" ? 30 : chartTimeRange === "60d" ? 60 : 90;
 
-        const [result, eloHistory] = await Promise.all([
+        // Fetch K/D and map list; fetch ELO from same source as ELO page when map selected
+        const [result, rankedMaps, mapEloHistory, globalEloHistory] = await Promise.all([
           getPlayerDailyKills(playerName, {
-            days,
+            days: chartTimeRange === "all" ? null : daysNum,
             map: chartMapFilter || null,
           }),
-          getPlayerEloHistory(
-            playerName,
-            chartTimeRange === "all" ? 730 : days ?? 30
-          ),
+          getRankedScrimMaps(),
+          chartMapFilter
+            ? getPlayerMapEloHistory(playerName, chartMapFilter, 99999) // Fetch ALL map history to calculate cumulative ELO correctly
+            : Promise.resolve(null),
+          chartMapFilter ? Promise.resolve(null) : getPlayerEloHistory(playerName, daysNum),
         ]);
 
-        // Build daily ELO from history (last elo_after per day, sum elo_change per day)
-        const eloByDay = new Map<
-          string,
-          { eloAfter: number; change: number }
-        >();
-        const sorted = [...eloHistory].sort(
-          (a, b) =>
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        );
-        for (const row of sorted) {
-          const dateKey = new Date(row.created_at).toISOString().split("T")[0];
-          const existing = eloByDay.get(dateKey);
-          const change = (existing?.change ?? 0) + (row.elo_change ?? 0);
-          eloByDay.set(dateKey, { eloAfter: row.elo_after, change });
+        // Map dropdown: use same maps as /tracker/elo so selection matches scrims.map
+        setAvailableChartMaps(rankedMaps ?? []);
+
+        const eloByDay = new Map<string, { elo: number; change: number }>();
+
+        if (chartMapFilter && mapEloHistory) {
+          // Same derivation as ELO page map leaderboard: 1200 + cumulative sum of elo_change on this map (from getPlayerMapEloHistory = same join as getPlayerStatsByMap)
+          let runningSum = 0;
+          for (const row of mapEloHistory) {
+            runningSum += row.elo_change;
+            const dateKey = new Date(row.created_at).toISOString().split("T")[0];
+            const existing = eloByDay.get(dateKey);
+            const dayChange = (existing?.change ?? 0) + row.elo_change;
+            eloByDay.set(dateKey, { elo: 1200 + runningSum, change: dayChange });
+          }
+        } else if (globalEloHistory) {
+          const sorted = [...globalEloHistory].sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          for (const row of sorted) {
+            const dateKey = new Date(row.created_at).toISOString().split("T")[0];
+            const existing = eloByDay.get(dateKey);
+            const change = (existing?.change ?? 0) + (row.elo_change ?? 0);
+            eloByDay.set(dateKey, { elo: row.elo_after, change });
+          }
         }
 
-        // Merge ELO into chart data: carry forward end-of-day ELO on days with no ranked games
-        let lastElo: number | null = null;
+        const initialElo = chartMapFilter ? 1200 : null;
+        let lastElo: number | null = initialElo;
         const merged = result.data.map((row) => {
           const day = eloByDay.get(row.date);
-          const elo = day?.eloAfter ?? lastElo ?? null;
-          if (day) lastElo = day.eloAfter;
+          const elo = day?.elo ?? lastElo ?? null;
+          if (day) lastElo = day.elo;
           return {
             ...row,
             elo: elo ?? undefined,
@@ -560,9 +569,6 @@ const PlayerDetailClient = () => {
         });
 
         setChartData(merged);
-        if (!chartMapFilter) {
-          setAvailableChartMaps(result.availableMaps);
-        }
       } catch (err) {
         console.error("Failed to fetch daily stats:", err);
         setChartData([]);
