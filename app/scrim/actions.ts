@@ -55,7 +55,7 @@ export async function getActiveScrims(): Promise<ScrimWithCounts[]> {
   const { data, error } = await supabase
     .from('scrims_with_counts')
     .select('*')
-    .in('status', ['waiting', 'ready_check', 'in_progress', 'scoring'])
+    .in('status', ['waiting', 'ready_check', 'drafting', 'in_progress', 'scoring'])
     .order('created_at', { ascending: false })
   
   if (error) throw new Error(`Failed to fetch scrims: ${error.message}`)
