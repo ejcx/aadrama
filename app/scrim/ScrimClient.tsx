@@ -543,15 +543,23 @@ function ScrimCard({
             {isParticipant && scrim.status === "waiting" && (
               <button
                 onClick={() => handleAction(() => toggleReady(scrim.id))}
-                disabled={loading || isPending}
+                disabled={loading || isPending || (scrim.selection_mode === "captains" && !scrim.captain_a_user_id && !scrim.captain_b_user_id)}
                 className={`px-3 py-1 rounded text-sm ${
-                  myPlayer?.is_ready 
-                    ? "bg-yellow-600 hover:bg-yellow-500 text-white" 
+                  myPlayer?.is_ready
+                    ? "bg-yellow-600 hover:bg-yellow-500 text-white"
                     : "bg-green-600 hover:bg-green-500 text-white"
                 }`}
+                title={scrim.selection_mode === "captains" && !scrim.captain_a_user_id && !scrim.captain_b_user_id ? "Waiting for creator to select captains" : ""}
               >
                 {myPlayer?.is_ready ? "Unready" : "Ready Up"}
               </button>
+            )}
+
+            {/* Show warning if captains mode but captains not set */}
+            {isParticipant && scrim.status === "waiting" && scrim.selection_mode === "captains" && !scrim.captain_a_user_id && !scrim.captain_b_user_id && (
+              <p className="text-yellow-400 text-xs">
+                ⏳ Creator must select captains before players can ready up
+              </p>
             )}
             
             {/* End game */}
