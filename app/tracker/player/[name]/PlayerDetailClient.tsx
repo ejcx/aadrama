@@ -207,6 +207,66 @@ function GrandmasterBadge({ rank }: { rank: number }) {
   );
 }
 
+function ProfileSectionSpinner({ label }: { label: string }) {
+  return (
+    <div
+      className="flex flex-col items-center justify-center gap-3 py-10 text-gray-400"
+      role="status"
+      aria-live="polite"
+    >
+      <svg className="w-8 h-8 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+        />
+      </svg>
+      <span className="text-sm">{label}</span>
+    </div>
+  );
+}
+
+function CompetitiveStatsSkeleton() {
+  return (
+    <div
+      className="rounded-lg p-4 sm:p-6 mb-6 border border-yellow-700/30 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 animate-pulse"
+      aria-hidden
+    >
+      <div className="h-3 w-28 bg-gray-700/80 rounded mb-3" />
+      <div className="h-9 w-20 bg-gray-700/80 rounded mb-5" />
+      <div className="flex flex-wrap gap-4 sm:gap-6">
+        {Array.from({ length: 5 }, (_, i) => (
+          <div key={i} className="space-y-2">
+            <div className="h-2.5 w-14 bg-gray-800 rounded" />
+            <div className="h-6 w-10 bg-gray-700 rounded" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CompetitiveStatsEmpty() {
+  return (
+    <div className="rounded-lg p-6 sm:p-8 mb-6 border border-gray-700 bg-gray-900/80 text-center">
+      <div className="text-4xl mb-3 opacity-80" aria-hidden>
+        🎮
+      </div>
+      <h2 className="text-white text-lg font-semibold mb-2">No ranked scrim history</h2>
+      <p className="text-gray-400 text-sm max-w-md mx-auto leading-relaxed">
+        {`This player hasn't played in any ranked scrims yet. Competitive stats and ELO will show up here after their first finalized scrim.`}
+      </p>
+      <Link
+        href="/scrim"
+        className="inline-block mt-4 text-sm text-cyan-400 hover:text-cyan-300 hover:underline"
+      >
+        Browse scrims →
+      </Link>
+    </div>
+  );
+}
+
 // Helper to get default dates (last 30 days)
 const getDefaultDates = () => {
   const now = new Date();
@@ -253,6 +313,8 @@ const PlayerDetailClient = ({
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [mapStatsLoading, setMapStatsLoading] = useState(true);
   const [eloLoading, setEloLoading] = useState(true);
+  const [allTimeScrimStatsLoading, setAllTimeScrimStatsLoading] = useState(true);
+  const [rankedScrimCount, setRankedScrimCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   // Session selection state
@@ -382,17 +444,25 @@ const PlayerDetailClient = ({
 
   // Fetch all-time scrim stats for totals
   useEffect(() => {
+    let cancelled = false;
+
     const fetchAllTimeScrimStats = async () => {
+      setAllTimeScrimStatsLoading(true);
       try {
         const allScrims = await getPlayerScrims({
           gameName: playerName,
           limit: 1000, // Get all scrims for totals
         });
-        
+
+        if (cancelled) return;
+
+        setRankedScrimCount(allScrims.length);
+
         const totalKills = allScrims.reduce((sum, s) => sum + (s.kills || 0), 0);
         const totalDeaths = allScrims.reduce((sum, s) => sum + (s.deaths || 0), 0);
-        const kdRatio = totalDeaths > 0 ? totalKills / totalDeaths : totalKills > 0 ? Infinity : 0;
-        
+        const kdRatio =
+          totalDeaths > 0 ? totalKills / totalDeaths : totalKills > 0 ? Infinity : 0;
+
         setAllTimeScrimStats({
           totalKills,
           totalDeaths,
@@ -400,11 +470,21 @@ const PlayerDetailClient = ({
         });
       } catch (err) {
         console.error('Failed to fetch all-time scrim stats:', err);
-        setAllTimeScrimStats(null);
+        if (!cancelled) {
+          setAllTimeScrimStats(null);
+          setRankedScrimCount(0);
+        }
+      } finally {
+        if (!cancelled) {
+          setAllTimeScrimStatsLoading(false);
+        }
       }
     };
-    
+
     fetchAllTimeScrimStats();
+    return () => {
+      cancelled = true;
+    };
   }, [playerName]);
 
   // Fetch player scrims
@@ -431,14 +511,27 @@ const PlayerDetailClient = ({
     fetchPlayerScrims();
   }, [playerName, scrimStartTime, scrimEndTime, scrimMapFilter, scrimLimit]);
 
+  // Reset competitive stats when switching profiles
+  useEffect(() => {
+    setEloLoading(true);
+    setAllTimeScrimStatsLoading(true);
+    setEloData(null);
+    setRankedScrimCount(null);
+    setAllTimeScrimStats(null);
+  }, [playerName]);
+
   // Fetch player ELO data
   useEffect(() => {
+    let cancelled = false;
+
     const fetchEloData = async () => {
       try {
         setEloLoading(true);
 
         // Fetch current ELO using server action
         const eloRecord = await getPlayerElo(playerName);
+
+        if (cancelled) return;
 
         if (!eloRecord) {
           setEloData(null);
@@ -462,29 +555,42 @@ const PlayerDetailClient = ({
           0
         );
 
-        setEloData({
-          elo: eloRecord.elo,
-          peakElo,
-          season1Elo,
-          season2Elo,
-          games_played: eloRecord.games_played,
-          wins: eloRecord.wins,
-          losses: eloRecord.losses,
-          draws: eloRecord.draws,
-          eloChange7Days,
-          rank,
-          recentHistory: historyRecords || [],
-        });
+        if (!cancelled) {
+          setEloData({
+            elo: eloRecord.elo,
+            peakElo,
+            season1Elo,
+            season2Elo,
+            games_played: eloRecord.games_played,
+            wins: eloRecord.wins,
+            losses: eloRecord.losses,
+            draws: eloRecord.draws,
+            eloChange7Days,
+            rank,
+            recentHistory: historyRecords || [],
+          });
+        }
       } catch (err) {
         console.error('Failed to fetch ELO data:', err);
-        setEloData(null);
+        if (!cancelled) {
+          setEloData(null);
+        }
       } finally {
-        setEloLoading(false);
+        if (!cancelled) {
+          setEloLoading(false);
+        }
       }
     };
 
     fetchEloData();
+    return () => {
+      cancelled = true;
+    };
   }, [playerName]);
+
+  const competitiveStatsLoading = eloLoading || allTimeScrimStatsLoading;
+  const hasCompetitiveStats =
+    eloData !== null || (rankedScrimCount !== null && rankedScrimCount > 0);
 
   // Fetch player stats (all-time)
   useEffect(() => {
@@ -772,10 +878,16 @@ const PlayerDetailClient = ({
             </div>
           )}
 
-          {/* ELO Rating Section */}
-          {!eloLoading && eloData && (
+          {/* Ranked / competitive stats */}
+          <div className="mb-6">
+            <h2 className="text-white text-lg sm:text-xl font-bold mb-4">Ranked Scrims</h2>
+            {competitiveStatsLoading ? (
+              <CompetitiveStatsSkeleton />
+            ) : !hasCompetitiveStats ? (
+              <CompetitiveStatsEmpty />
+            ) : eloData ? (
             <div className={`
-              rounded-lg p-4 sm:p-6 mb-6 border
+              rounded-lg p-4 sm:p-6 border
               ${eloData.rank !== null && eloData.rank <= 10
                 ? eloData.rank === 1
                   ? 'bg-gradient-to-r from-yellow-900/40 via-amber-900/30 to-orange-900/40 border-yellow-600/70'
@@ -940,7 +1052,8 @@ const PlayerDetailClient = ({
                 </div>
               )}
             </div>
-          )}
+            ) : null}
+          </div>
 
           {/* Player Stats */}
           {statsLoading ? (
@@ -1271,6 +1384,7 @@ const PlayerDetailClient = ({
           </div>
 
           {/* Scrim Results Section */}
+          {hasCompetitiveStats && !competitiveStatsLoading && (
           <div className="mb-6">
             <h2 className="text-white text-lg sm:text-xl font-bold mb-4">Scrim Results</h2>
 
@@ -1324,7 +1438,7 @@ const PlayerDetailClient = ({
 
             {/* Scrim Results Table */}
             {scrimsLoading ? (
-              <div className="text-white text-center py-8">Loading scrim results...</div>
+              <ProfileSectionSpinner label="Loading scrim results…" />
             ) : scrimResults.length > 0 ? (
               <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
@@ -1426,6 +1540,7 @@ const PlayerDetailClient = ({
               </div>
             )}
           </div>
+          )}
 
           {/* Sessions Section */}
           <div className="mb-4">
