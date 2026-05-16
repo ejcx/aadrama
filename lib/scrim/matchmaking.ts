@@ -194,10 +194,10 @@ export function assignRandomTeams(
 export function countTeams(assignments: Map<string, Team>): { team_a: number; team_b: number } {
   let team_a = 0
   let team_b = 0
-  for (const team of assignments.values()) {
+  assignments.forEach((team) => {
     if (team === 'team_a') team_a++
     else team_b++
-  }
+  })
   return { team_a, team_b }
 }
 
@@ -208,11 +208,11 @@ export function sumRatingByTeam(
   const byId = new Map(players.map((p) => [p.id, p.rating]))
   let team_a = 0
   let team_b = 0
-  for (const [id, team] of assignments) {
+  assignments.forEach((team, id) => {
     const rating = byId.get(id) ?? 0
     if (team === 'team_a') team_a += rating
     else team_b += rating
-  }
+  })
   return { team_a, team_b }
 }
 
