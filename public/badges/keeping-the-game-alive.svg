@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Keeping the Game Alive">
+  <defs>
+    <linearGradient id="kgGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fdba74"/>
+      <stop offset="50%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#c2410c"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="46" fill="#7c2d12" stroke="#fb923c" stroke-width="2"/>
+  <circle cx="50" cy="50" r="36" fill="#431407"/>
+  <path d="M50 24 C58 24 64 30 64 38 C64 46 58 50 50 56 C42 50 36 46 36 38 C36 30 42 24 50 24 Z" fill="url(#kgGrad)"/>
+  <path d="M44 54 Q50 62 56 54 L54 68 Q50 72 46 68 Z" fill="#fb923c" opacity="0.85"/>
+  <rect x="16" y="74" width="68" height="12" rx="2" fill="#9a3412"/>
+  <text x="50" y="83" text-anchor="middle" font-family="system-ui,sans-serif" font-size="4.8" font-weight="700" fill="#ffedd5">KEEPING ALIVE</text>
+</svg>

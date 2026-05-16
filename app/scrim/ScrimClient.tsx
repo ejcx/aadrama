@@ -698,7 +698,7 @@ export default function ScrimClient() {
   const [isPending, startTransition] = useTransition();
   const [selectedMap, setSelectedMap] = useState("");
   const [isRanked, setIsRanked] = useState(true);
-  const [selectionMode, setSelectionMode] = useState<"random" | "elo_balanced" | "captains">("elo_balanced");
+  const [selectionMode, setSelectionMode] = useState<"random" | "skill_based" | "captains">("skill_based");
 
   // Time range state for recent scrims
   const [timeRange, setTimeRange] = useState<TimeRange>("30d");
@@ -901,14 +901,14 @@ export default function ScrimClient() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSelectionMode("elo_balanced")}
+                        onClick={() => setSelectionMode("skill_based")}
                         className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-                          selectionMode === "elo_balanced"
+                          selectionMode === "skill_based"
                             ? "bg-blue-600 text-white"
                             : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                         }`}
                       >
-                        ⚖️ ELO Balanced
+                        ⚖️ Skill Based
                       </button>
                       <button
                         type="button"
@@ -927,9 +927,9 @@ export default function ScrimClient() {
                         💡 Creator will select captains before the draft starts
                       </p>
                     )}
-                    {selectionMode === "elo_balanced" && (
+                    {selectionMode === "skill_based" && (
                       <p className="text-blue-400 text-xs mt-2">
-                        ℹ️ Teams will be balanced based on player ELO ratings (default)
+                        ℹ️ Teams balanced by skill: 50% ELO snake draft, 50% avg kills per scrim
                       </p>
                     )}
                   </div>

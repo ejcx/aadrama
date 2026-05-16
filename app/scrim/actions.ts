@@ -4,6 +4,15 @@ import { createClient } from '@/lib/supabase/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
 import type { CreateScrimInput, Scrim, ScrimPlayer, ScrimWithCounts, ScrimScoreSubmission } from '@/lib/supabase/types'
+import { hasBadgeForSession } from '@/lib/badges/award'
+import { isBadgeGoForward } from '@/lib/badges/constants'
+import {
+  getLosingTeam,
+  potatoVotesNeeded,
+  processScrimAutoBadges,
+  tryAwardPotatoFromVotes,
+  type ScrimPlayerKillStats,
+} from '@/lib/badges/process-scrim'
 
 // Get current user info from Clerk
 async function getCurrentUser() {
@@ -31,7 +40,7 @@ export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
       max_players_per_team: input?.max_players_per_team || 8,
       min_players_per_team: input?.min_players_per_team || 4, // 4v4 minimum
       is_ranked: input?.is_ranked !== false, // Default to ranked
-      selection_mode: input?.selection_mode || 'elo_balanced', // Default to ELO-balanced
+      selection_mode: input?.selection_mode || 'skill_based',
     })
     .select()
     .single()
@@ -230,17 +239,19 @@ async function checkAndStartGame(scrimId: string): Promise<void> {
     }
 
     console.log(`[Scrim ${scrimId}] Draft started successfully!`)
-  } else if (scrim.selection_mode === 'elo_balanced') {
-    // ELO-balanced mode - assign teams using ELO ratings
-    console.log(`[Scrim ${scrimId}] ELO-balanced mode - calling assign_elo_balanced_teams...`)
-    const { error } = await supabase.rpc('assign_elo_balanced_teams', { p_scrim_id: scrimId })
+  } else if (
+    scrim.selection_mode === 'skill_based' ||
+    (scrim.selection_mode as string) === 'elo_balanced'
+  ) {
+    console.log(`[Scrim ${scrimId}] Skill-based mode - calling assign_skill_based_teams...`)
+    const { error } = await supabase.rpc('assign_skill_based_teams', { p_scrim_id: scrimId })
 
     if (error) {
-      console.error(`[Scrim ${scrimId}] assign_elo_balanced_teams failed:`, error)
+      console.error(`[Scrim ${scrimId}] assign_skill_based_teams failed:`, error)
       throw new Error(`Failed to start game: ${error.message}`)
     }
 
-    console.log(`[Scrim ${scrimId}] ELO-balanced teams assigned successfully! Game started.`)
+    console.log(`[Scrim ${scrimId}] Skill-based teams assigned successfully! Game started.`)
   } else {
     // Random mode - assign teams randomly
     console.log(`[Scrim ${scrimId}] Random mode - calling assign_random_teams...`)
@@ -319,8 +330,12 @@ export async function submitScore(
   // Try to finalize if consensus reached
   await supabase.rpc('finalize_scrim', { p_scrim_id: scrimId })
   
-  // Check if scrim was finalized and process ELO automatically
   const updatedScrim = await getScrim(scrimId)
+  if (updatedScrim?.status === 'finalized') {
+    await runScrimBadgeProcessing(scrimId)
+  }
+
+  // Check if scrim was finalized and process ELO automatically
   if (updatedScrim?.status === 'finalized' && updatedScrim.is_ranked && 
       updatedScrim.tracker_session_id && !updatedScrim.ranked_processed_at) {
     try {
@@ -444,6 +459,10 @@ export async function setTrackerSessionId(scrimId: string, sessionIdInput: strin
   
   console.log('Updated scrim:', data)
   
+  if (data.status === 'finalized') {
+    await runScrimBadgeProcessing(scrimId)
+  }
+
   // Automatically process ELO for ranked scrims when session ID is added
   if (data.is_ranked && data.status === 'finalized' && !data.ranked_processed_at) {
     try {
@@ -927,6 +946,212 @@ export async function voteReroll(scrimId: string): Promise<{ rerolled: boolean; 
   revalidatePath(`/scrim/${scrimId}`)
   
   return { rerolled, status }
+}
+
+// ==================== SCRIM BADGES ====================
+
+function playerKillStatsFromValidation(
+  playerMatches: RankedValidationResult['playerMatches']
+): ScrimPlayerKillStats[] {
+  return playerMatches.map((pm) => {
+    const gameName = pm.sessionPlayerName || pm.userName
+    const gameNameLower = (pm.gameNameLower || pm.sessionPlayerName || pm.userName).toLowerCase()
+    return {
+      gameName,
+      gameNameLower,
+      kills: pm.kills ?? 0,
+      team: pm.team,
+    }
+  })
+}
+
+async function runScrimBadgeProcessing(scrimId: string): Promise<void> {
+  const supabase = await createClient()
+  const scrim = await getScrim(scrimId)
+  if (!scrim || scrim.status !== 'finalized' || !isBadgeGoForward(scrim.finalized_at)) {
+    return
+  }
+
+  if (!scrim.tracker_session_id) {
+    return
+  }
+
+  const validation = await validateRankedScrim(scrimId)
+  const stats = playerKillStatsFromValidation(validation.playerMatches)
+  await processScrimAutoBadges(supabase, scrim, stats)
+}
+
+export interface PotatoVoteTarget {
+  gameName: string
+  gameNameLower: string
+  displayLabel: string
+}
+
+export interface PotatoVoteStatus {
+  eligible: boolean
+  potatoAwarded: boolean
+  losingTeam: 'team_a' | 'team_b' | null
+  isOnLosingTeam: boolean
+  votesNeeded: number
+  voteCount: number
+  leadingTarget: string | null
+  leadingVotes: number
+  myVoteTarget: string | null
+  targets: PotatoVoteTarget[]
+  votes: Array<{ voterName: string; targetName: string }>
+}
+
+export async function getPotatoVoteStatus(scrimId: string): Promise<PotatoVoteStatus> {
+  const supabase = await createClient()
+  const scrim = await getScrim(scrimId)
+  const empty: PotatoVoteStatus = {
+    eligible: false,
+    potatoAwarded: false,
+    losingTeam: null,
+    isOnLosingTeam: false,
+    votesNeeded: 0,
+    voteCount: 0,
+    leadingTarget: null,
+    leadingVotes: 0,
+    myVoteTarget: null,
+    targets: [],
+    votes: [],
+  }
+
+  if (!scrim || scrim.status !== 'finalized' || !isBadgeGoForward(scrim.finalized_at)) {
+    return empty
+  }
+
+  const potatoAwarded = await hasBadgeForSession(supabase, 'potato', scrimId)
+  const losingTeam = getLosingTeam(scrim.winner)
+  const validation = await validateRankedScrim(scrimId)
+  const targets: PotatoVoteTarget[] = validation.playerMatches.map((pm) => {
+    const gameName = pm.sessionPlayerName || pm.userName
+    const gameNameLower = (pm.gameNameLower || pm.sessionPlayerName || pm.userName).toLowerCase()
+    return {
+      gameName,
+      gameNameLower,
+      displayLabel: pm.sessionPlayerName || pm.userName,
+    }
+  })
+
+  const losingPlayers = validation.playerMatches.filter((p) => p.team === losingTeam)
+  const votesNeeded = potatoVotesNeeded(losingPlayers.length)
+
+  const { data: voteRows } = await supabase
+    .from('scrim_potato_votes')
+    .select('voter_user_id, voted_for_game_name, voted_for_game_name_lower')
+    .eq('scrim_id', scrimId)
+
+  const players = await getScrimPlayers(scrimId)
+  const voterNameById = new Map(players.map((p) => [p.user_id, p.user_name]))
+
+  const votes = (voteRows || []).map((v) => ({
+    voterName: voterNameById.get(v.voter_user_id) || 'Unknown',
+    targetName: v.voted_for_game_name,
+  }))
+
+  const counts = new Map<string, number>()
+  for (const v of voteRows || []) {
+    const key = v.voted_for_game_name_lower
+    counts.set(key, (counts.get(key) || 0) + 1)
+  }
+
+  let leadingTarget: string | null = null
+  let leadingVotes = 0
+  for (const [lower, count] of Array.from(counts.entries())) {
+    if (count > leadingVotes) {
+      leadingVotes = count
+      leadingTarget = targets.find((t) => t.gameNameLower === lower)?.displayLabel || lower
+    }
+  }
+
+  let isOnLosingTeam = false
+  let myVoteTarget: string | null = null
+  try {
+    const { userId } = await getCurrentUser()
+    const myPlayer = players.find((p) => p.user_id === userId)
+    isOnLosingTeam = !!myPlayer?.team && myPlayer.team === losingTeam
+    const myVote = voteRows?.find((v) => v.voter_user_id === userId)
+    myVoteTarget = myVote?.voted_for_game_name_lower ?? null
+  } catch {
+    // not logged in
+  }
+
+  return {
+    eligible: !potatoAwarded && losingTeam !== null && votesNeeded > 0,
+    potatoAwarded,
+    losingTeam,
+    isOnLosingTeam,
+    votesNeeded,
+    voteCount: voteRows?.length || 0,
+    leadingTarget,
+    leadingVotes,
+    myVoteTarget,
+    targets,
+    votes,
+  }
+}
+
+export async function votePotato(
+  scrimId: string,
+  targetGameNameLower: string
+): Promise<{ success: boolean; potatoAwarded: boolean; status: PotatoVoteStatus }> {
+  const { userId } = await getCurrentUser()
+  const supabase = await createClient()
+
+  const scrim = await getScrim(scrimId)
+  if (!scrim) throw new Error('Scrim not found')
+  if (scrim.status !== 'finalized') throw new Error('Potato voting is only available after the scrim is finalized')
+  if (!isBadgeGoForward(scrim.finalized_at)) {
+    throw new Error('Potato voting only applies to scrims finalized after the badge system launch')
+  }
+
+  if (await hasBadgeForSession(supabase, 'potato', scrimId)) {
+    const status = await getPotatoVoteStatus(scrimId)
+    return { success: false, potatoAwarded: true, status }
+  }
+
+  const losingTeam = getLosingTeam(scrim.winner)
+  if (!losingTeam) throw new Error('Cannot vote for potato on a draw')
+
+  const players = await getScrimPlayers(scrimId)
+  const myPlayer = players.find((p) => p.user_id === userId)
+  if (!myPlayer) throw new Error('Only participants can vote')
+  if (myPlayer.team !== losingTeam) {
+    throw new Error('Only players on the losing team can vote for the potato')
+  }
+
+  const validation = await validateRankedScrim(scrimId)
+  const target = validation.playerMatches.find((pm) => {
+    const lower = (pm.gameNameLower || pm.sessionPlayerName || pm.userName).toLowerCase()
+    return lower === targetGameNameLower.toLowerCase()
+  })
+  if (!target) throw new Error('Invalid vote target')
+
+  const gameName = target.sessionPlayerName || target.userName
+  const gameNameLower = (target.gameNameLower || target.sessionPlayerName || target.userName).toLowerCase()
+
+  const { error } = await supabase.from('scrim_potato_votes').upsert(
+    {
+      scrim_id: scrimId,
+      voter_user_id: userId,
+      voted_for_game_name: gameName,
+      voted_for_game_name_lower: gameNameLower,
+    },
+    { onConflict: 'scrim_id,voter_user_id' }
+  )
+
+  if (error) throw new Error(`Failed to submit vote: ${error.message}`)
+
+  const losingTeamSize = validation.playerMatches.filter((p) => p.team === losingTeam).length
+  const { awarded } = await tryAwardPotatoFromVotes(supabase, scrim, losingTeamSize)
+
+  revalidatePath(`/scrim/${scrimId}`)
+  revalidatePath('/tracker')
+
+  const status = await getPotatoVoteStatus(scrimId)
+  return { success: true, potatoAwarded: awarded, status }
 }
 
 // ==================== CAPTAIN PICK MODE ====================

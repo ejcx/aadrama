@@ -155,9 +155,6 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
                   }`}
               >
                 Scrim
-                <span className="px-1.5 py-0.5 text-[10px] font-bold bg-purple-600 text-purple-100 rounded">
-                  BETA
-                </span>
               </a>
             </div>
             <div className="pt-4 mt-4 border-t border-gray-700">

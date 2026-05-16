@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Season 1 Elite">
+  <defs>
+    <linearGradient id="s1eGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e9d5ff"/>
+      <stop offset="50%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
+    </linearGradient>
+    <linearGradient id="s1eInner" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#312e81"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <polygon points="50,4 94,28 94,72 50,96 6,72 6,28" fill="#4c1d95" stroke="#c4b5fd" stroke-width="2"/>
+  <polygon points="50,14 82,32 82,68 50,86 18,68 18,32" fill="url(#s1eInner)" stroke="url(#s1eGrad)" stroke-width="2"/>
+  <polygon points="50,26 58,44 78,44 62,56 68,76 50,64 32,76 38,56 22,44 42,44" fill="url(#s1eGrad)" opacity="0.95"/>
+  <text x="50" y="88" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#e9d5ff" letter-spacing="1">ELITE</text>
+</svg>

@@ -1,14 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
+import { SEASON_2_LABEL } from "@/lib/scrim/seasons";
 import {
   getEloLeaderboard,
   getEloChanges7Days,
+  getSeason2EloLeaderboard,
+  getSeason2EloChanges7Days,
   getRankedScrimMaps,
   getPlayerStatsByMap,
   type MapPlayerStats,
 } from "../actions";
+
+type SeasonView = "all" | "season2";
 
 interface EloPlayer {
   game_name: string;
@@ -30,12 +35,74 @@ interface InitialData {
   maps: string[];
 }
 
+async function buildEloPlayers(
+  records: Awaited<ReturnType<typeof getEloLeaderboard>>,
+  fetchChanges: (names: string[]) => Promise<{ game_name_lower: string; elo_change: number }[]>
+): Promise<EloPlayer[]> {
+  const gameNames = records.map((p) => p.game_name_lower);
+  const historyRecords = gameNames.length > 0 ? await fetchChanges(gameNames) : [];
+
+  const changeMap = new Map<string, { change: number; matches: number }>();
+  for (const record of historyRecords) {
+    const existing = changeMap.get(record.game_name_lower) || { change: 0, matches: 0 };
+    changeMap.set(record.game_name_lower, {
+      change: existing.change + record.elo_change,
+      matches: existing.matches + 1,
+    });
+  }
+
+  return records.map((p) => ({
+    game_name: p.game_name,
+    game_name_lower: p.game_name_lower,
+    elo: p.elo,
+    games_played: p.games_played,
+    wins: p.wins,
+    losses: p.losses,
+    draws: p.draws,
+    eloChange7Days: changeMap.get(p.game_name_lower)?.change || 0,
+    recentMatches: changeMap.get(p.game_name_lower)?.matches || 0,
+    total_kills: p.total_kills,
+    total_deaths: p.total_deaths,
+    kd_ratio: p.kd_ratio,
+  }));
+}
+
 export default function EloClient({ initialData }: { initialData: InitialData }) {
+  const [seasonView, setSeasonView] = useState<SeasonView>("all");
   const [selectedMap, setSelectedMap] = useState<string>("");
   const [maps, setMaps] = useState<string[]>(initialData.maps);
   const [eloPlayers, setEloPlayers] = useState<EloPlayer[]>(initialData.eloPlayers);
   const [mapStats, setMapStats] = useState<MapPlayerStats[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [seasonLoading, setSeasonLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const switchSeason = (view: SeasonView) => {
+    if (view === seasonView) return;
+    setSeasonView(view);
+    setSelectedMap("");
+    setMapStats(null);
+    setSeasonLoading(true);
+
+    startTransition(async () => {
+      try {
+        const [records, mapList] = await Promise.all([
+          view === "season2" ? getSeason2EloLeaderboard(100) : getEloLeaderboard(100),
+          getRankedScrimMaps({ season2: view === "season2" }),
+        ]);
+        const players = await buildEloPlayers(
+          records,
+          view === "season2" ? getSeason2EloChanges7Days : getEloChanges7Days
+        );
+        setEloPlayers(players);
+        setMaps(mapList);
+      } catch (err) {
+        console.error("Failed to load season leaderboard:", err);
+      } finally {
+        setSeasonLoading(false);
+      }
+    });
+  };
 
   // Load map stats when map is selected
   useEffect(() => {
@@ -45,7 +112,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
     }
 
     setLoading(true);
-    getPlayerStatsByMap(selectedMap)
+    getPlayerStatsByMap(selectedMap, { season2: seasonView === "season2" })
       .then((stats) => {
         setMapStats(stats);
       })
@@ -56,12 +123,50 @@ export default function EloClient({ initialData }: { initialData: InitialData })
       .finally(() => {
         setLoading(false);
       });
-  }, [selectedMap]);
+  }, [selectedMap, seasonView]);
 
-  const displayData = selectedMap && mapStats ? mapStats : null;
+  const tableLoading = loading || seasonLoading || isPending;
 
   return (
     <div className="space-y-4">
+      {/* Season toggle */}
+      <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <span className="text-gray-300 text-sm font-medium">Leaderboard:</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => switchSeason("all")}
+              disabled={tableLoading}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                seasonView === "all"
+                  ? "bg-white text-black"
+                  : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+              }`}
+            >
+              All time
+            </button>
+            <button
+              type="button"
+              onClick={() => switchSeason("season2")}
+              disabled={tableLoading}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                seasonView === "season2"
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+              }`}
+            >
+              {SEASON_2_LABEL}
+            </button>
+          </div>
+          {seasonView === "season2" && (
+            <span className="text-purple-300 text-sm">
+              Ranked games since May 16, 2026 · fresh ELO from 1200
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Map Filter */}
       <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -92,14 +197,14 @@ export default function EloClient({ initialData }: { initialData: InitialData })
       </div>
 
       {/* Loading State */}
-      {loading && (
+      {tableLoading && (
         <div className="bg-gray-900 border border-gray-700 rounded-lg p-8 text-center text-gray-400">
-          Loading map statistics...
+          {seasonLoading || isPending ? "Loading leaderboard..." : "Loading map statistics..."}
         </div>
       )}
 
       {/* Map-Specific Stats Table */}
-      {!loading && selectedMap && mapStats && (
+      {!tableLoading && selectedMap && mapStats && (
         <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
           {mapStats.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
@@ -187,11 +292,13 @@ export default function EloClient({ initialData }: { initialData: InitialData })
       )}
 
       {/* Overall ELO Table (when no map selected) */}
-      {!loading && !selectedMap && (
+      {!tableLoading && !selectedMap && (
         <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
           {eloPlayers.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
-              No ranked players yet. Play some scrims to get on the leaderboard!
+              {seasonView === "season2"
+                ? "No Season 2 ranked games yet. Play some scrims to get on the leaderboard!"
+                : "No ranked players yet. Play some scrims to get on the leaderboard!"}
             </div>
           ) : (
             <div className="overflow-x-auto">

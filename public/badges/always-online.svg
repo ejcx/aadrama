@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Always Online">
+  <defs>
+    <linearGradient id="aoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#86efac"/>
+      <stop offset="50%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#15803d"/>
+    </linearGradient>
+    <radialGradient id="aoPulse" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4ade80" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#4ade80" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="46" fill="#14532d" stroke="#4ade80" stroke-width="2"/>
+  <circle cx="50" cy="50" r="40" fill="url(#aoPulse)"/>
+  <circle cx="50" cy="50" r="34" fill="#052e16"/>
+  <circle cx="50" cy="48" r="14" fill="none" stroke="url(#aoGrad)" stroke-width="3"/>
+  <circle cx="50" cy="48" r="4" fill="#86efac"/>
+  <rect x="48" y="52" width="4" height="10" rx="1" fill="url(#aoGrad)"/>
+  <rect x="22" y="72" width="56" height="12" rx="2" fill="#166534"/>
+  <text x="50" y="81" text-anchor="middle" font-family="system-ui,sans-serif" font-size="5.5" font-weight="700" fill="#dcfce7">ALWAYS ONLINE</text>
+</svg>

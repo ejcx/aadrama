@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Held First Place">
+  <defs>
+    <linearGradient id="h1pGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="40%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="h1pRibbon" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#991b1b"/>
+      <stop offset="100%" stop-color="#450a0a"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="52" r="40" fill="#78350f" stroke="url(#h1pGold)" stroke-width="3"/>
+  <circle cx="50" cy="52" r="32" fill="#1c1917"/>
+  <text x="50" y="62" text-anchor="middle" font-family="Georgia, serif" font-size="28" font-weight="700" fill="url(#h1pGold)">1</text>
+  <path d="M28 22 L36 14 L50 20 L64 14 L72 22 L68 30 L50 26 L32 30 Z" fill="url(#h1pGold)" stroke="#b45309" stroke-width="1"/>
+  <path d="M22 72 L28 58 L36 72 Z" fill="url(#h1pRibbon)"/>
+  <path d="M78 72 L72 58 L64 72 Z" fill="url(#h1pRibbon)"/>
+  <rect x="22" y="78" width="56" height="12" rx="1" fill="#7f1d1d" stroke="#fca5a5" stroke-width="0.8"/>
+  <text x="50" y="87" text-anchor="middle" font-family="system-ui,sans-serif" font-size="5.5" font-weight="700" fill="#fecaca" letter-spacing="0.5">#1 HELD</text>
+</svg>

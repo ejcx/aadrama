@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Season 1 Combat Patch">
+  <defs>
+    <linearGradient id="patchBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5c5744"/>
+      <stop offset="45%" stop-color="#3f3d33"/>
+      <stop offset="100%" stop-color="#2a2820"/>
+    </linearGradient>
+    <linearGradient id="patchBorder" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#d6d3c4"/>
+      <stop offset="100%" stop-color="#78716c"/>
+    </linearGradient>
+    <linearGradient id="patchStar" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e7e5d6"/>
+      <stop offset="100%" stop-color="#a8a38f"/>
+    </linearGradient>
+  </defs>
+  <!-- Shoulder patch shape -->
+  <rect x="14" y="18" width="72" height="64" rx="6" fill="url(#patchBg)" stroke="url(#patchBorder)" stroke-width="2.5"/>
+  <!-- Stitched edge -->
+  <rect x="14" y="18" width="72" height="64" rx="6" fill="none" stroke="#a8a29e" stroke-width="1" stroke-dasharray="3 2.5" opacity="0.85"/>
+  <!-- Inner field -->
+  <rect x="22" y="26" width="56" height="48" rx="3" fill="#1c1917" stroke="#57534e" stroke-width="1"/>
+  <!-- Star -->
+  <path d="M50 32 L53 42 L64 42 L55 48 L58 58 L50 52 L42 58 L45 48 L36 42 L47 42 Z" fill="url(#patchStar)"/>
+  <!-- S1 -->
+  <text x="50" y="72" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="800" fill="#d6d3c4" letter-spacing="1">S1</text>
+  <text x="50" y="84" text-anchor="middle" font-family="system-ui,sans-serif" font-size="5.5" font-weight="700" fill="#a8a29e" letter-spacing="0.8">COMBAT PATCH</text>
+</svg>

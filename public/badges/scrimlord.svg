@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Scrimlord">
+  <defs>
+    <linearGradient id="slGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d9f99d"/>
+      <stop offset="50%" stop-color="#84cc16"/>
+      <stop offset="100%" stop-color="#4d7c0f"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="46" fill="#365314" stroke="#a3e635" stroke-width="2"/>
+  <circle cx="50" cy="50" r="36" fill="#1a2e05"/>
+  <path d="M50 22 L58 42 L80 44 L62 58 L68 80 L50 66 L32 80 L38 58 L20 44 L42 42 Z" fill="url(#slGrad)"/>
+  <rect x="22" y="72" width="56" height="12" rx="2" fill="#3f6212" stroke="#84cc16" stroke-width="0.8"/>
+  <text x="50" y="81" text-anchor="middle" font-family="system-ui,sans-serif" font-size="6.5" font-weight="800" fill="#ecfccb" letter-spacing="0.5">SCRIMLORD</text>
+</svg>

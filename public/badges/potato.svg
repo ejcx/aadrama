@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Potato Badge">
+  <defs>
+    <radialGradient id="potatoBody" cx="40%" cy="35%" r="75%">
+      <stop offset="0%" stop-color="#d8a26a" />
+      <stop offset="55%" stop-color="#a06a36" />
+      <stop offset="100%" stop-color="#5a3a1c" />
+    </radialGradient>
+    <linearGradient id="potatoRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b2412" />
+      <stop offset="100%" stop-color="#1a0e06" />
+    </linearGradient>
+    <radialGradient id="potatoShine" cx="35%" cy="28%" r="22%">
+      <stop offset="0%" stop-color="#fff5e0" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#fff5e0" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Outer pin rim -->
+  <ellipse cx="50" cy="52" rx="44" ry="40" fill="url(#potatoRim)" />
+
+  <!-- Potato body (lumpy ellipse) -->
+  <path
+    d="M50 14
+       C72 14 88 28 88 50
+       C88 70 76 88 52 90
+       C30 92 14 76 12 56
+       C10 36 22 18 38 14
+       C42 13 46 14 50 14 Z"
+    fill="url(#potatoBody)"
+    stroke="#3b2412"
+    stroke-width="2"
+  />
+
+  <!-- Surface shine -->
+  <ellipse cx="40" cy="34" rx="22" ry="14" fill="url(#potatoShine)" />
+
+  <!-- Eyes / dimples (the "eyes" of a potato) -->
+  <g fill="#3b2412" opacity="0.75">
+    <ellipse cx="34" cy="46" rx="3" ry="2" />
+    <ellipse cx="62" cy="40" rx="2.5" ry="1.8" />
+    <ellipse cx="56" cy="62" rx="3" ry="2.2" />
+    <ellipse cx="40" cy="68" rx="2.2" ry="1.5" />
+    <ellipse cx="72" cy="58" rx="2.4" ry="1.7" />
+  </g>
+
+  <!-- Sprouts -->
+  <g fill="#7ec850" stroke="#3a6b22" stroke-width="0.8">
+    <path d="M62 40 Q64 32 70 30 Q66 36 65 41 Z" />
+    <path d="M34 46 Q30 40 32 34 Q35 40 37 47 Z" />
+  </g>
+
+  <!-- Banner -->
+  <g>
+    <path
+      d="M22 74 L78 74 L74 86 L26 86 Z"
+      fill="#7c2d12"
+      stroke="#3b1108"
+      stroke-width="1.5"
+    />
+    <text
+      x="50"
+      y="83"
+      text-anchor="middle"
+      font-family="Georgia, 'Times New Roman', serif"
+      font-size="9"
+      font-weight="700"
+      fill="#fde68a"
+      letter-spacing="1"
+    >POTATO</text>
+  </g>
+</svg>

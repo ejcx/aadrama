@@ -22,7 +22,10 @@ import {
   getScrimDetails,
   voteReroll,
   getRerollStatus,
+  getPotatoVoteStatus,
+  votePotato,
   type RerollStatus,
+  type PotatoVoteStatus,
 } from "../actions";
 import type { ScrimWithCounts, ScrimPlayer, ScrimScoreSubmission } from "@/lib/supabase/types";
 import { SessionContent } from "../../tracker/session/SessionContent";
@@ -93,6 +96,7 @@ export default function ScrimDetailClient() {
   const [players, setPlayers] = useState<ScrimPlayer[]>([]);
     const [scoreSubmissions, setScoreSubmissions] = useState<ScrimScoreSubmission[]>([]);
     const [rerollStatus, setRerollStatus] = useState<RerollStatus | null>(null);
+    const [potatoStatus, setPotatoStatus] = useState<PotatoVoteStatus | null>(null);
     const [eloChanges, setEloChanges] = useState<Map<string, { change: number; eloBefore: number; eloAfter: number }>>(new Map());
     const [playerElos, setPlayerElos] = useState<Map<string, number>>(new Map()); // gameNameLower -> current elo (for non-finalized scrims)
     const [userGameNames, setUserGameNames] = useState<Map<string, string>>(new Map()); // userId -> gameNameLower
@@ -203,6 +207,18 @@ export default function ScrimDetailClient() {
         }
       } else {
         setRerollStatus(null);
+      }
+
+      if (scrimData.status === "finalized") {
+        try {
+          const pStatus = await getPotatoVoteStatus(scrimId);
+          setPotatoStatus(pStatus);
+        } catch (err) {
+          console.error("Failed to load potato vote status:", err);
+          setPotatoStatus(null);
+        }
+      } else {
+        setPotatoStatus(null);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load scrim");
@@ -651,6 +667,55 @@ export default function ScrimDetailClient() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {scrim.status === "finalized" && potatoStatus?.eligible && (
+          <div className="bg-gray-900 border border-amber-800/50 rounded-lg p-6 mb-6">
+            <div className="flex items-start gap-3 mb-4">
+              <img src="/badges/potato.svg" alt="" className="w-12 h-12 flex-shrink-0" />
+              <div>
+                <h2 className="text-amber-200 text-xl font-semibold">Potato Award Vote</h2>
+                <p className="text-gray-400 text-sm mt-1">
+                  Losing team votes for the potato. Needs all but one losing player on the same pick
+                  ({potatoStatus.leadingVotes}/{potatoStatus.votesNeeded}).
+                </p>
+              </div>
+            </div>
+            {potatoStatus.isOnLosingTeam ? (
+              <div className="flex flex-wrap gap-2">
+                {potatoStatus.targets.map((t) => (
+                  <button
+                    key={t.gameNameLower}
+                    type="button"
+                    disabled={isPending}
+                    onClick={() =>
+                      handleAction(async () => {
+                        const result = await votePotato(scrimId, t.gameNameLower);
+                        setPotatoStatus(result.status);
+                        if (result.potatoAwarded) alert(`${t.displayLabel} got the potato!`);
+                      })
+                    }
+                    className={`px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50 ${
+                      potatoStatus.myVoteTarget === t.gameNameLower
+                        ? "bg-amber-700 text-amber-100 ring-2 ring-amber-500"
+                        : "bg-gray-800 text-gray-200 hover:bg-gray-700 border border-gray-600"
+                    }`}
+                  >
+                    {t.displayLabel}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">Only losing-team players can vote.</p>
+            )}
+          </div>
+        )}
+
+        {scrim.status === "finalized" && potatoStatus?.potatoAwarded && (
+          <div className="bg-amber-950/30 border border-amber-800/40 rounded-lg px-4 py-3 mb-6 text-amber-200/90 text-sm flex items-center gap-2">
+            <img src="/badges/potato.svg" alt="" className="w-8 h-8" />
+            Potato award issued for this scrim.
           </div>
         )}
 

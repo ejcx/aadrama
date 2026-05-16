@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Cal-I Activity Confirmed">
+  <defs>
+    <linearGradient id="calGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#bae6fd"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="46" fill="#0c4a6e" stroke="#7dd3fc" stroke-width="2"/>
+  <circle cx="50" cy="50" r="36" fill="#082f49"/>
+  <path d="M50 28 L54 38 L66 38 L56 46 L60 58 L50 52 L40 58 L44 46 L34 38 L46 38 Z" fill="url(#calGrad)"/>
+  <path d="M38 62 L44 56 L50 62 L56 56 L62 62 L56 68 L50 74 L44 68 Z" fill="#22d3ee" opacity="0.9"/>
+  <rect x="14" y="76" width="72" height="12" rx="2" fill="#075985"/>
+  <text x="50" y="84" text-anchor="middle" font-family="system-ui,sans-serif" font-size="5" font-weight="700" fill="#e0f2fe">CAL-I ACTIVITY</text>
+</svg>

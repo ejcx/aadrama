@@ -14,7 +14,7 @@ export type Team = 'team_a' | 'team_b'
 
 export type Winner = 'team_a' | 'team_b' | 'draw'
 
-export type SelectionMode = 'random' | 'elo_balanced' | 'captains'
+export type SelectionMode = 'random' | 'skill_based' | 'captains'
 
 export interface Scrim {
   id: string
@@ -44,6 +44,7 @@ export interface Scrim {
   started_at: string | null
   finished_at: string | null
   finalized_at: string | null
+  auto_badges_processed_at: string | null
 }
 
 export interface ScrimWithCounts extends Scrim {
@@ -140,5 +141,19 @@ export interface EloLeaderboardEntry {
   win_rate: number
   user_id: string | null
   updated_at: string
+}
+
+// Badges - pin-style awards displayed on a player's profile.
+import type { BadgeType as PlayerBadgeType } from '@/lib/badges/constants'
+export type { BadgeType } from '@/lib/badges/constants'
+
+export interface PlayerBadge {
+  id: string
+  badge_type: PlayerBadgeType
+  game_name: string
+  game_name_lower: string
+  session_id: string | null
+  earned_at: string
+  created_at: string
 }
 

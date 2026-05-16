@@ -4,7 +4,10 @@ import { useParams } from "next/navigation";
 import SidebarLayout from "../../../components/SidebarLayout";
 import Link from "next/link";
 import { SessionHoverPopover } from "../../../components/SessionHoverPopover";
-import { getPlayerElo, getPlayerEloHistory, getPlayerMapEloHistory, getPlayerRank, getPlayerDailyKills, getRankedScrimMaps } from "../../actions";
+import PlayerBadgesRow from "@/app/components/PlayerBadgesRow";
+import type { PlayerBadge } from "@/lib/supabase/types";
+import { SEASON_1_LABEL } from "@/lib/scrim/seasons";
+import { getPlayerElo, getPlayerEloHistory, getPlayerMapEloHistory, getPlayerRank, getPlayerSeason1Elo, getPlayerDailyKills, getRankedScrimMaps, getPlayerBadges } from "../../actions";
 import { getPlayerScrims, getScrimMaps, type PlayerScrimResult } from "../../../scrim/actions";
 import {
   ComposedChart,
@@ -58,6 +61,7 @@ interface MapStats {
 
 interface PlayerEloData {
   elo: number;
+  season1Elo: number | null;
   games_played: number;
   wins: number;
   losses: number;
@@ -222,7 +226,11 @@ const getDefaultDates = () => {
   };
 };
 
-const PlayerDetailClient = () => {
+type PlayerDetailClientProps = {
+  initialBadges?: PlayerBadge[];
+};
+
+const PlayerDetailClient = ({ initialBadges = [] }: PlayerDetailClientProps) => {
   const params = useParams();
   const playerName = decodeURIComponent(params.name as string);
   
@@ -230,6 +238,8 @@ const PlayerDetailClient = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [mapStats, setMapStats] = useState<MapStats[]>([]);
   const [eloData, setEloData] = useState<PlayerEloData | null>(null);
+  const [badges, setBadges] = useState<PlayerBadge[]>(initialBadges);
+  const [badgesFetchError, setBadgesFetchError] = useState<string | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [mapStatsLoading, setMapStatsLoading] = useState(true);
@@ -313,6 +323,36 @@ const PlayerDetailClient = () => {
     }
   };
 
+  // Sync when server passes new initialBadges (navigation between profiles)
+  useEffect(() => {
+    setBadges(initialBadges);
+    setBadgesFetchError(null);
+  }, [initialBadges, playerName]);
+
+  // Refetch on client (e.g. after earning a badge on a scrim)
+  useEffect(() => {
+    let cancelled = false;
+    getPlayerBadges(playerName)
+      .then((data) => {
+        if (!cancelled) {
+          setBadges(data);
+          setBadgesFetchError(null);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch player badges:", err);
+        if (!cancelled) {
+          setBadgesFetchError(
+            err instanceof Error ? err.message : "Could not load badges"
+          );
+          // Keep server-rendered badges on client fetch failure
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [playerName]);
+
   // Fetch scrim maps
   useEffect(() => {
     const fetchScrimMaps = async () => {
@@ -391,10 +431,11 @@ const PlayerDetailClient = () => {
           return;
         }
 
-        // Fetch ELO history and rank in parallel using server actions
-        const [historyRecords, rankData] = await Promise.all([
+        // Fetch ELO history, rank, and frozen Season 1 rating in parallel
+        const [historyRecords, rankData, season1Elo] = await Promise.all([
           getPlayerEloHistory(playerName, 7),
           getPlayerRank(playerName),
+          getPlayerSeason1Elo(playerName),
         ]);
 
         const rank = rankData?.rank || null;
@@ -407,6 +448,7 @@ const PlayerDetailClient = () => {
 
         setEloData({
           elo: eloRecord.elo,
+          season1Elo,
           games_played: eloRecord.games_played,
           wins: eloRecord.wins,
           losses: eloRecord.losses,
@@ -662,7 +704,40 @@ const PlayerDetailClient = () => {
             >
               ← Back to Tracker
             </Link>
-            <h1 className="text-white text-2xl sm:text-3xl font-bold break-words">{playerName}</h1>
+
+            {/* Profile header with awards on the chest */}
+            <div
+              className="
+                mt-2 rounded-xl overflow-visible
+                bg-gradient-to-br from-gray-800/95 via-gray-900 to-gray-950
+                border border-gray-600/70
+                shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_20px_rgba(0,0,0,0.35)]
+              "
+            >
+              <div className="px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div className="min-w-0 self-start">
+                  <p className="text-[10px] uppercase tracking-[0.25em] text-gray-500 mb-1">
+                    Player Profile
+                  </p>
+                  <h1 className="text-white text-2xl sm:text-3xl font-bold break-words">
+                    {playerName}
+                  </h1>
+                </div>
+                <PlayerBadgesRow badges={badges} variant="chest" />
+              </div>
+              {badges.length > 0 && (
+                <div className="px-4 sm:px-6 pb-3 border-t border-gray-700/50">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">
+                    {badges.length} award{badges.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              )}
+              {badgesFetchError && process.env.NODE_ENV === "development" && (
+                <div className="px-4 sm:px-6 pb-3 border-t border-red-900/50 text-red-400 text-xs">
+                  Badge load error: {badgesFetchError}
+                </div>
+              )}
+            </div>
           </div>
 
           {error && (
@@ -714,6 +789,22 @@ const PlayerDetailClient = () => {
                         </span>
                       )}
                     </div>
+                    {eloData.season1Elo != null && (
+                      <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+                        <span className="text-gray-500">{SEASON_1_LABEL}</span>
+                        <span className="font-semibold text-amber-400/90 tabular-nums">{eloData.season1Elo}</span>
+                        {eloData.elo !== eloData.season1Elo && (
+                          <span
+                            className={`tabular-nums ${
+                              eloData.elo > eloData.season1Elo ? 'text-green-400/90' : 'text-red-400/90'
+                            }`}
+                          >
+                            ({eloData.elo > eloData.season1Elo ? '+' : ''}
+                            {eloData.elo - eloData.season1Elo} since)
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

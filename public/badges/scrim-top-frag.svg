@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Scrim Top Frag">
+  <defs>
+    <linearGradient id="stfBlade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fecaca"/>
+      <stop offset="40%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#991b1b"/>
+    </linearGradient>
+    <linearGradient id="stfMedal" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#44403c"/>
+      <stop offset="100%" stop-color="#0c0a09"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="54" r="42" fill="#450a0a" stroke="#f87171" stroke-width="2"/>
+  <circle cx="50" cy="54" r="34" fill="url(#stfMedal)" stroke="#78716c" stroke-width="1.5"/>
+  <path d="M50 20 L58 48 L86 52 L62 62 L68 90 L50 72 L32 90 L38 62 L14 52 L42 48 Z" fill="url(#stfBlade)" stroke="#7f1d1d" stroke-width="1"/>
+  <circle cx="50" cy="52" r="10" fill="#1c1917" stroke="#fca5a5" stroke-width="1"/>
+  <text x="50" y="56" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="800" fill="#fecaca">K</text>
+  <rect x="24" y="78" width="52" height="11" rx="1" fill="#7f1d1d"/>
+  <text x="50" y="86" text-anchor="middle" font-family="system-ui,sans-serif" font-size="5.5" font-weight="700" fill="#fca5a5" letter-spacing="0.8">TOP FRAG</text>
+</svg>
