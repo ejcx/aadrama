@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 
-const POTATO_STACK_MAX = 3;
-const POTATO_LAYER_OFFSET = 18;
+const STACKED_BADGE_MAX = 3;
+const STACKED_BADGE_LAYER_OFFSET = 18;
 const BADGE_RIBBON_CLASS = "w-2.5 h-4 sm:w-3 sm:h-5";
 
 type BadgeMeta = ReturnType<typeof getBadgeMeta>;
@@ -400,9 +400,10 @@ function Season1ChampionBadge({ badge }: { badge: PlayerBadge }) {
 function PotatoBadgeStack({ badges }: { badges: PlayerBadge[] }) {
   const meta = getBadgeMeta("potato");
   const count = badges.length;
-  const stackLayers = Math.min(count, POTATO_STACK_MAX);
+  const stackLayers = Math.min(count, STACKED_BADGE_MAX);
   const showCount = count > 1;
-  const stackWidth = 48 + (stackLayers - 1) * POTATO_LAYER_OFFSET + (showCount ? 22 : 0);
+  const stackWidth =
+    48 + (stackLayers - 1) * STACKED_BADGE_LAYER_OFFSET + (showCount ? 22 : 0);
 
   const recentDates = badges
     .slice(0, 5)
@@ -421,7 +422,7 @@ function PotatoBadgeStack({ badges }: { badges: PlayerBadge[] }) {
               key={i}
               className="absolute top-0 transition-transform duration-200 group-hover:scale-105"
               style={{
-                left: i * POTATO_LAYER_OFFSET,
+                left: i * STACKED_BADGE_LAYER_OFFSET,
                 zIndex: i + 1,
                 opacity: i === stackLayers - 1 ? 1 : 0.92 - i * 0.08,
                 transform: `rotate(${i * 4 - (stackLayers - 1) * 2}deg)`,
@@ -438,7 +439,7 @@ function PotatoBadgeStack({ badges }: { badges: PlayerBadge[] }) {
                 rounded-full bg-amber-900 border-2 border-amber-600/80
                 flex items-center justify-center shadow-md
               "
-              style={{ left: (stackLayers - 1) * POTATO_LAYER_OFFSET + 38 }}
+              style={{ left: (stackLayers - 1) * STACKED_BADGE_LAYER_OFFSET + 38 }}
             >
               <span className="text-[10px] sm:text-xs font-bold text-amber-100 leading-none tabular-nums">
                 {count}
@@ -462,12 +463,80 @@ function PotatoBadgeStack({ badges }: { badges: PlayerBadge[] }) {
   );
 }
 
+function TopFragBadgeStack({ badges }: { badges: PlayerBadge[] }) {
+  const meta = getBadgeMeta("scrim_top_frag");
+  const count = badges.length;
+  const stackLayers = Math.min(count, STACKED_BADGE_MAX);
+  const showCount = count > 1;
+  const stackWidth =
+    48 + (stackLayers - 1) * STACKED_BADGE_LAYER_OFFSET + (showCount ? 22 : 0);
+
+  const recentDates = badges
+    .slice(0, 5)
+    .map((b) => new Date(b.earned_at).toLocaleDateString());
+
+  return (
+    <BadgeTooltip
+      borderClassName="border-red-900/50"
+      trigger={
+        <div
+          className="relative group flex-shrink-0 self-start outline-none cursor-default"
+          style={{ width: stackWidth, minHeight: 56 }}
+          aria-label={`${count} top frag award${count !== 1 ? "s" : ""}`}
+        >
+          {Array.from({ length: stackLayers }, (_, i) => (
+            <div
+              key={i}
+              className="absolute top-0 transition-transform duration-200 group-hover:scale-105"
+              style={{
+                left: i * STACKED_BADGE_LAYER_OFFSET,
+                zIndex: i + 1,
+                opacity: i === stackLayers - 1 ? 1 : 0.92 - i * 0.08,
+                transform: `rotate(${i * 4 - (stackLayers - 1) * 2}deg)`,
+              }}
+            >
+              <BadgeMedalCore meta={meta} />
+            </div>
+          ))}
+
+          {showCount && (
+            <div
+              className="
+                absolute -top-0.5 z-20 min-w-[1.35rem] h-[1.35rem] px-1
+                rounded-full bg-red-950 border-2 border-red-600/80
+                flex items-center justify-center shadow-md
+              "
+              style={{ left: (stackLayers - 1) * STACKED_BADGE_LAYER_OFFSET + 38 }}
+            >
+              <span className="text-[10px] sm:text-xs font-bold text-red-100 leading-none tabular-nums">
+                {count}
+              </span>
+            </div>
+          )}
+        </div>
+      }
+    >
+      <p className="font-semibold whitespace-nowrap" style={{ color: meta.accent }}>
+        Top Frag ×{count}
+      </p>
+      <p className="text-gray-400 text-[11px] leading-snug mt-0.5">{meta.description}</p>
+      {count > 1 && (
+        <p className="text-gray-500 text-[10px] mt-1">
+          Recent: {recentDates.join(", ")}
+          {count > 5 ? ` +${count - 5} more` : ""}
+        </p>
+      )}
+    </BadgeTooltip>
+  );
+}
+
 function partitionBadges(badges: PlayerBadge[]) {
   let champion: PlayerBadge | null = null;
   let season1Top10: PlayerBadge | null = null;
   let heldFirstPlace: PlayerBadge | null = null;
   let combatPatch: PlayerBadge | null = null;
   const potato: PlayerBadge[] = [];
+  const topFrag: PlayerBadge[] = [];
   const other: PlayerBadge[] = [];
 
   for (const b of badges) {
@@ -496,16 +565,20 @@ function partitionBadges(badges: PlayerBadge[]) {
       combatPatch = b;
     } else if (b.badge_type === "potato") {
       potato.push(b);
+    } else if (b.badge_type === "scrim_top_frag") {
+      topFrag.push(b);
     } else {
       other.push(b);
     }
   }
 
-  potato.sort(
-    (a, b) => new Date(b.earned_at).getTime() - new Date(a.earned_at).getTime()
-  );
+  const byEarnedDesc = (a: PlayerBadge, b: PlayerBadge) =>
+    new Date(b.earned_at).getTime() - new Date(a.earned_at).getTime();
 
-  return { champion, season1Top10, heldFirstPlace, combatPatch, potato, other };
+  potato.sort(byEarnedDesc);
+  topFrag.sort(byEarnedDesc);
+
+  return { champion, season1Top10, heldFirstPlace, combatPatch, potato, topFrag, other };
 }
 
 function BadgeRack({
@@ -517,7 +590,7 @@ function BadgeRack({
   variant: "panel" | "chest";
   scrimsAtEloFirstPlace?: number | null;
 }) {
-  const { champion, season1Top10, heldFirstPlace, combatPatch, potato, other } =
+  const { champion, season1Top10, heldFirstPlace, combatPatch, potato, topFrag, other } =
     partitionBadges(badges);
 
   return (
@@ -540,6 +613,7 @@ function BadgeRack({
       {other.map((b) => (
         <BadgeMedal key={b.id} badge={b} />
       ))}
+      {topFrag.length > 0 && <TopFragBadgeStack badges={topFrag} />}
       {potato.length > 0 && <PotatoBadgeStack badges={potato} />}
     </div>
   );
