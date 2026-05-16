@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+import { SEASON_2_LABEL } from "@/lib/scrim/seasons";
 
 interface SidebarLayoutProps {
   children: React.ReactNode;
@@ -155,6 +156,9 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
                   }`}
               >
                 Scrim
+                <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-purple-600 text-purple-100 rounded">
+                  {SEASON_2_LABEL}
+                </span>
               </a>
             </div>
             <div className="pt-4 mt-4 border-t border-gray-700">
