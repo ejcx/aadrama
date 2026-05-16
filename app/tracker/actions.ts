@@ -289,22 +289,44 @@ export async function getPlayerElo(playerName: string) {
   return data
 }
 
-/** Frozen Season 1 ELO (1200 + ranked games before Season 2). Null if no Season 1 games. */
-export async function getPlayerSeason1Elo(playerName: string): Promise<number | null> {
+async function getPlayerSeasonElo(
+  playerName: string,
+  season: 1 | 2
+): Promise<number | null> {
   const supabase = await createClient()
   const playerNameLower = playerName.toLowerCase()
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('elo_history')
     .select('elo_change')
     .eq('game_name_lower', playerNameLower)
-    .lt('created_at', SEASON_2_START_ISO)
 
-  if (error) throw new Error(`Failed to fetch Season 1 ELO: ${error.message}`)
+  query =
+    season === 1
+      ? query.lt('created_at', SEASON_2_START_ISO)
+      : query.gte('created_at', SEASON_2_START_ISO)
+
+  const { data, error } = await query
+
+  if (error) {
+    throw new Error(
+      `Failed to fetch Season ${season} ELO: ${error.message}`
+    )
+  }
   if (!data?.length) return null
 
   const eloChangeSum = data.reduce((sum, row) => sum + (row.elo_change ?? 0), 0)
   return season1EloFromChanges(eloChangeSum)
+}
+
+/** Frozen Season 1 ELO (1200 + ranked games before Season 2). Null if no Season 1 games. */
+export async function getPlayerSeason1Elo(playerName: string): Promise<number | null> {
+  return getPlayerSeasonElo(playerName, 1)
+}
+
+/** Season 2 ELO (1200 + ranked games on or after Season 2 start). Null if no Season 2 games. */
+export async function getPlayerSeason2Elo(playerName: string): Promise<number | null> {
+  return getPlayerSeasonElo(playerName, 2)
 }
 
 // ELO history row shape (no join) for player chart

@@ -6,8 +6,8 @@ import Link from "next/link";
 import { SessionHoverPopover } from "../../../components/SessionHoverPopover";
 import PlayerBadgesRow from "@/app/components/PlayerBadgesRow";
 import type { PlayerBadge } from "@/lib/supabase/types";
-import { SEASON_1_LABEL } from "@/lib/scrim/seasons";
-import { getPlayerElo, getPlayerEloHistory, getPlayerMapEloHistory, getPlayerRank, getPlayerSeason1Elo, getPlayerDailyKills, getRankedScrimMaps, getPlayerBadges } from "../../actions";
+import { SEASON_1_LABEL, SEASON_2_LABEL } from "@/lib/scrim/seasons";
+import { getPlayerElo, getPlayerEloHistory, getPlayerMapEloHistory, getPlayerRank, getPlayerSeason1Elo, getPlayerSeason2Elo, getPlayerDailyKills, getRankedScrimMaps, getPlayerBadges } from "../../actions";
 import { getPlayerScrims, getScrimMaps, type PlayerScrimResult } from "../../../scrim/actions";
 import {
   ComposedChart,
@@ -62,6 +62,7 @@ interface MapStats {
 interface PlayerEloData {
   elo: number;
   season1Elo: number | null;
+  season2Elo: number | null;
   games_played: number;
   wins: number;
   losses: number;
@@ -432,10 +433,11 @@ const PlayerDetailClient = ({ initialBadges = [] }: PlayerDetailClientProps) => 
         }
 
         // Fetch ELO history, rank, and frozen Season 1 rating in parallel
-        const [historyRecords, rankData, season1Elo] = await Promise.all([
+        const [historyRecords, rankData, season1Elo, season2Elo] = await Promise.all([
           getPlayerEloHistory(playerName, 7),
           getPlayerRank(playerName),
           getPlayerSeason1Elo(playerName),
+          getPlayerSeason2Elo(playerName),
         ]);
 
         const rank = rankData?.rank || null;
@@ -449,6 +451,7 @@ const PlayerDetailClient = ({ initialBadges = [] }: PlayerDetailClientProps) => 
         setEloData({
           elo: eloRecord.elo,
           season1Elo,
+          season2Elo,
           games_played: eloRecord.games_played,
           wins: eloRecord.wins,
           losses: eloRecord.losses,
@@ -768,7 +771,7 @@ const PlayerDetailClient = ({ initialBadges = [] }: PlayerDetailClientProps) => 
                   
                   <div>
                     <div className="text-yellow-400/80 text-xs sm:text-sm mb-1">
-                      Ranked ELO
+                      Cumulative ELO
                       {eloData.rank !== null && (
                         <span className="text-gray-400 ml-2">
                           #{eloData.rank}
@@ -789,20 +792,20 @@ const PlayerDetailClient = ({ initialBadges = [] }: PlayerDetailClientProps) => 
                         </span>
                       )}
                     </div>
-                    {eloData.season1Elo != null && (
-                      <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
-                        <span className="text-gray-500">{SEASON_1_LABEL}</span>
-                        <span className="font-semibold text-amber-400/90 tabular-nums">{eloData.season1Elo}</span>
-                        {eloData.elo !== eloData.season1Elo && (
-                          <span
-                            className={`tabular-nums ${
-                              eloData.elo > eloData.season1Elo ? 'text-green-400/90' : 'text-red-400/90'
-                            }`}
-                          >
-                            ({eloData.elo > eloData.season1Elo ? '+' : ''}
-                            {eloData.elo - eloData.season1Elo} since)
+                    {(eloData.season1Elo != null || eloData.season2Elo != null) && (
+                      <div className="mt-2 flex flex-col gap-1 text-sm">
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="text-gray-500 w-[5.5rem] shrink-0">{SEASON_1_LABEL}</span>
+                          <span className="font-semibold text-amber-400/90 tabular-nums">
+                            {eloData.season1Elo ?? '—'}
                           </span>
-                        )}
+                        </div>
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="text-gray-500 w-[5.5rem] shrink-0">{SEASON_2_LABEL}</span>
+                          <span className="font-semibold text-cyan-400/90 tabular-nums">
+                            {eloData.season2Elo ?? '—'}
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>

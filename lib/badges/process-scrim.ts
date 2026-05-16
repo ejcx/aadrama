@@ -14,8 +14,8 @@ export async function processScrimAutoBadges(
   supabase: SupabaseClient,
   scrim: Scrim,
   playerStats: ScrimPlayerKillStats[]
-): Promise<{ topFragAwarded: string[]; potatoAutoAwarded: string[] }> {
-  const result = { topFragAwarded: [] as string[], potatoAutoAwarded: [] as string[] }
+): Promise<{ potatoAutoAwarded: string[] }> {
+  const result = { potatoAutoAwarded: [] as string[] }
 
   if (scrim.status !== 'finalized' || !isBadgeGoForward(scrim.finalized_at)) {
     return result
@@ -30,20 +30,6 @@ export async function processScrimAutoBadges(
   }
 
   const sessionId = scrim.id
-  const maxKills = Math.max(...playerStats.map((p) => p.kills))
-  if (maxKills > 0) {
-    const topFraggers = playerStats.filter((p) => p.kills === maxKills)
-    for (const player of topFraggers) {
-      const { awarded } = await awardBadge(supabase, {
-        badgeType: 'scrim_top_frag',
-        gameName: player.gameName,
-        gameNameLower: player.gameNameLower,
-        sessionId,
-        earnedAt: scrim.finalized_at ?? undefined,
-      })
-      if (awarded) result.topFragAwarded.push(player.gameNameLower)
-    }
-  }
 
   for (const player of playerStats) {
     if (player.kills === 1) {
