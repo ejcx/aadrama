@@ -65,7 +65,7 @@ export const BADGE_META: Record<BadgeType, BadgeMeta> = {
   },
   held_first_place: {
     label: '#1 ELO',
-    description: 'Held the #1 spot on the global ELO leaderboard.',
+    description: 'Reached #1 on the global ELO leaderboard. Scrims at #1 counts ranked games finished while tied for first.',
     src: '/badges/held-first-place.svg',
     accent: '#f59e0b',
   },

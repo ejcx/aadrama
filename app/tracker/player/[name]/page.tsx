@@ -1,4 +1,4 @@
-import { getPlayerBadges } from "../../actions";
+import { getPlayerBadges, getPlayerScrimsAtEloFirstPlace } from "../../actions";
 import PlayerDetailClient from "./PlayerDetailClient";
 
 export default async function PlayerDetailPage({
@@ -8,7 +8,15 @@ export default async function PlayerDetailPage({
 }) {
   const { name } = await params;
   const playerName = decodeURIComponent(name);
-  const initialBadges = await getPlayerBadges(playerName);
+  const [initialBadges, initialScrimsAtEloFirstPlace] = await Promise.all([
+    getPlayerBadges(playerName),
+    getPlayerScrimsAtEloFirstPlace(playerName),
+  ]);
 
-  return <PlayerDetailClient initialBadges={initialBadges} />;
+  return (
+    <PlayerDetailClient
+      initialBadges={initialBadges}
+      initialScrimsAtEloFirstPlace={initialScrimsAtEloFirstPlace}
+    />
+  );
 }

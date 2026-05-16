@@ -198,9 +198,16 @@ function Season1CombatPatchBadge({ badge }: { badge: PlayerBadge }) {
   );
 }
 
-function HeldFirstPlaceBadge({ badge }: { badge: PlayerBadge }) {
+function HeldFirstPlaceBadge({
+  badge,
+  scrimsAtFirstPlace,
+}: {
+  badge: PlayerBadge;
+  scrimsAtFirstPlace?: number | null;
+}) {
   const meta = getBadgeMeta("held_first_place");
   const earned = new Date(badge.earned_at).toLocaleDateString();
+  const showScrimsCount = scrimsAtFirstPlace != null;
 
   return (
     <BadgeTooltip
@@ -246,17 +253,27 @@ function HeldFirstPlaceBadge({ badge }: { badge: PlayerBadge }) {
             <p
               className="
                 mt-1.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.18em]
-                text-orange-200/95 text-center
+                text-orange-200/95 text-center leading-tight
               "
             >
               #1 ELO
             </p>
+            {showScrimsCount && (
+              <p className="mt-0.5 text-[9px] sm:text-[10px] text-orange-300/80 text-center tabular-nums leading-tight">
+                {scrimsAtFirstPlace} scrim{scrimsAtFirstPlace === 1 ? "" : "s"} at #1
+              </p>
+            )}
           </div>
         </div>
       }
     >
       <p className="font-semibold text-orange-300">{meta.label}</p>
       <p className="text-gray-400 text-[11px] leading-snug mt-0.5">{meta.description}</p>
+      {showScrimsCount && (
+        <p className="text-orange-200/90 text-[11px] mt-1 tabular-nums">
+          Scrims at #1: {scrimsAtFirstPlace}
+        </p>
+      )}
       <p className="text-gray-500 text-[10px] mt-1">Earned {earned}</p>
     </BadgeTooltip>
   );
@@ -494,9 +511,11 @@ function partitionBadges(badges: PlayerBadge[]) {
 function BadgeRack({
   badges,
   variant,
+  scrimsAtEloFirstPlace,
 }: {
   badges: PlayerBadge[];
   variant: "panel" | "chest";
+  scrimsAtEloFirstPlace?: number | null;
 }) {
   const { champion, season1Top10, heldFirstPlace, combatPatch, potato, other } =
     partitionBadges(badges);
@@ -511,7 +530,12 @@ function BadgeRack({
     >
       {champion && <Season1ChampionBadge badge={champion} />}
       {season1Top10 && <Season1Top10Badge badge={season1Top10} />}
-      {heldFirstPlace && <HeldFirstPlaceBadge badge={heldFirstPlace} />}
+      {heldFirstPlace && (
+        <HeldFirstPlaceBadge
+          badge={heldFirstPlace}
+          scrimsAtFirstPlace={scrimsAtEloFirstPlace}
+        />
+      )}
       {combatPatch && <Season1CombatPatchBadge badge={combatPatch} />}
       {other.map((b) => (
         <BadgeMedal key={b.id} badge={b} />
@@ -524,18 +548,24 @@ function BadgeRack({
 type PlayerBadgesRowProps = {
   badges: PlayerBadge[];
   variant?: "panel" | "chest";
+  scrimsAtEloFirstPlace?: number | null;
 };
 
 export default function PlayerBadgesRow({
   badges,
   variant = "panel",
+  scrimsAtEloFirstPlace = null,
 }: PlayerBadgesRowProps) {
   if (!badges?.length) return null;
 
   if (variant === "chest") {
     return (
       <div className="flex-shrink-0 self-start" aria-label="Player awards">
-        <BadgeRack badges={badges} variant="chest" />
+        <BadgeRack
+          badges={badges}
+          variant="chest"
+          scrimsAtEloFirstPlace={scrimsAtEloFirstPlace}
+        />
       </div>
     );
   }

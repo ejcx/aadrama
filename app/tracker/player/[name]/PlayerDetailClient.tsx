@@ -7,7 +7,7 @@ import { SessionHoverPopover } from "../../../components/SessionHoverPopover";
 import PlayerBadgesRow from "@/app/components/PlayerBadgesRow";
 import type { PlayerBadge } from "@/lib/supabase/types";
 import { SEASON_1_LABEL, SEASON_2_LABEL } from "@/lib/scrim/seasons";
-import { getPlayerElo, getPlayerEloHistory, getPlayerMapEloHistory, getPlayerRank, getPlayerSeason1Elo, getPlayerSeason2Elo, getPlayerDailyKills, getRankedScrimMaps, getPlayerBadges } from "../../actions";
+import { getPlayerElo, getPlayerEloHistory, getPlayerMapEloHistory, getPlayerRank, getPlayerSeason1Elo, getPlayerSeason2Elo, getPlayerPeakElo, getPlayerScrimsAtEloFirstPlace, getPlayerDailyKills, getRankedScrimMaps, getPlayerBadges } from "../../actions";
 import { getPlayerScrims, getScrimMaps, type PlayerScrimResult } from "../../../scrim/actions";
 import {
   ComposedChart,
@@ -61,6 +61,7 @@ interface MapStats {
 
 interface PlayerEloData {
   elo: number;
+  peakElo: number | null;
   season1Elo: number | null;
   season2Elo: number | null;
   games_played: number;
@@ -229,9 +230,13 @@ const getDefaultDates = () => {
 
 type PlayerDetailClientProps = {
   initialBadges?: PlayerBadge[];
+  initialScrimsAtEloFirstPlace?: number;
 };
 
-const PlayerDetailClient = ({ initialBadges = [] }: PlayerDetailClientProps) => {
+const PlayerDetailClient = ({
+  initialBadges = [],
+  initialScrimsAtEloFirstPlace = 0,
+}: PlayerDetailClientProps) => {
   const params = useParams();
   const playerName = decodeURIComponent(params.name as string);
   
@@ -240,6 +245,9 @@ const PlayerDetailClient = ({ initialBadges = [] }: PlayerDetailClientProps) => 
   const [mapStats, setMapStats] = useState<MapStats[]>([]);
   const [eloData, setEloData] = useState<PlayerEloData | null>(null);
   const [badges, setBadges] = useState<PlayerBadge[]>(initialBadges);
+  const [scrimsAtEloFirstPlace, setScrimsAtEloFirstPlace] = useState<number>(
+    initialScrimsAtEloFirstPlace
+  );
   const [badgesFetchError, setBadgesFetchError] = useState<string | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [sessionsLoading, setSessionsLoading] = useState(true);
@@ -327,16 +335,21 @@ const PlayerDetailClient = ({ initialBadges = [] }: PlayerDetailClientProps) => 
   // Sync when server passes new initialBadges (navigation between profiles)
   useEffect(() => {
     setBadges(initialBadges);
+    setScrimsAtEloFirstPlace(initialScrimsAtEloFirstPlace);
     setBadgesFetchError(null);
-  }, [initialBadges, playerName]);
+  }, [initialBadges, initialScrimsAtEloFirstPlace, playerName]);
 
   // Refetch on client (e.g. after earning a badge on a scrim)
   useEffect(() => {
     let cancelled = false;
-    getPlayerBadges(playerName)
-      .then((data) => {
+    Promise.all([
+      getPlayerBadges(playerName),
+      getPlayerScrimsAtEloFirstPlace(playerName),
+    ])
+      .then(([badgeData, scrimsAtFirst]) => {
         if (!cancelled) {
-          setBadges(data);
+          setBadges(badgeData);
+          setScrimsAtEloFirstPlace(scrimsAtFirst);
           setBadgesFetchError(null);
         }
       })
@@ -433,11 +446,12 @@ const PlayerDetailClient = ({ initialBadges = [] }: PlayerDetailClientProps) => 
         }
 
         // Fetch ELO history, rank, and frozen Season 1 rating in parallel
-        const [historyRecords, rankData, season1Elo, season2Elo] = await Promise.all([
+        const [historyRecords, rankData, season1Elo, season2Elo, peakElo] = await Promise.all([
           getPlayerEloHistory(playerName, 7),
           getPlayerRank(playerName),
           getPlayerSeason1Elo(playerName),
           getPlayerSeason2Elo(playerName),
+          getPlayerPeakElo(playerName),
         ]);
 
         const rank = rankData?.rank || null;
@@ -450,6 +464,7 @@ const PlayerDetailClient = ({ initialBadges = [] }: PlayerDetailClientProps) => 
 
         setEloData({
           elo: eloRecord.elo,
+          peakElo,
           season1Elo,
           season2Elo,
           games_played: eloRecord.games_played,
@@ -726,7 +741,15 @@ const PlayerDetailClient = ({ initialBadges = [] }: PlayerDetailClientProps) => 
                     {playerName}
                   </h1>
                 </div>
-                <PlayerBadgesRow badges={badges} variant="chest" />
+                <PlayerBadgesRow
+                  badges={badges}
+                  variant="chest"
+                  scrimsAtEloFirstPlace={
+                    badges.some((b) => b.badge_type === "held_first_place")
+                      ? scrimsAtEloFirstPlace
+                      : null
+                  }
+                />
               </div>
               {badges.length > 0 && (
                 <div className="px-4 sm:px-6 pb-3 border-t border-gray-700/50">
@@ -792,7 +815,9 @@ const PlayerDetailClient = ({ initialBadges = [] }: PlayerDetailClientProps) => 
                         </span>
                       )}
                     </div>
-                    {(eloData.season1Elo != null || eloData.season2Elo != null) && (
+                    {(eloData.season1Elo != null ||
+                      eloData.season2Elo != null ||
+                      eloData.peakElo != null) && (
                       <div className="mt-2 flex flex-col gap-1 text-sm">
                         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                           <span className="text-gray-500 w-[5.5rem] shrink-0">{SEASON_1_LABEL}</span>
@@ -806,6 +831,19 @@ const PlayerDetailClient = ({ initialBadges = [] }: PlayerDetailClientProps) => 
                             {eloData.season2Elo ?? '—'}
                           </span>
                         </div>
+                        {eloData.peakElo != null && (
+                          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                            <span className="text-gray-500 w-[5.5rem] shrink-0">Peak</span>
+                            <span className="font-semibold text-violet-300/90 tabular-nums">
+                              {eloData.peakElo}
+                            </span>
+                            {eloData.peakElo > eloData.elo && (
+                              <span className="text-gray-500 text-xs tabular-nums">
+                                (+{eloData.peakElo - eloData.elo} above current)
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

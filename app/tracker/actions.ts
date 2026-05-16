@@ -329,6 +329,46 @@ export async function getPlayerSeason2Elo(playerName: string): Promise<number | 
   return getPlayerSeasonElo(playerName, 2)
 }
 
+/** Highest cumulative ELO ever reached (max elo_after across ranked games). */
+export async function getPlayerPeakElo(playerName: string): Promise<number | null> {
+  const supabase = await createClient()
+  const playerNameLower = playerName.toLowerCase()
+
+  const { data: peakRow, error } = await supabase
+    .from('elo_history')
+    .select('elo_after')
+    .eq('game_name_lower', playerNameLower)
+    .order('elo_after', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Failed to fetch peak ELO: ${error.message}`)
+  }
+
+  if (peakRow) {
+    return peakRow.elo_after
+  }
+
+  const current = await getPlayerElo(playerName)
+  return current?.elo ?? null
+}
+
+/** Ranked scrims finished while at global ELO #1 (ties count). */
+export async function getPlayerScrimsAtEloFirstPlace(playerName: string): Promise<number> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('count_scrims_at_elo_first_place', {
+    p_game_name_lower: playerName.toLowerCase(),
+  })
+
+  if (error) {
+    console.error('getPlayerScrimsAtEloFirstPlace:', error.message)
+    return 0
+  }
+
+  return typeof data === 'number' ? data : 0
+}
+
 // ELO history row shape (no join) for player chart
 export type PlayerEloHistoryRow = {
   scrim_id: string
