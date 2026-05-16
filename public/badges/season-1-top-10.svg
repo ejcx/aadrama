@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Season 1 Top 10">
+  <defs>
+    <linearGradient id="s1t10Rim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="35%" stop-color="#cbd5e1"/>
+      <stop offset="55%" stop-color="#e2e8f0"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+    <linearGradient id="s1t10Face" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="45%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="s1t10Shine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="45%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="s1t10Num" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f1f5f9"/>
+      <stop offset="40%" stop-color="#94a3b8"/>
+      <stop offset="100%" stop-color="#475569"/>
+    </linearGradient>
+    <radialGradient id="s1t10Glow" cx="50%" cy="35%" r="55%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="46" fill="url(#s1t10Glow)"/>
+  <polygon points="50,6 88,26 88,74 50,94 12,74 12,26" fill="#334155" stroke="url(#s1t10Rim)" stroke-width="2.5"/>
+  <polygon points="50,14 80,30 80,70 50,86 20,70 20,30" fill="url(#s1t10Face)" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="14" y="28" width="72" height="10" rx="5" fill="url(#s1t10Shine)" opacity="0.85"/>
+  <text x="50" y="58" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" font-weight="800" fill="url(#s1t10Num)" letter-spacing="-1">10</text>
+  <circle cx="24" cy="22" r="2" fill="#e2e8f0" opacity="0.9"/>
+  <circle cx="76" cy="20" r="1.5" fill="#f8fafc" opacity="0.85"/>
+  <circle cx="82" cy="42" r="1.2" fill="#cbd5e1" opacity="0.8"/>
+  <circle cx="18" cy="44" r="1.4" fill="#e2e8f0" opacity="0.75"/>
+  <path d="M50 22 L52 28 L58 28 L53 32 L55 38 L50 34 L45 38 L47 32 L42 28 L48 28 Z" fill="#e2e8f0" opacity="0.95"/>
+  <text x="50" y="78" text-anchor="middle" font-family="system-ui,sans-serif" font-size="6.5" font-weight="700" fill="#94a3b8" letter-spacing="1.2">S1 TOP</text>
+</svg>

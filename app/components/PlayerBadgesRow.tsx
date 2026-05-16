@@ -262,6 +262,59 @@ function HeldFirstPlaceBadge({ badge }: { badge: PlayerBadge }) {
   );
 }
 
+function Season1Top10Badge({ badge }: { badge: PlayerBadge }) {
+  const meta = getBadgeMeta("season_1_top_10");
+  const earned = new Date(badge.earned_at).toLocaleDateString();
+
+  return (
+    <BadgeTooltip
+      borderClassName="border-slate-500/50"
+      trigger={
+        <div className="relative group flex-shrink-0 self-start mx-0.5 outline-none cursor-default">
+          <div
+            className="absolute -inset-1 rounded-2xl bg-slate-400/15 blur-md pointer-events-none"
+            aria-hidden
+          />
+          <div
+            className="
+              absolute -inset-0.5 rounded-xl pointer-events-none
+              bg-gradient-to-br from-slate-300/20 via-sky-400/10 to-slate-500/15
+            "
+            aria-hidden
+          />
+
+          <div className="relative flex flex-col items-center">
+            <div className="relative">
+              <BadgeMedalCore
+                meta={meta}
+                size="md"
+                className="
+                  border-slate-300/70 ring-1 ring-sky-300/30 ring-offset-1 ring-offset-gray-950
+                  shadow-[0_0_18px_rgba(148,163,184,0.45),0_3px_10px_rgba(0,0,0,0.45)]
+                  transition-transform duration-200 group-hover:scale-105
+                "
+              />
+            </div>
+
+            <p
+              className="
+                mt-1.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.16em]
+                text-slate-300/95 text-center leading-tight
+              "
+            >
+              S1 Top 10
+            </p>
+          </div>
+        </div>
+      }
+    >
+      <p className="font-semibold text-slate-200">{meta.label}</p>
+      <p className="text-gray-400 text-[11px] leading-snug mt-0.5">{meta.description}</p>
+      <p className="text-gray-500 text-[10px] mt-1">Earned {earned}</p>
+    </BadgeTooltip>
+  );
+}
+
 function Season1ChampionBadge({ badge }: { badge: PlayerBadge }) {
   const meta = getBadgeMeta("season_1_champion");
   const earned = new Date(badge.earned_at).toLocaleDateString();
@@ -394,6 +447,7 @@ function PotatoBadgeStack({ badges }: { badges: PlayerBadge[] }) {
 
 function partitionBadges(badges: PlayerBadge[]) {
   let champion: PlayerBadge | null = null;
+  let season1Top10: PlayerBadge | null = null;
   let heldFirstPlace: PlayerBadge | null = null;
   let combatPatch: PlayerBadge | null = null;
   const potato: PlayerBadge[] = [];
@@ -406,6 +460,13 @@ function partitionBadges(badges: PlayerBadge[]) {
         new Date(b.earned_at).getTime() > new Date(champion.earned_at).getTime()
       ) {
         champion = b;
+      }
+    } else if (b.badge_type === "season_1_top_10") {
+      if (
+        !season1Top10 ||
+        new Date(b.earned_at).getTime() > new Date(season1Top10.earned_at).getTime()
+      ) {
+        season1Top10 = b;
       }
     } else if (b.badge_type === "held_first_place") {
       if (
@@ -427,7 +488,7 @@ function partitionBadges(badges: PlayerBadge[]) {
     (a, b) => new Date(b.earned_at).getTime() - new Date(a.earned_at).getTime()
   );
 
-  return { champion, heldFirstPlace, combatPatch, potato, other };
+  return { champion, season1Top10, heldFirstPlace, combatPatch, potato, other };
 }
 
 function BadgeRack({
@@ -437,7 +498,8 @@ function BadgeRack({
   badges: PlayerBadge[];
   variant: "panel" | "chest";
 }) {
-  const { champion, heldFirstPlace, combatPatch, potato, other } = partitionBadges(badges);
+  const { champion, season1Top10, heldFirstPlace, combatPatch, potato, other } =
+    partitionBadges(badges);
 
   return (
     <div
@@ -448,6 +510,7 @@ function BadgeRack({
       }
     >
       {champion && <Season1ChampionBadge badge={champion} />}
+      {season1Top10 && <Season1Top10Badge badge={season1Top10} />}
       {heldFirstPlace && <HeldFirstPlaceBadge badge={heldFirstPlace} />}
       {combatPatch && <Season1CombatPatchBadge badge={combatPatch} />}
       {other.map((b) => (

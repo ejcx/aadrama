@@ -4,6 +4,7 @@ export const BADGES_GO_FORWARD_CUTOFF = new Date('2026-05-16T00:00:00.000Z')
 export const BADGE_TYPES = [
   'potato',
   'season_1_champion',
+  'season_1_top_10',
   'season_1_combat_patch',
   'season_1_elite',
   'season_1_active',
@@ -37,6 +38,12 @@ export const BADGE_META: Record<BadgeType, BadgeMeta> = {
     description: 'Season 1 ranked champion.',
     src: '/badges/season-1-champion.svg',
     accent: '#fbbf24',
+  },
+  season_1_top_10: {
+    label: 'Season 1 Top 10',
+    description: 'Finished Season 1 ranked in the top 10 on the ELO leaderboard.',
+    src: '/badges/season-1-top-10.svg',
+    accent: '#94a3b8',
   },
   season_1_combat_patch: {
     label: 'Season 1 Combat Patch',
