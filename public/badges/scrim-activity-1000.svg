@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="1000 Scrim Activity">
+  <defs>
+    <linearGradient id="sa1kGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="45%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <radialGradient id="sa1kGlow" cx="50%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#fde047" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#fde047" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="46" fill="url(#sa1kGlow)"/>
+  <circle cx="50" cy="50" r="44" fill="#78350f" stroke="#fcd34d" stroke-width="2.5"/>
+  <circle cx="50" cy="50" r="34" fill="#1c1917"/>
+  <path d="M50 16 L54 34 L74 36 L58 48 L64 70 L50 56 L36 70 L42 48 L26 36 L46 34 Z" fill="url(#sa1kGrad)"/>
+  <text x="50" y="54" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="800" fill="#fde68a" letter-spacing="-0.5">1000</text>
+  <text x="50" y="70" text-anchor="middle" font-family="system-ui,sans-serif" font-size="5" font-weight="700" fill="#fcd34d" letter-spacing="0.6">SCRIMS</text>
+</svg>

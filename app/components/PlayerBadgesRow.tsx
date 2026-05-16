@@ -4,6 +4,16 @@ import type { ReactNode } from "react";
 import type { PlayerBadge } from "@/lib/supabase/types";
 import { getBadgeMeta } from "@/lib/badges/constants";
 import {
+  isScrimActivityBadgeType,
+  pickScrimActivityBadge,
+  SCRIM_ACTIVITY_TIERS,
+} from "@/lib/badges/activity";
+import {
+  ELO_MILESTONE_TIERS,
+  isEloMilestoneBadgeType,
+  pickEloMilestoneBadge,
+} from "@/lib/badges/elo-milestone";
+import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
@@ -530,6 +540,70 @@ function TopFragBadgeStack({ badges }: { badges: PlayerBadge[] }) {
   );
 }
 
+function EloMilestoneBadge({ badge }: { badge: PlayerBadge }) {
+  const meta = getBadgeMeta(badge.badge_type);
+  const tier = ELO_MILESTONE_TIERS.find((t) => t.badgeType === badge.badge_type);
+  const earned = new Date(badge.earned_at).toLocaleDateString();
+
+  return (
+    <BadgeTooltip
+      borderClassName="border-amber-700/40"
+      trigger={
+        <div className="relative group flex-shrink-0 self-start outline-none cursor-default">
+          <BadgeMedalCore
+            meta={meta}
+            size="md"
+            className="border-amber-500/50 shadow-[0_0_14px_rgba(245,158,11,0.2)] transition-transform duration-200 group-hover:scale-105"
+          />
+        </div>
+      }
+    >
+      <p className="font-semibold" style={{ color: meta.accent }}>
+        {meta.label}
+      </p>
+      <p className="text-gray-400 text-[11px] leading-snug mt-0.5">{meta.description}</p>
+      {tier && (
+        <p className="text-gray-500 text-[10px] mt-1 tabular-nums">
+          Peak: {tier.threshold}+ cumulative ELO
+        </p>
+      )}
+      <p className="text-gray-500 text-[10px] mt-0.5">Earned {earned}</p>
+    </BadgeTooltip>
+  );
+}
+
+function ScrimActivityBadge({ badge }: { badge: PlayerBadge }) {
+  const meta = getBadgeMeta(badge.badge_type);
+  const tier = SCRIM_ACTIVITY_TIERS.find((t) => t.badgeType === badge.badge_type);
+  const earned = new Date(badge.earned_at).toLocaleDateString();
+
+  return (
+    <BadgeTooltip
+      borderClassName="border-lime-700/40"
+      trigger={
+        <div className="relative group flex-shrink-0 self-start outline-none cursor-default">
+          <BadgeMedalCore
+            meta={meta}
+            size="md"
+            className="border-lime-500/50 shadow-[0_0_14px_rgba(132,204,22,0.25)] transition-transform duration-200 group-hover:scale-105"
+          />
+        </div>
+      }
+    >
+      <p className="font-semibold" style={{ color: meta.accent }}>
+        {meta.label}
+      </p>
+      <p className="text-gray-400 text-[11px] leading-snug mt-0.5">{meta.description}</p>
+      {tier && (
+        <p className="text-gray-500 text-[10px] mt-1 tabular-nums">
+          Tier: {tier.threshold}+ ranked scrims
+        </p>
+      )}
+      <p className="text-gray-500 text-[10px] mt-0.5">Earned {earned}</p>
+    </BadgeTooltip>
+  );
+}
+
 function partitionBadges(badges: PlayerBadge[]) {
   let champion: PlayerBadge | null = null;
   let season1Top10: PlayerBadge | null = null;
@@ -539,7 +613,16 @@ function partitionBadges(badges: PlayerBadge[]) {
   const topFrag: PlayerBadge[] = [];
   const other: PlayerBadge[] = [];
 
+  const scrimActivity = pickScrimActivityBadge(badges);
+  const eloMilestone = pickEloMilestoneBadge(badges);
+
   for (const b of badges) {
+    if (isScrimActivityBadgeType(b.badge_type)) {
+      continue;
+    }
+    if (isEloMilestoneBadgeType(b.badge_type)) {
+      continue;
+    }
     if (b.badge_type === "season_1_champion") {
       if (
         !champion ||
@@ -578,7 +661,20 @@ function partitionBadges(badges: PlayerBadge[]) {
   potato.sort(byEarnedDesc);
   topFrag.sort(byEarnedDesc);
 
-  return { champion, season1Top10, heldFirstPlace, combatPatch, potato, topFrag, other };
+  // Combat patch and scrim activity are mutually exclusive (< 50 vs 50+ ranked scrims).
+  const participationPatch = scrimActivity ? null : combatPatch;
+
+  return {
+    champion,
+    season1Top10,
+    heldFirstPlace,
+    combatPatch: participationPatch,
+    scrimActivity,
+    eloMilestone,
+    potato,
+    topFrag,
+    other,
+  };
 }
 
 function BadgeRack({
@@ -590,8 +686,17 @@ function BadgeRack({
   variant: "panel" | "chest";
   scrimsAtEloFirstPlace?: number | null;
 }) {
-  const { champion, season1Top10, heldFirstPlace, combatPatch, potato, topFrag, other } =
-    partitionBadges(badges);
+  const {
+    champion,
+    season1Top10,
+    heldFirstPlace,
+    combatPatch,
+    scrimActivity,
+    eloMilestone,
+    potato,
+    topFrag,
+    other,
+  } = partitionBadges(badges);
 
   return (
     <div
@@ -609,7 +714,12 @@ function BadgeRack({
           scrimsAtFirstPlace={scrimsAtEloFirstPlace}
         />
       )}
-      {combatPatch && <Season1CombatPatchBadge badge={combatPatch} />}
+      {eloMilestone && <EloMilestoneBadge badge={eloMilestone} />}
+      {scrimActivity ? (
+        <ScrimActivityBadge badge={scrimActivity} />
+      ) : (
+        combatPatch && <Season1CombatPatchBadge badge={combatPatch} />
+      )}
       {other.map((b) => (
         <BadgeMedal key={b.id} badge={b} />
       ))}
@@ -674,7 +784,9 @@ export default function PlayerBadgesRow({
             (b) =>
               b.badge_type !== "season_1_champion" &&
               b.badge_type !== "held_first_place" &&
-              b.badge_type !== "season_1_combat_patch"
+              b.badge_type !== "season_1_combat_patch" &&
+              !isScrimActivityBadgeType(b.badge_type) &&
+              !isEloMilestoneBadgeType(b.badge_type)
           )}
           variant="panel"
         />

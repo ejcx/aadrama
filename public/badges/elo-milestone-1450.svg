@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="ELO 1450">
+  <defs>
+    <linearGradient id="e1450Rim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="40%" stop-color="#facc15"/>
+      <stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+    <linearGradient id="e1450Face" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#422006"/>
+      <stop offset="100%" stop-color="#0c0a09"/>
+    </linearGradient>
+    <linearGradient id="e1450Num" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fffbeb"/>
+      <stop offset="50%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#eab308"/>
+    </linearGradient>
+    <radialGradient id="e1450Glow" cx="50%" cy="35%" r="50%">
+      <stop offset="0%" stop-color="#fef08a" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#fef08a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="46" fill="url(#e1450Glow)"/>
+  <polygon points="50,6 88,26 88,74 50,94 12,74 12,26" fill="#713f12" stroke="url(#e1450Rim)" stroke-width="2.5"/>
+  <polygon points="50,14 80,30 80,70 50,86 20,70 20,30" fill="url(#e1450Face)" stroke="#fde047" stroke-width="1.5"/>
+  <path d="M50 18 L52 26 L60 26 L54 31 L57 39 L50 34 L43 39 L46 31 L40 26 L48 26 Z" fill="#fde047" opacity="0.95"/>
+  <text x="50" y="56" text-anchor="middle" font-family="system-ui,sans-serif" font-size="16" font-weight="800" fill="url(#e1450Num)" letter-spacing="-0.5">1450</text>
+  <text x="50" y="74" text-anchor="middle" font-family="system-ui,sans-serif" font-size="6" font-weight="700" fill="#fef9c3" letter-spacing="1">ELO</text>
+</svg>

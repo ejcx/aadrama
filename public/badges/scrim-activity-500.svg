@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="500 Scrim Activity">
+  <defs>
+    <linearGradient id="sa500Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e9d5ff"/>
+      <stop offset="50%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#6b21a8"/>
+    </linearGradient>
+    <linearGradient id="sa500Rim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f3e8ff"/>
+      <stop offset="100%" stop-color="#7e22ce"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="46" fill="#3b0764" stroke="url(#sa500Rim)" stroke-width="2"/>
+  <circle cx="50" cy="50" r="36" fill="#1e1b4b"/>
+  <path d="M50 20 L58 38 L78 40 L62 52 L67 72 L50 60 L33 72 L38 52 L22 40 L42 38 Z" fill="url(#sa500Grad)"/>
+  <text x="50" y="56" text-anchor="middle" font-family="system-ui,sans-serif" font-size="15" font-weight="800" fill="#e9d5ff">500</text>
+  <text x="50" y="72" text-anchor="middle" font-family="system-ui,sans-serif" font-size="5" font-weight="700" fill="#c4b5fd" letter-spacing="0.6">SCRIMS</text>
+</svg>

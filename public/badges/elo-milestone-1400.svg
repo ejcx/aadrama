@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="ELO 1400">
+  <defs>
+    <linearGradient id="e1400Rim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="45%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+    <linearGradient id="e1400Face" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="e1400Num" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f1f5f9"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+    <radialGradient id="e1400Shine" cx="35%" cy="30%" r="40%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="44" fill="url(#e1400Shine)"/>
+  <polygon points="50,6 88,26 88,74 50,94 12,74 12,26" fill="#334155" stroke="url(#e1400Rim)" stroke-width="2.5"/>
+  <polygon points="50,14 80,30 80,70 50,86 20,70 20,30" fill="url(#e1400Face)" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="50" y="54" text-anchor="middle" font-family="system-ui,sans-serif" font-size="17" font-weight="800" fill="url(#e1400Num)" letter-spacing="-0.5">1400</text>
+  <text x="50" y="72" text-anchor="middle" font-family="system-ui,sans-serif" font-size="6" font-weight="700" fill="#cbd5e1" letter-spacing="1">ELO</text>
+</svg>
