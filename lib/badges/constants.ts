@@ -3,6 +3,7 @@ export const BADGES_GO_FORWARD_CUTOFF = new Date('2026-05-16T00:00:00.000Z')
 
 export const BADGE_TYPES = [
   'potato',
+  'rage_quit',
   'season_1_champion',
   'season_1_top_10',
   'season_1_combat_patch',
@@ -38,6 +39,12 @@ export const BADGE_META: Record<BadgeType, BadgeMeta> = {
     description: 'Voted worst performer by the losing team, or earned with a heroic 1-kill game.',
     src: '/badges/potato.svg',
     accent: '#a06a36',
+  },
+  rage_quit: {
+    label: 'Rage Quit',
+    description: 'Left a scrim early or bailed mid-match. Manually awarded.',
+    src: '/badges/rage-quit.svg',
+    accent: '#ef4444',
   },
   season_1_champion: {
     label: 'Season 1 Champion',
