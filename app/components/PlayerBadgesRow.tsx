@@ -572,6 +572,33 @@ function EloMilestoneBadge({ badge }: { badge: PlayerBadge }) {
   );
 }
 
+function VitalityBadge({ badge }: { badge: PlayerBadge }) {
+  const meta = getBadgeMeta("vitality");
+  const earned = new Date(badge.earned_at).toLocaleDateString();
+
+  return (
+    <BadgeTooltip
+      borderClassName="border-emerald-700/40"
+      trigger={
+        <div className="relative group flex-shrink-0 self-start outline-none cursor-default">
+          <BadgeMedalCore
+            meta={meta}
+            size="md"
+            className="border-emerald-500/50 shadow-[0_0_14px_rgba(74,222,128,0.25)] transition-transform duration-200 group-hover:scale-105"
+          />
+        </div>
+      }
+    >
+      <p className="font-semibold" style={{ color: meta.accent }}>
+        {meta.label}
+      </p>
+      <p className="text-gray-400 text-[11px] leading-snug mt-0.5">{meta.description}</p>
+      <p className="text-gray-500 text-[10px] mt-1 tabular-nums">Streak: 10 scrims unbeaten</p>
+      <p className="text-gray-500 text-[10px] mt-0.5">Earned {earned}</p>
+    </BadgeTooltip>
+  );
+}
+
 function ScrimActivityBadge({ badge }: { badge: PlayerBadge }) {
   const meta = getBadgeMeta(badge.badge_type);
   const tier = SCRIM_ACTIVITY_TIERS.find((t) => t.badgeType === badge.badge_type);
@@ -609,6 +636,7 @@ function partitionBadges(badges: PlayerBadge[]) {
   let season1Top10: PlayerBadge | null = null;
   let heldFirstPlace: PlayerBadge | null = null;
   let combatPatch: PlayerBadge | null = null;
+  let vitality: PlayerBadge | null = null;
   const potato: PlayerBadge[] = [];
   const topFrag: PlayerBadge[] = [];
   const other: PlayerBadge[] = [];
@@ -646,6 +674,8 @@ function partitionBadges(badges: PlayerBadge[]) {
       }
     } else if (b.badge_type === "season_1_combat_patch") {
       combatPatch = b;
+    } else if (b.badge_type === "vitality") {
+      vitality = b;
     } else if (b.badge_type === "potato") {
       potato.push(b);
     } else if (b.badge_type === "scrim_top_frag") {
@@ -669,6 +699,7 @@ function partitionBadges(badges: PlayerBadge[]) {
     season1Top10,
     heldFirstPlace,
     combatPatch: participationPatch,
+    vitality,
     scrimActivity,
     eloMilestone,
     potato,
@@ -691,6 +722,7 @@ function BadgeRack({
     season1Top10,
     heldFirstPlace,
     combatPatch,
+    vitality,
     scrimActivity,
     eloMilestone,
     potato,
@@ -715,6 +747,7 @@ function BadgeRack({
         />
       )}
       {eloMilestone && <EloMilestoneBadge badge={eloMilestone} />}
+      {vitality && <VitalityBadge badge={vitality} />}
       {scrimActivity ? (
         <ScrimActivityBadge badge={scrimActivity} />
       ) : (
