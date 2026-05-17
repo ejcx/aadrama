@@ -1,12 +1,13 @@
 -- Skill-based matchmaking: 50% ELO snake draft, 50% avg kills/scrim snake draft.
 -- Replaces elo_balanced selection mode with skill_based.
 
+-- Drop constraint before backfill: old check disallows skill_based.
+ALTER TABLE public.scrims
+DROP CONSTRAINT IF EXISTS scrims_selection_mode_check;
+
 UPDATE public.scrims
 SET selection_mode = 'skill_based'
 WHERE selection_mode = 'elo_balanced';
-
-ALTER TABLE public.scrims
-DROP CONSTRAINT IF EXISTS scrims_selection_mode_check;
 
 ALTER TABLE public.scrims
 ADD CONSTRAINT scrims_selection_mode_check
