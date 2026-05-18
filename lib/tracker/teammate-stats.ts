@@ -2,19 +2,23 @@ export type RankedGame = {
   gameNameLower: string
   scrimId: string
   result: 'win' | 'loss' | 'draw'
-  /** Rounds scored by the subject's team in this scrim. */
   roundsFor: number
-  /** Rounds scored against the subject's team in this scrim. */
   roundsAgainst: number
   kills: number
   map: string | null
 }
 
+export type TeammateComparisonMode =
+  | 'with'
+  | 'without'
+  | 'against'
+  | 'everyone_but'
+  | 'all_teammates'
+
 export type TeammateComparisonInput = {
   subject: string
   teammate: string
-  mode: 'with' | 'without'
-  /** When set, only ranked scrims on this map count. */
+  mode: TeammateComparisonMode
   map?: string
 }
 
@@ -23,7 +27,7 @@ export type TeammateStatsResult = {
   subjectDisplay: string
   teammate: string
   teammateDisplay: string
-  mode: 'with' | 'without'
+  mode: TeammateComparisonMode
   wins: number
   losses: number
   draws: number
@@ -33,10 +37,89 @@ export type TeammateStatsResult = {
   roundsLost: number
   roundWinPct: number | null
   totalKills: number
-  /** Average kills per ranked scrim in this slice. */
   fragRate: number | null
   map: string | null
   label: string
+}
+
+export function comparisonNeedsFullScrimRoster(mode: TeammateComparisonMode): boolean {
+  return mode === 'everyone_but' || mode === 'all_teammates'
+}
+
+function teamOnScrim(
+  roster: Map<string, Map<string, Set<string>>>,
+  scrimId: string,
+  result: string
+): Set<string> {
+  return roster.get(scrimId)?.get(result) ?? new Set()
+}
+
+function isAgainst(
+  roster: Map<string, Map<string, Set<string>>>,
+  scrimId: string,
+  subjectResult: string,
+  teammate: string
+): boolean {
+  const byResult = roster.get(scrimId)
+  if (!byResult) return false
+  for (const [result, players] of byResult) {
+    if (result !== subjectResult && players.has(teammate)) return true
+  }
+  return false
+}
+
+function gameMatchesComparison(
+  roster: Map<string, Map<string, Set<string>>>,
+  subject: string,
+  teammate: string,
+  mode: TeammateComparisonMode,
+  game: RankedGame
+): boolean {
+  const teammates = teamOnScrim(roster, game.scrimId, game.result)
+  const onTeam = teammates.has(teammate)
+
+  switch (mode) {
+    case 'with':
+      return onTeam
+    case 'without':
+      return !onTeam
+    case 'against':
+      return isAgainst(roster, game.scrimId, game.result, teammate)
+    case 'everyone_but': {
+      if (onTeam) return false
+      const others = [...teammates].filter((p) => p !== subject)
+      return others.length > 0
+    }
+    case 'all_teammates': {
+      const others = [...teammates].filter((p) => p !== subject)
+      return others.length > 0
+    }
+    default:
+      return false
+  }
+}
+
+export function buildComparisonLabel(
+  subjectDisplay: string,
+  teammateDisplay: string,
+  mode: TeammateComparisonMode,
+  map?: string
+): string {
+  const mapSuffix = map ? ` · ${map}` : ''
+  switch (mode) {
+    case 'with':
+      return `${subjectDisplay} with ${teammateDisplay}${mapSuffix}`
+    case 'without':
+      return `${subjectDisplay} without ${teammateDisplay} on team${mapSuffix}`
+    case 'against':
+      return `${subjectDisplay} against ${teammateDisplay}${mapSuffix}`
+    case 'everyone_but':
+      return `${subjectDisplay} with everyone but ${teammateDisplay}${mapSuffix}`
+    case 'all_teammates':
+      return `${subjectDisplay} with any ranked teammate${mapSuffix}`
+    default:
+      return `${subjectDisplay}${mapSuffix}`
+  }
 }
 
 /** Same scrim + same ranked result = teammates (from elo_history). */
@@ -71,7 +154,11 @@ export function computeTeammateStats(
   const display = (lower: string) => displayNames.get(lower) ?? lower
 
   return comparisons
-    .filter((c) => c.subject && c.teammate)
+    .filter(
+      (c) =>
+        c.subject &&
+        (c.mode === 'all_teammates' || c.teammate)
+    )
     .map((c) => {
       const subject = c.subject.toLowerCase()
       const teammate = c.teammate.toLowerCase()
@@ -87,10 +174,17 @@ export function computeTeammateStats(
       for (const g of playerGames) {
         if (c.map && g.map !== c.map) continue
 
-        const onTeam =
-          scrimRoster.get(g.scrimId)?.get(g.result)?.has(teammate) ?? false
-        const include = c.mode === 'with' ? onTeam : !onTeam
-        if (!include) continue
+        if (
+          !gameMatchesComparison(
+            scrimRoster,
+            subject,
+            teammate,
+            c.mode,
+            g
+          )
+        ) {
+          continue
+        }
 
         if (g.result === 'win') wins++
         else if (g.result === 'loss') losses++
@@ -101,38 +195,63 @@ export function computeTeammateStats(
         totalKills += g.kills
       }
 
-      const games = wins + losses + draws
+      const gameCount = wins + losses + draws
       const fragRate =
-        games > 0 ? Math.round((10 * totalKills) / games) / 10 : null
+        gameCount > 0 ? Math.round((10 * totalKills) / gameCount) / 10 : null
       const winPct =
-        wins + losses > 0 ? Math.round((1000 * wins) / (wins + losses)) / 10 : null
+        wins + losses > 0
+          ? Math.round((1000 * wins) / (wins + losses)) / 10
+          : null
       const roundWinPct =
         roundsWon + roundsLost > 0
           ? Math.round((1000 * roundsWon) / (roundsWon + roundsLost)) / 10
           : null
 
-      const modeLabel = c.mode === 'with' ? 'with' : 'without'
-      const mapSuffix = c.map ? ` · ${c.map}` : ''
-      const label = `${display(subject)} ${modeLabel} ${display(teammate)}${mapSuffix}`
+      const subjectDisplay = display(subject)
+      const teammateDisplay =
+        c.mode === 'all_teammates' ? '—' : display(teammate)
 
       return {
         subject,
-        subjectDisplay: display(subject),
+        subjectDisplay,
         teammate,
-        teammateDisplay: display(teammate),
+        teammateDisplay,
         mode: c.mode,
         map: c.map ?? null,
         wins,
         losses,
         draws,
-        games,
+        games: gameCount,
         winPct,
         roundsWon,
         roundsLost,
         roundWinPct,
         totalKills,
         fragRate,
-        label,
+        label: buildComparisonLabel(
+          subjectDisplay,
+          teammateDisplay === '—' ? 'others' : teammateDisplay,
+          c.mode,
+          c.map
+        ),
       }
     })
+}
+
+export function mergeRankedGames(
+  primary: RankedGame[],
+  extra: RankedGame[]
+): RankedGame[] {
+  const seen = new Set(
+    primary.map((g) => `${g.scrimId}:${g.gameNameLower}`)
+  )
+  const merged = [...primary]
+  for (const g of extra) {
+    const key = `${g.scrimId}:${g.gameNameLower}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      merged.push(g)
+    }
+  }
+  return merged
 }

@@ -3,13 +3,20 @@
 import { createClient } from '@/lib/supabase/server'
 import { SEASON_2_START_ISO, season1EloFromChanges } from '@/lib/scrim/seasons'
 import {
+  comparisonNeedsFullScrimRoster,
   computeTeammateStats,
+  mergeRankedGames,
   type RankedGame,
   type TeammateComparisonInput,
+  type TeammateComparisonMode,
   type TeammateStatsResult,
 } from '@/lib/tracker/teammate-stats'
 
-export type { TeammateComparisonInput, TeammateStatsResult }
+export type {
+  TeammateComparisonInput,
+  TeammateComparisonMode,
+  TeammateStatsResult,
+}
 
 function parseTrackerSessionIds(trackerSessionId: string): string[] {
   return trackerSessionId.split(/[+~\s]+/).map((id) => id.trim()).filter(Boolean)
@@ -896,6 +903,61 @@ async function fetchRankedGames(
   return games
 }
 
+/** All ranked players on specific scrims (for everyone-but / all-teammates modes). */
+async function fetchRankedGamesForScrims(
+  season2: boolean,
+  scrimIds: string[]
+): Promise<RankedGame[]> {
+  if (scrimIds.length === 0) return []
+
+  const supabase = await createClient()
+  const pageSize = 1000
+  const games: RankedGame[] = []
+  const scrimChunkSize = 80
+
+  for (let i = 0; i < scrimIds.length; i += scrimChunkSize) {
+    const scrimChunk = scrimIds.slice(i, i + scrimChunkSize)
+
+    for (let from = 0; ; from += pageSize) {
+      let query = supabase
+        .from('elo_history')
+        .select(`
+          game_name_lower,
+          result,
+          scrim_id,
+          team_score,
+          opponent_score,
+          kills,
+          scrims!inner(status, finalized_at, map)
+        `)
+        .eq('scrims.status', 'finalized')
+        .in('scrim_id', scrimChunk)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + pageSize - 1)
+
+      if (season2) {
+        query = query.gte('scrims.finalized_at', SEASON_2_START_ISO)
+      }
+
+      const { data, error } = await query
+      if (error) {
+        throw new Error(`Failed to fetch ranked games for scrims: ${error.message}`)
+      }
+
+      const page = data ?? []
+      for (const row of page) {
+        const game = parseRankedGameRow(row)
+        if (game) games.push(game)
+      }
+
+      if (page.length < pageSize) break
+    }
+  }
+
+  return games
+}
+
 export async function getTeammateStats(
   comparisons: TeammateComparisonInput[],
   options?: { season2?: boolean }
@@ -907,21 +969,38 @@ export async function getTeammateStats(
       mode: c.mode,
       map: c.map?.trim() || undefined,
     }))
-    .filter((c) => c.subject && c.teammate)
+    .filter(
+      (c) =>
+        c.subject && (c.mode === 'all_teammates' || c.teammate)
+    )
 
   if (normalized.length === 0) return []
 
   const playerNames = Array.from(
     new Set(
-      normalized.flatMap((c) => [c.subject, c.teammate])
+      normalized.flatMap((c) =>
+        c.mode === 'all_teammates' ? [c.subject] : [c.subject, c.teammate]
+      )
     )
   )
 
-  const [games, rankedPlayers] = await Promise.all([
-    fetchRankedGames(options?.season2 === true, playerNames),
-    getRankedPlayerOptions(500),
-  ])
+  const season2 = options?.season2 === true
+  let games = await fetchRankedGames(season2, playerNames)
 
+  if (normalized.some((c) => comparisonNeedsFullScrimRoster(c.mode))) {
+    const subjects = new Set(normalized.map((c) => c.subject))
+    const scrimIds = Array.from(
+      new Set(
+        games
+          .filter((g) => subjects.has(g.gameNameLower))
+          .map((g) => g.scrimId)
+      )
+    )
+    const scrimGames = await fetchRankedGamesForScrims(season2, scrimIds)
+    games = mergeRankedGames(games, scrimGames)
+  }
+
+  const rankedPlayers = await getRankedPlayerOptions(500)
   const displayNames = new Map(
     rankedPlayers.map((p) => [p.game_name_lower, p.game_name])
   )
