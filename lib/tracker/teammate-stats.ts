@@ -62,10 +62,13 @@ function isAgainst(
 ): boolean {
   const byResult = roster.get(scrimId)
   if (!byResult) return false
-  for (const [result, players] of byResult) {
-    if (result !== subjectResult && players.has(teammate)) return true
-  }
-  return false
+  let found = false
+  byResult.forEach((players, result) => {
+    if (!found && result !== subjectResult && players.has(teammate)) {
+      found = true
+    }
+  })
+  return found
 }
 
 function gameMatchesComparison(
@@ -87,11 +90,11 @@ function gameMatchesComparison(
       return isAgainst(roster, game.scrimId, game.result, teammate)
     case 'everyone_but': {
       if (onTeam) return false
-      const others = [...teammates].filter((p) => p !== subject)
+      const others = Array.from(teammates).filter((p) => p !== subject)
       return others.length > 0
     }
     case 'all_teammates': {
-      const others = [...teammates].filter((p) => p !== subject)
+      const others = Array.from(teammates).filter((p) => p !== subject)
       return others.length > 0
     }
     default:
