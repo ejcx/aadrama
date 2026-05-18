@@ -1803,8 +1803,32 @@ export async function getScrimRankedStatus(scrimId: string): Promise<{
 // Admin user ID that can recalculate ELO
 const ADMIN_USER_ID = 'user_37oDN0YOSoKb4uypcjhU0Rgodzi'
 
+/** Rebuild cumulative history rows, player_elo, and milestone badges after ELO edits. */
+async function syncPlayersAfterEloHistoryChange(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    gameNamesLower: string[]
+): Promise<void> {
+    const names = Array.from(
+        new Set(gameNamesLower.map((n) => n.toLowerCase()).filter(Boolean))
+    )
+    if (names.length === 0) return
+
+    await supabase.rpc('rebuild_cumulative_elo_history_for_players', {
+        p_game_names_lower: names,
+    })
+
+    for (const name of names) {
+        await supabase.rpc('recalculate_player_elo_from_history', {
+            p_game_name_lower: name,
+        })
+        await supabase.rpc('sync_elo_milestone_badge', {
+            p_game_name_lower: name,
+        })
+    }
+}
+
 // Admin-only: Recalculate ELO for a scrim
-// This reverts the previous ELO changes and recalculates using ELO values as they were at the time
+// Deletes this scrim's history, rebuilds player_elo from remaining games, then reprocesses.
 export async function adminRecalculateElo(scrimId: string): Promise<{
     success: boolean
     error?: string
@@ -1840,42 +1864,21 @@ export async function adminRecalculateElo(scrimId: string): Promise<{
         .eq('scrim_id', scrimId)
     
     const revertedChanges: Array<{ gameName: string; revertedChange: number }> = []
-    
-    // Revert previous ELO changes if they exist
+    const affectedPlayers = new Set(
+        (existingHistory ?? []).map((record) => record.game_name_lower)
+    )
+
     if (existingHistory && existingHistory.length > 0) {
         for (const record of existingHistory) {
-            // Get current ELO for this player
-            const { data: currentElo } = await supabase
-                .from('player_elo')
-                .select('*')
-                .eq('game_name_lower', record.game_name_lower)
-                .single()
-            
-            if (currentElo) {
-                // Revert: subtract the change and adjust win/loss/draw counts
-                await supabase
-                    .from('player_elo')
-                    .update({
-                        elo: currentElo.elo - record.elo_change,
-                        games_played: Math.max(0, currentElo.games_played - 1),
-                        wins: record.result === 'win' ? Math.max(0, currentElo.wins - 1) : currentElo.wins,
-                        losses: record.result === 'loss' ? Math.max(0, currentElo.losses - 1) : currentElo.losses,
-                        draws: record.result === 'draw' ? Math.max(0, currentElo.draws - 1) : currentElo.draws,
-                    })
-                    .eq('game_name_lower', record.game_name_lower)
-                
-                revertedChanges.push({
-                    gameName: record.game_name_lower,
-                    revertedChange: -record.elo_change,
-                })
-            }
+            revertedChanges.push({
+                gameName: record.game_name_lower,
+                revertedChange: -(record.elo_change ?? 0),
+            })
         }
-        
-        // Delete the old ELO history for this scrim
-        await supabase
-            .from('elo_history')
-            .delete()
-            .eq('scrim_id', scrimId)
+
+        await supabase.from('elo_history').delete().eq('scrim_id', scrimId)
+
+        await syncPlayersAfterEloHistoryChange(supabase, Array.from(affectedPlayers))
     }
     
     // Clear ranked_processed_at to allow reprocessing
@@ -1884,12 +1887,25 @@ export async function adminRecalculateElo(scrimId: string): Promise<{
         .update({ ranked_processed_at: null })
         .eq('id', scrimId)
     
-    // Now recalculate ELO fresh
     const result = await processRankedScrim(scrimId)
-    
+
+    if (result.success) {
+        const { data: newHistory } = await supabase
+            .from('elo_history')
+            .select('game_name_lower')
+            .eq('scrim_id', scrimId)
+
+        for (const row of newHistory ?? []) {
+            affectedPlayers.add(row.game_name_lower)
+        }
+
+        await syncPlayersAfterEloHistoryChange(supabase, Array.from(affectedPlayers))
+    }
+
     revalidatePath('/scrim')
     revalidatePath(`/scrim/${scrimId}`)
-    
+    revalidatePath('/tracker/elo')
+
     return {
         success: result.success,
         error: result.error,

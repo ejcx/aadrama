@@ -2,6 +2,14 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { SEASON_2_START_ISO, season1EloFromChanges } from '@/lib/scrim/seasons'
+import {
+  computeTeammateStats,
+  type RankedGame,
+  type TeammateComparisonInput,
+  type TeammateStatsResult,
+} from '@/lib/tracker/teammate-stats'
+
+export type { TeammateComparisonInput, TeammateStatsResult }
 
 function parseTrackerSessionIds(trackerSessionId: string): string[] {
   return trackerSessionId.split(/[+~\s]+/).map((id) => id.trim()).filter(Boolean)
@@ -734,4 +742,189 @@ export async function getPlayerBadges(playerName: string): Promise<PlayerBadge[]
   }
 
   return (byDisplayName || []) as PlayerBadge[]
+}
+
+export interface RankedPlayerOption {
+  game_name: string
+  game_name_lower: string
+  games_played: number
+}
+
+/** Players with at least one ranked (ELO) game — for teammate stats picker. */
+export async function searchRankedPlayers(
+  query: string,
+  limit = 12
+): Promise<RankedPlayerOption[]> {
+  if (!query.trim()) return []
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('player_elo')
+    .select('game_name, game_name_lower, games_played')
+    .ilike('game_name_lower', `%${query.toLowerCase().trim()}%`)
+    .gt('games_played', 0)
+    .order('games_played', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error('Failed to search ranked players:', error.message)
+    return []
+  }
+
+  return data ?? []
+}
+
+/** Resolve typed name to a ranked player (exact lower name, then display name). */
+export async function resolveRankedPlayer(
+  query: string
+): Promise<RankedPlayerOption | null> {
+  const trimmed = query.trim()
+  if (!trimmed) return null
+
+  const supabase = await createClient()
+  const lower = trimmed.toLowerCase()
+
+  const { data: exact } = await supabase
+    .from('player_elo')
+    .select('game_name, game_name_lower, games_played')
+    .eq('game_name_lower', lower)
+    .gt('games_played', 0)
+    .maybeSingle()
+
+  if (exact) return exact
+
+  const { data: byDisplay } = await supabase
+    .from('player_elo')
+    .select('game_name, game_name_lower, games_played')
+    .ilike('game_name', trimmed)
+    .gt('games_played', 0)
+    .order('games_played', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  return byDisplay ?? null
+}
+
+export async function getRankedPlayerOptions(limit = 200): Promise<RankedPlayerOption[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('player_elo')
+    .select('game_name, game_name_lower, games_played')
+    .gt('games_played', 0)
+    .order('games_played', { ascending: false })
+    .limit(limit)
+
+  if (error) throw new Error(`Failed to fetch ranked players: ${error.message}`)
+  return data ?? []
+}
+
+function parseRankedGameRow(row: {
+  game_name_lower: string
+  result: string
+  scrim_id: string
+  team_score: number | null
+  opponent_score: number | null
+  kills: number | null
+  scrims: { map?: string | null } | { map?: string | null }[] | null
+}): RankedGame | null {
+  if (row.result !== 'win' && row.result !== 'loss' && row.result !== 'draw') {
+    return null
+  }
+  const scrimRaw = row.scrims
+  const scrim = Array.isArray(scrimRaw) ? scrimRaw[0] : scrimRaw
+  return {
+    gameNameLower: row.game_name_lower,
+    scrimId: row.scrim_id,
+    result: row.result,
+    roundsFor: row.team_score ?? 0,
+    roundsAgainst: row.opponent_score ?? 0,
+    kills: row.kills ?? 0,
+    map: scrim?.map ?? null,
+  }
+}
+
+/** Paginated elo_history fetch (Supabase caps at 1000 rows per request). */
+async function fetchRankedGames(
+  season2: boolean,
+  playerNamesLower: string[]
+): Promise<RankedGame[]> {
+  const supabase = await createClient()
+  const pageSize = 1000
+  const games: RankedGame[] = []
+  const uniqueNames = Array.from(
+    new Set(playerNamesLower.map((n) => n.toLowerCase().trim()).filter(Boolean))
+  )
+
+  for (let from = 0; ; from += pageSize) {
+    let query = supabase
+      .from('elo_history')
+      .select(`
+        game_name_lower,
+        result,
+        scrim_id,
+        team_score,
+        opponent_score,
+        kills,
+        scrims!inner(status, finalized_at, map)
+      `)
+      .eq('scrims.status', 'finalized')
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1)
+
+    if (uniqueNames.length > 0) {
+      query = query.in('game_name_lower', uniqueNames)
+    }
+
+    if (season2) {
+      query = query.gte('scrims.finalized_at', SEASON_2_START_ISO)
+    }
+
+    const { data, error } = await query
+
+    if (error) throw new Error(`Failed to fetch ranked games: ${error.message}`)
+
+    const page = data ?? []
+    for (const row of page) {
+      const game = parseRankedGameRow(row)
+      if (game) games.push(game)
+    }
+
+    if (page.length < pageSize) break
+  }
+
+  return games
+}
+
+export async function getTeammateStats(
+  comparisons: TeammateComparisonInput[],
+  options?: { season2?: boolean }
+): Promise<TeammateStatsResult[]> {
+  const normalized = comparisons
+    .map((c) => ({
+      subject: c.subject.trim().toLowerCase(),
+      teammate: c.teammate.trim().toLowerCase(),
+      mode: c.mode,
+      map: c.map?.trim() || undefined,
+    }))
+    .filter((c) => c.subject && c.teammate)
+
+  if (normalized.length === 0) return []
+
+  const playerNames = Array.from(
+    new Set(
+      normalized.flatMap((c) => [c.subject, c.teammate])
+    )
+  )
+
+  const [games, rankedPlayers] = await Promise.all([
+    fetchRankedGames(options?.season2 === true, playerNames),
+    getRankedPlayerOptions(500),
+  ])
+
+  const displayNames = new Map(
+    rankedPlayers.map((p) => [p.game_name_lower, p.game_name])
+  )
+
+  return computeTeammateStats(games, displayNames, normalized)
 }
