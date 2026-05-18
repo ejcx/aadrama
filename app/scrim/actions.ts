@@ -13,6 +13,11 @@ import {
   tryAwardPotatoFromVotes,
   type ScrimPlayerKillStats,
 } from '@/lib/badges/process-scrim'
+import {
+  isSeason2Scrim,
+  SEASON_2_START_ISO,
+  season1EloFromChanges,
+} from '@/lib/scrim/seasons'
 
 // Get current user info from Clerk
 async function getCurrentUser() {
@@ -1488,8 +1493,36 @@ export async function processRankedScrim(scrimId: string): Promise<{
 
     const eloMap = new Map(eloRecords?.map(e => [e.game_name_lower, e]) || [])
 
-    // Calculate average ELO for each team
-    const getPlayerElo = (gameNameLower: string) => eloMap.get(gameNameLower)?.elo || 1200
+    const useSeason2Elo = isSeason2Scrim(scrim.finalized_at)
+    const season2EloMap = new Map<string, number>()
+    if (useSeason2Elo) {
+        const { data: season2History, error: season2Error } = await supabase
+            .from('elo_history')
+            .select('game_name_lower, elo_change, scrims!inner(finalized_at)')
+            .in('game_name_lower', allGameNames)
+            .gte('scrims.finalized_at', SEASON_2_START_ISO)
+
+        if (season2Error) {
+            console.error('Failed to fetch Season 2 ELO for team averages:', season2Error)
+        } else {
+            const changeSum = new Map<string, number>()
+            for (const row of season2History || []) {
+                const key = row.game_name_lower
+                changeSum.set(key, (changeSum.get(key) ?? 0) + (row.elo_change ?? 0))
+            }
+            for (const [key, sum] of changeSum) {
+                season2EloMap.set(key, season1EloFromChanges(sum))
+            }
+        }
+    }
+
+    // Calculate average ELO for each team (Season 2 scrims use 1200 + prior S2 changes)
+    const getPlayerElo = (gameNameLower: string) => {
+        if (useSeason2Elo) {
+            return season2EloMap.get(gameNameLower) ?? 1200
+        }
+        return eloMap.get(gameNameLower)?.elo || 1200
+    }
 
     const teamAAvgElo = teamAPlayers.length > 0
         ? Math.round(teamAPlayers.reduce((sum, p) => sum + getPlayerElo(p.gameNameLower!), 0) / teamAPlayers.length)

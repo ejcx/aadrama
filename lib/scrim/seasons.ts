@@ -10,3 +10,9 @@ const ELO_BASE = 1200
 export function season1EloFromChanges(eloChangeSum: number): number {
   return ELO_BASE + eloChangeSum
 }
+
+/** True when a finalized scrim counts toward Season 2 ranked ELO. */
+export function isSeason2Scrim(finalizedAt: string | null | undefined): boolean {
+  if (!finalizedAt) return false
+  return new Date(finalizedAt).getTime() >= new Date(SEASON_2_START_ISO).getTime()
+}
