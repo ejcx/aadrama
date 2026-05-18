@@ -1510,9 +1510,9 @@ export async function processRankedScrim(scrimId: string): Promise<{
                 const key = row.game_name_lower
                 changeSum.set(key, (changeSum.get(key) ?? 0) + (row.elo_change ?? 0))
             }
-            for (const [key, sum] of changeSum) {
+            changeSum.forEach((sum, key) => {
                 season2EloMap.set(key, season1EloFromChanges(sum))
-            }
+            })
         }
     }
 
