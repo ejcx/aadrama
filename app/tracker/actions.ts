@@ -271,14 +271,22 @@ async function getSeasonEloLeaderboard(
   if (agg.size === 0) return []
 
   const gameNames = Array.from(agg.keys())
-  const { data: eloRecords, error: namesError } = await supabase
-    .from('player_elo')
-    .select('game_name, game_name_lower')
-    .in('game_name_lower', gameNames)
+  const nameMap = new Map<string, string>()
+  const nameChunkSize = 100
+  for (let i = 0; i < gameNames.length; i += nameChunkSize) {
+    const chunk = gameNames.slice(i, i + nameChunkSize)
+    const { data: eloRecords, error: namesError } = await supabase
+      .from('player_elo')
+      .select('game_name, game_name_lower')
+      .in('game_name_lower', chunk)
 
-  if (namesError) throw new Error(`Failed to fetch player names: ${namesError.message}`)
-
-  const nameMap = new Map(eloRecords?.map((r) => [r.game_name_lower, r.game_name]) || [])
+    if (namesError) {
+      throw new Error(`Failed to fetch player names: ${namesError.message}`)
+    }
+    for (const r of eloRecords || []) {
+      nameMap.set(r.game_name_lower, r.game_name)
+    }
+  }
   const kdMap = await getRankedScrimKdStats(Array.from(scrimIds), gameNames)
 
   const results: EloLeaderboardRow[] = Array.from(agg.entries()).map(([gameNameLower, stats]) => {
@@ -314,65 +322,100 @@ export async function getSeason2EloLeaderboard(limit = 100): Promise<EloLeaderbo
   return getSeasonEloLeaderboard(2, limit)
 }
 
-async function getSeasonScrimKdStats(
-  season: 1 | 2,
-  gameNamesLower?: string[]
-): Promise<Map<string, { total_kills: number; total_deaths: number; kd_ratio: number }>> {
-  const supabase = await createClient()
-  const result = new Map<string, { total_kills: number; total_deaths: number; kd_ratio: number }>()
-
-  let scrimsQuery = supabase
-    .from('scrims')
-    .select('tracker_session_id')
-    .eq('status', 'finalized')
-    .not('tracker_session_id', 'is', null)
-
-  scrimsQuery =
-    season === 1
-      ? scrimsQuery.lt('finalized_at', SEASON_2_START_ISO)
-      : scrimsQuery.gte('finalized_at', SEASON_2_START_ISO)
-
-  const { data: scrims, error: scrimsError } = await scrimsQuery
-
-  if (scrimsError) {
-    console.error(`Failed to fetch Season ${season} scrims for K/D:`, scrimsError.message)
-    return result
-  }
-
+async function getTrackerSessionIdsForScrims(
+  scrimIds: string[]
+): Promise<Set<string>> {
   const sessionIds = new Set<string>()
-  for (const scrim of scrims || []) {
-    if (!scrim.tracker_session_id) continue
-    for (const id of parseTrackerSessionIds(scrim.tracker_session_id)) {
-      sessionIds.add(id)
+  if (scrimIds.length === 0) return sessionIds
+
+  const supabase = await createClient()
+  const uniqueIds = Array.from(new Set(scrimIds))
+
+  for (let i = 0; i < uniqueIds.length; i += SCRIM_ID_CHUNK) {
+    const chunk = uniqueIds.slice(i, i + SCRIM_ID_CHUNK)
+    const { data, error } = await supabase
+      .from('scrims')
+      .select('tracker_session_id')
+      .in('id', chunk)
+      .not('tracker_session_id', 'is', null)
+
+    if (error) {
+      console.error('Failed to fetch scrim tracker sessions:', error.message)
+      continue
+    }
+
+    for (const scrim of data || []) {
+      if (!scrim.tracker_session_id) continue
+      for (const id of parseTrackerSessionIds(scrim.tracker_session_id)) {
+        sessionIds.add(id)
+      }
     }
   }
 
-  if (sessionIds.size === 0) return result
+  return sessionIds
+}
 
-  const { data: stats, error: statsError } = await supabase
-    .from('player_stats')
-    .select('name, kills, deaths')
-    .in('session_id', Array.from(sessionIds))
+async function aggregatePlayerStatsKd(
+  sessionIds: Set<string>,
+  allowedPlayers: Set<string> | null
+): Promise<Map<string, { kills: number; deaths: number }>> {
+  const agg = new Map<string, { kills: number; deaths: number }>()
+  const list = Array.from(sessionIds)
+  if (list.length === 0) return agg
 
-  if (statsError) {
-    console.error(`Failed to fetch Season ${season} player stats:`, statsError.message)
-    return result
+  const supabase = await createClient()
+
+  for (let i = 0; i < list.length; i += SESSION_ID_CHUNK) {
+    const sessionChunk = list.slice(i, i + SESSION_ID_CHUNK)
+
+    for (let from = 0; ; from += ELO_HISTORY_PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from('player_stats')
+        .select('name, kills, deaths')
+        .in('session_id', sessionChunk)
+        .order('session_id', { ascending: true })
+        .order('time', { ascending: true })
+        .range(from, from + ELO_HISTORY_PAGE_SIZE - 1)
+
+      if (error) {
+        console.error('Failed to fetch player_stats K/D:', error.message)
+        break
+      }
+
+      const page = data ?? []
+      for (const row of page) {
+        const key = row.name.toLowerCase()
+        if (allowedPlayers && !allowedPlayers.has(key)) continue
+        const existing = agg.get(key) || { kills: 0, deaths: 0 }
+        existing.kills += row.kills ?? 0
+        existing.deaths += row.deaths ?? 0
+        agg.set(key, existing)
+      }
+
+      if (page.length < ELO_HISTORY_PAGE_SIZE) break
+    }
   }
 
+  return agg
+}
+
+/** K/D from tracker sessions for specific ranked scrims (paginated; avoids 1000-row cap). */
+async function getRankedScrimKdStats(
+  scrimIds: string[],
+  gameNamesLower?: string[]
+): Promise<Map<string, { total_kills: number; total_deaths: number; kd_ratio: number }>> {
+  const result = new Map<
+    string,
+    { total_kills: number; total_deaths: number; kd_ratio: number }
+  >()
+
+  const sessionIds = await getTrackerSessionIdsForScrims(scrimIds)
   const allowed =
     gameNamesLower && gameNamesLower.length > 0
-      ? new Set(gameNamesLower)
+      ? new Set(gameNamesLower.map((n) => n.toLowerCase()))
       : null
 
-  const agg = new Map<string, { kills: number; deaths: number }>()
-  for (const row of stats || []) {
-    const key = row.name.toLowerCase()
-    if (allowed && !allowed.has(key)) continue
-    const existing = agg.get(key) || { kills: 0, deaths: 0 }
-    existing.kills += row.kills ?? 0
-    existing.deaths += row.deaths ?? 0
-    agg.set(key, existing)
-  }
+  const agg = await aggregatePlayerStatsKd(sessionIds, allowed)
 
   for (const [key, { kills, deaths }] of Array.from(agg.entries())) {
     result.set(key, {
