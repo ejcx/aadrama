@@ -134,16 +134,29 @@ export async function getEloChanges7Days(gameNames: string[]) {
 
 export type EloLeaderboardRow = Awaited<ReturnType<typeof getEloLeaderboard>>[number]
 
-/** Season 2 leaderboard: 1200 + sum(elo_change) and W-L-D from ranked games since season start. */
-export async function getSeason2EloLeaderboard(limit = 100): Promise<EloLeaderboardRow[]> {
+/** Season leaderboard: 1200 + sum(elo_change) and W-L-D for ranked games in that season. */
+async function getSeasonEloLeaderboard(
+  season: 1 | 2,
+  limit: number
+): Promise<EloLeaderboardRow[]> {
   const supabase = await createClient()
 
-  const { data: history, error } = await supabase
+  let historyQuery = supabase
     .from('elo_history')
     .select('game_name_lower, elo_change, result, kills')
-    .gte('created_at', SEASON_2_START_ISO)
 
-  if (error) throw new Error(`Failed to fetch Season 2 ELO history: ${error.message}`)
+  historyQuery =
+    season === 1
+      ? historyQuery.lt('created_at', SEASON_2_START_ISO)
+      : historyQuery.gte('created_at', SEASON_2_START_ISO)
+
+  const { data: history, error } = await historyQuery
+
+  if (error) {
+    throw new Error(
+      `Failed to fetch Season ${season} ELO history: ${error.message}`
+    )
+  }
 
   const agg = new Map<
     string,
@@ -177,7 +190,7 @@ export async function getSeason2EloLeaderboard(limit = 100): Promise<EloLeaderbo
   if (namesError) throw new Error(`Failed to fetch player names: ${namesError.message}`)
 
   const nameMap = new Map(eloRecords?.map((r) => [r.game_name_lower, r.game_name]) || [])
-  const kdMap = await getSeason2ScrimKdStats(gameNames)
+  const kdMap = await getSeasonScrimKdStats(season, gameNames)
 
   const results: EloLeaderboardRow[] = Array.from(agg.entries()).map(([gameNameLower, stats]) => {
     const kd = kdMap.get(gameNameLower)
@@ -185,7 +198,7 @@ export async function getSeason2EloLeaderboard(limit = 100): Promise<EloLeaderbo
     return {
       game_name: nameMap.get(gameNameLower) || gameNameLower,
       game_name_lower: gameNameLower,
-      elo: 1200 + stats.eloSum,
+      elo: season1EloFromChanges(stats.eloSum),
       games_played: gamesPlayed,
       wins: stats.wins,
       losses: stats.losses,
@@ -200,21 +213,38 @@ export async function getSeason2EloLeaderboard(limit = 100): Promise<EloLeaderbo
   return results.slice(0, limit)
 }
 
-async function getSeason2ScrimKdStats(
+/** Frozen Season 1 leaderboard (ranked games before Season 2 start). */
+export async function getSeason1EloLeaderboard(limit = 100): Promise<EloLeaderboardRow[]> {
+  return getSeasonEloLeaderboard(1, limit)
+}
+
+/** Season 2 leaderboard: 1200 + sum(elo_change) and W-L-D from ranked games since season start. */
+export async function getSeason2EloLeaderboard(limit = 100): Promise<EloLeaderboardRow[]> {
+  return getSeasonEloLeaderboard(2, limit)
+}
+
+async function getSeasonScrimKdStats(
+  season: 1 | 2,
   gameNamesLower?: string[]
 ): Promise<Map<string, { total_kills: number; total_deaths: number; kd_ratio: number }>> {
   const supabase = await createClient()
   const result = new Map<string, { total_kills: number; total_deaths: number; kd_ratio: number }>()
 
-  const { data: scrims, error: scrimsError } = await supabase
+  let scrimsQuery = supabase
     .from('scrims')
     .select('tracker_session_id')
     .eq('status', 'finalized')
-    .gte('finalized_at', SEASON_2_START_ISO)
     .not('tracker_session_id', 'is', null)
 
+  scrimsQuery =
+    season === 1
+      ? scrimsQuery.lt('finalized_at', SEASON_2_START_ISO)
+      : scrimsQuery.gte('finalized_at', SEASON_2_START_ISO)
+
+  const { data: scrims, error: scrimsError } = await scrimsQuery
+
   if (scrimsError) {
-    console.error('Failed to fetch Season 2 scrims for K/D:', scrimsError.message)
+    console.error(`Failed to fetch Season ${season} scrims for K/D:`, scrimsError.message)
     return result
   }
 
@@ -234,7 +264,7 @@ async function getSeason2ScrimKdStats(
     .in('session_id', Array.from(sessionIds))
 
   if (statsError) {
-    console.error('Failed to fetch Season 2 player stats:', statsError.message)
+    console.error(`Failed to fetch Season ${season} player stats:`, statsError.message)
     return result
   }
 
@@ -461,7 +491,10 @@ export async function getPlayerRank(playerName: string) {
 }
 
 // Get maps that have been played in ranked scrims (for ELO filtering)
-export async function getRankedScrimMaps(options?: { season2?: boolean }) {
+export async function getRankedScrimMaps(options?: {
+  season1?: boolean
+  season2?: boolean
+}) {
   const supabase = await createClient()
 
   let query = supabase
@@ -471,7 +504,9 @@ export async function getRankedScrimMaps(options?: { season2?: boolean }) {
     .eq('status', 'finalized')
     .eq('is_ranked', true)
 
-  if (options?.season2) {
+  if (options?.season1) {
+    query = query.lt('finalized_at', SEASON_2_START_ISO)
+  } else if (options?.season2) {
     query = query.gte('finalized_at', SEASON_2_START_ISO)
   }
 
@@ -651,7 +686,7 @@ export async function getPlayerMapEloHistory(
 
 export async function getPlayerStatsByMap(
   map: string,
-  options?: { season2?: boolean }
+  options?: { season1?: boolean; season2?: boolean }
 ): Promise<MapPlayerStats[]> {
   const supabase = await createClient()
 
@@ -665,7 +700,9 @@ export async function getPlayerStatsByMap(
     `)
     .eq('scrims.map', map)
 
-  if (options?.season2) {
+  if (options?.season1) {
+    query = query.lt('created_at', SEASON_2_START_ISO)
+  } else if (options?.season2) {
     query = query.gte('created_at', SEASON_2_START_ISO)
   }
 
