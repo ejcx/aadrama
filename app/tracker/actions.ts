@@ -33,26 +33,84 @@ function computeFragsPerScrim(kills: number, games: number): number | null {
   return Math.round((10 * kills) / games) / 10
 }
 
+const ELO_HISTORY_PAGE_SIZE = 1000
+
+type EloHistoryAggRow = {
+  game_name_lower: string
+  elo_change: number | null
+  result: string
+  kills: number | null
+}
+
+/** Paginated elo_history fetch (Supabase caps at 1000 rows per request). */
+async function fetchSeasonEloHistory(season: 1 | 2): Promise<EloHistoryAggRow[]> {
+  const supabase = await createClient()
+  const rows: EloHistoryAggRow[] = []
+
+  for (let from = 0; ; from += ELO_HISTORY_PAGE_SIZE) {
+    let query = supabase
+      .from('elo_history')
+      .select('game_name_lower, elo_change, result, kills')
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + ELO_HISTORY_PAGE_SIZE - 1)
+
+    query =
+      season === 1
+        ? query.lt('created_at', SEASON_2_START_ISO)
+        : query.gte('created_at', SEASON_2_START_ISO)
+
+    const { data, error } = await query
+
+    if (error) {
+      throw new Error(
+        `Failed to fetch Season ${season} ELO history: ${error.message}`
+      )
+    }
+
+    const page = (data ?? []) as EloHistoryAggRow[]
+    rows.push(...page)
+    if (page.length < ELO_HISTORY_PAGE_SIZE) break
+  }
+
+  return rows
+}
+
 async function getRankedKillsByPlayer(
   gameNames: string[]
 ): Promise<Map<string, number>> {
   const result = new Map<string, number>()
   if (gameNames.length === 0) return result
 
+  const names = Array.from(
+    new Set(gameNames.map((n) => n.toLowerCase().trim()).filter(Boolean))
+  )
   const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('elo_history')
-    .select('game_name_lower, kills')
-    .in('game_name_lower', gameNames)
 
-  if (error) {
-    console.error('Failed to fetch ranked kills:', error.message)
-    return result
-  }
+  try {
+    for (let from = 0; ; from += ELO_HISTORY_PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from('elo_history')
+        .select('game_name_lower, kills')
+        .in('game_name_lower', names)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + ELO_HISTORY_PAGE_SIZE - 1)
 
-  for (const row of data || []) {
-    const key = row.game_name_lower
-    result.set(key, (result.get(key) ?? 0) + (row.kills ?? 0))
+      if (error) {
+        console.error('Failed to fetch ranked kills:', error.message)
+        break
+      }
+
+      const page = data ?? []
+      for (const row of page) {
+        const key = row.game_name_lower
+        result.set(key, (result.get(key) ?? 0) + (row.kills ?? 0))
+      }
+      if (page.length < ELO_HISTORY_PAGE_SIZE) break
+    }
+  } catch (err) {
+    console.error('Failed to fetch ranked kills:', err)
   }
 
   return result
@@ -176,30 +234,14 @@ async function getSeasonEloLeaderboard(
   limit: number
 ): Promise<EloLeaderboardRow[]> {
   const supabase = await createClient()
-
-  let historyQuery = supabase
-    .from('elo_history')
-    .select('game_name_lower, elo_change, result, kills')
-
-  historyQuery =
-    season === 1
-      ? historyQuery.lt('created_at', SEASON_2_START_ISO)
-      : historyQuery.gte('created_at', SEASON_2_START_ISO)
-
-  const { data: history, error } = await historyQuery
-
-  if (error) {
-    throw new Error(
-      `Failed to fetch Season ${season} ELO history: ${error.message}`
-    )
-  }
+  const history = await fetchSeasonEloHistory(season)
 
   const agg = new Map<
     string,
     { wins: number; losses: number; draws: number; eloSum: number; kills: number }
   >()
 
-  for (const row of history || []) {
+  for (const row of history) {
     const existing = agg.get(row.game_name_lower) || {
       wins: 0,
       losses: 0,
@@ -728,30 +770,46 @@ export async function getPlayerStatsByMap(
 ): Promise<MapPlayerStats[]> {
   const supabase = await createClient()
 
-  let query = supabase
-    .from('elo_history')
-    .select(`
-      game_name_lower,
-      result,
-      elo_change,
-      scrims!inner(map, finalized_at)
-    `)
-    .eq('scrims.map', map)
-
-  if (options?.season1) {
-    query = query.lt('created_at', SEASON_2_START_ISO)
-  } else if (options?.season2) {
-    query = query.gte('created_at', SEASON_2_START_ISO)
+  type MapHistoryRow = {
+    game_name_lower: string
+    result: string
+    elo_change: number | null
   }
 
-  const { data, error } = await query
+  const data: MapHistoryRow[] = []
+  for (let from = 0; ; from += ELO_HISTORY_PAGE_SIZE) {
+    let query = supabase
+      .from('elo_history')
+      .select(`
+        game_name_lower,
+        result,
+        elo_change,
+        scrims!inner(map, finalized_at)
+      `)
+      .eq('scrims.map', map)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + ELO_HISTORY_PAGE_SIZE - 1)
 
-  if (error) throw new Error(`Failed to fetch map stats: ${error.message}`)
+    if (options?.season1) {
+      query = query.lt('created_at', SEASON_2_START_ISO)
+    } else if (options?.season2) {
+      query = query.gte('created_at', SEASON_2_START_ISO)
+    }
+
+    const { data: page, error } = await query
+
+    if (error) throw new Error(`Failed to fetch map stats: ${error.message}`)
+
+    const rows = (page ?? []) as MapHistoryRow[]
+    data.push(...rows)
+    if (rows.length < ELO_HISTORY_PAGE_SIZE) break
+  }
 
   // Aggregate stats per player
   const playerMap = new Map<string, { wins: number; losses: number; draws: number; eloSum: number }>()
   
-  for (const record of data || []) {
+  for (const record of data) {
     const existing = playerMap.get(record.game_name_lower) || { wins: 0, losses: 0, draws: 0, eloSum: 0 }
     if (record.result === 'win') existing.wins++
     else if (record.result === 'loss') existing.losses++
