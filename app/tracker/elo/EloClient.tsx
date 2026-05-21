@@ -2,10 +2,15 @@
 
 import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
-import { SEASON_2_LABEL } from "@/lib/scrim/seasons";
+import {
+  SEASON_1_END_DISPLAY,
+  SEASON_1_LABEL,
+  SEASON_2_LABEL,
+} from "@/lib/scrim/seasons";
 import {
   getEloLeaderboard,
   getEloChanges7Days,
+  getSeason1EloLeaderboard,
   getSeason2EloLeaderboard,
   getSeason2EloChanges7Days,
   getRankedScrimMaps,
@@ -13,7 +18,7 @@ import {
   type MapPlayerStats,
 } from "../actions";
 
-type SeasonView = "all" | "season2";
+type SeasonView = "cumulative" | "season1" | "season2";
 
 interface EloPlayer {
   game_name: string;
@@ -28,6 +33,7 @@ interface EloPlayer {
   total_kills: number;
   total_deaths: number;
   kd_ratio: number;
+  frags_per_scrim: number | null;
 }
 
 interface InitialData {
@@ -37,10 +43,11 @@ interface InitialData {
 
 async function buildEloPlayers(
   records: Awaited<ReturnType<typeof getEloLeaderboard>>,
-  fetchChanges: (names: string[]) => Promise<{ game_name_lower: string; elo_change: number }[]>
+  fetchChanges?: (names: string[]) => Promise<{ game_name_lower: string; elo_change: number }[]>
 ): Promise<EloPlayer[]> {
   const gameNames = records.map((p) => p.game_name_lower);
-  const historyRecords = gameNames.length > 0 ? await fetchChanges(gameNames) : [];
+  const historyRecords =
+    fetchChanges && gameNames.length > 0 ? await fetchChanges(gameNames) : [];
 
   const changeMap = new Map<string, { change: number; matches: number }>();
   for (const record of historyRecords) {
@@ -64,11 +71,24 @@ async function buildEloPlayers(
     total_kills: p.total_kills,
     total_deaths: p.total_deaths,
     kd_ratio: p.kd_ratio,
+    frags_per_scrim: p.frags_per_scrim ?? null,
   }));
 }
 
+function seasonMapOptions(view: SeasonView) {
+  if (view === "season1") return { season1: true as const };
+  if (view === "season2") return { season2: true as const };
+  return {};
+}
+
+async function fetchLeaderboard(view: SeasonView, limit: number) {
+  if (view === "season1") return getSeason1EloLeaderboard(limit);
+  if (view === "season2") return getSeason2EloLeaderboard(limit);
+  return getEloLeaderboard(limit);
+}
+
 export default function EloClient({ initialData }: { initialData: InitialData }) {
-  const [seasonView, setSeasonView] = useState<SeasonView>("all");
+  const [seasonView, setSeasonView] = useState<SeasonView>("cumulative");
   const [selectedMap, setSelectedMap] = useState<string>("");
   const [maps, setMaps] = useState<string[]>(initialData.maps);
   const [eloPlayers, setEloPlayers] = useState<EloPlayer[]>(initialData.eloPlayers);
@@ -87,12 +107,16 @@ export default function EloClient({ initialData }: { initialData: InitialData })
     startTransition(async () => {
       try {
         const [records, mapList] = await Promise.all([
-          view === "season2" ? getSeason2EloLeaderboard(100) : getEloLeaderboard(100),
-          getRankedScrimMaps({ season2: view === "season2" }),
+          fetchLeaderboard(view, 100),
+          getRankedScrimMaps(seasonMapOptions(view)),
         ]);
         const players = await buildEloPlayers(
           records,
-          view === "season2" ? getSeason2EloChanges7Days : getEloChanges7Days
+          view === "cumulative"
+            ? getEloChanges7Days
+            : view === "season2"
+              ? getSeason2EloChanges7Days
+              : undefined
         );
         setEloPlayers(players);
         setMaps(mapList);
@@ -104,7 +128,6 @@ export default function EloClient({ initialData }: { initialData: InitialData })
     });
   };
 
-  // Load map stats when map is selected
   useEffect(() => {
     if (!selectedMap) {
       setMapStats(null);
@@ -112,7 +135,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
     }
 
     setLoading(true);
-    getPlayerStatsByMap(selectedMap, { season2: seasonView === "season2" })
+    getPlayerStatsByMap(selectedMap, seasonMapOptions(seasonView))
       .then((stats) => {
         setMapStats(stats);
       })
@@ -126,48 +149,73 @@ export default function EloClient({ initialData }: { initialData: InitialData })
   }, [selectedMap, seasonView]);
 
   const tableLoading = loading || seasonLoading || isPending;
+  const show7DayChange = seasonView !== "season1";
+  const isFrozenSeason1 = seasonView === "season1";
 
   return (
     <div className="space-y-4">
-      {/* Season toggle */}
       <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <span className="text-gray-300 text-sm font-medium">Leaderboard:</span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => switchSeason("all")}
-              disabled={tableLoading}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                seasonView === "all"
-                  ? "bg-white text-black"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
-              }`}
-            >
-              All time
-            </button>
-            <button
-              type="button"
-              onClick={() => switchSeason("season2")}
-              disabled={tableLoading}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                seasonView === "season2"
-                  ? "bg-purple-600 text-white"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
-              }`}
-            >
-              {SEASON_2_LABEL}
-            </button>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <span className="text-gray-300 text-sm font-medium">Leaderboard:</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => switchSeason("cumulative")}
+                disabled={tableLoading}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  seasonView === "cumulative"
+                    ? "bg-white text-black"
+                    : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+                }`}
+              >
+                Cumulative
+              </button>
+              <button
+                type="button"
+                onClick={() => switchSeason("season2")}
+                disabled={tableLoading}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  seasonView === "season2"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+                }`}
+              >
+                {SEASON_2_LABEL}
+              </button>
+              <button
+                type="button"
+                onClick={() => switchSeason("season1")}
+                disabled={tableLoading}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  seasonView === "season1"
+                    ? "bg-amber-600 text-white"
+                    : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+                }`}
+              >
+                {SEASON_1_LABEL}
+              </button>
+            </div>
           </div>
           {seasonView === "season2" && (
-            <span className="text-purple-300 text-sm">
-              Ranked games since May 16, 2026 · fresh ELO from 1200
-            </span>
+            <p className="text-purple-300 text-sm">
+              Ranked games since {SEASON_1_END_DISPLAY} · fresh ELO from 1200
+            </p>
+          )}
+          {seasonView === "season1" && (
+            <p className="text-amber-200/90 text-sm">
+              Final standings through {SEASON_1_END_DISPLAY} · frozen (no longer
+              updating)
+            </p>
+          )}
+          {seasonView === "cumulative" && (
+            <p className="text-gray-400 text-sm">
+              Lifetime ranked ELO across all seasons (continues to update)
+            </p>
           )}
         </div>
       </div>
 
-      {/* Map Filter */}
       <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <label className="text-gray-300 text-sm font-medium">Filter by Map:</label>
@@ -186,29 +234,31 @@ export default function EloClient({ initialData }: { initialData: InitialData })
           {selectedMap && (
             <span className="text-cyan-400 text-sm">
               🗺️ Showing stats for {selectedMap}
+              {isFrozenSeason1 ? ` (${SEASON_1_LABEL})` : ""}
             </span>
           )}
         </div>
         {selectedMap && (
           <p className="text-gray-400 text-xs mt-2">
-            Note: Map ELO is calculated as 1200 + sum of all ELO changes from scrims on this map.
+            Note: Map ELO is calculated as 1200 + sum of all ELO changes from scrims on
+            this map
+            {isFrozenSeason1 ? ` before ${SEASON_1_END_DISPLAY}` : ""}.
           </p>
         )}
       </div>
 
-      {/* Loading State */}
       {tableLoading && (
         <div className="bg-gray-900 border border-gray-700 rounded-lg p-8 text-center text-gray-400">
           {seasonLoading || isPending ? "Loading leaderboard..." : "Loading map statistics..."}
         </div>
       )}
 
-      {/* Map-Specific Stats Table */}
       {!tableLoading && selectedMap && mapStats && (
         <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
           {mapStats.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
               No ranked games found on {selectedMap}
+              {isFrozenSeason1 ? ` in ${SEASON_1_LABEL}` : ""}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -291,27 +341,35 @@ export default function EloClient({ initialData }: { initialData: InitialData })
         </div>
       )}
 
-      {/* Overall ELO Table (when no map selected) */}
       {!tableLoading && !selectedMap && (
         <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
           {eloPlayers.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
               {seasonView === "season2"
                 ? "No Season 2 ranked games yet. Play some scrims to get on the leaderboard!"
-                : "No ranked players yet. Play some scrims to get on the leaderboard!"}
+                : seasonView === "season1"
+                  ? "No Season 1 ranked games found."
+                  : "No ranked players yet. Play some scrims to get on the leaderboard!"}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-white text-xs sm:text-sm min-w-[800px]">
+              <table
+                className={`w-full text-white text-xs sm:text-sm ${
+                  show7DayChange ? "min-w-[880px]" : "min-w-[780px]"
+                }`}
+              >
                 <thead>
                   <tr className="border-b border-gray-700 bg-gray-800">
                     <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Rank</th>
                     <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Player</th>
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">ELO</th>
-                    <th className="text-center py-2 sm:py-3 px-2 sm:px-4">7d Change</th>
+                    {show7DayChange && (
+                      <th className="text-center py-2 sm:py-3 px-2 sm:px-4">7d Change</th>
+                    )}
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Games</th>
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">W-L-D</th>
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Win%</th>
+                    <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Frags/Scrim</th>
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Scrim Kills</th>
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Scrim Deaths</th>
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Scrim K/D</th>
@@ -351,21 +409,23 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                           {player.elo}
                         </span>
                       </td>
-                      <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
-                        {player.eloChange7Days !== 0 ? (
-                          <span
-                            className={`font-semibold ${
-                              player.eloChange7Days > 0 ? "text-green-400" : "text-red-400"
-                            }`}
-                          >
-                            {player.eloChange7Days > 0 ? "▲" : "▼"}{" "}
-                            {player.eloChange7Days > 0 ? "+" : ""}
-                            {player.eloChange7Days}
-                          </span>
-                        ) : (
-                          <span className="text-gray-500">─</span>
-                        )}
-                      </td>
+                      {show7DayChange && (
+                        <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
+                          {player.eloChange7Days !== 0 ? (
+                            <span
+                              className={`font-semibold ${
+                                player.eloChange7Days > 0 ? "text-green-400" : "text-red-400"
+                              }`}
+                            >
+                              {player.eloChange7Days > 0 ? "▲" : "▼"}{" "}
+                              {player.eloChange7Days > 0 ? "+" : ""}
+                              {player.eloChange7Days}
+                            </span>
+                          ) : (
+                            <span className="text-gray-500">─</span>
+                          )}
+                        </td>
+                      )}
                       <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-gray-300">
                         {player.games_played}
                       </td>
@@ -386,6 +446,15 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                             }`}
                           >
                             {((player.wins / player.games_played) * 100).toFixed(0)}%
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">─</span>
+                        )}
+                      </td>
+                      <td className="text-center py-2 sm:py-3 px-2 sm:px-4 tabular-nums">
+                        {player.frags_per_scrim != null ? (
+                          <span className="text-amber-300/90 font-medium">
+                            {player.frags_per_scrim}
                           </span>
                         ) : (
                           <span className="text-gray-500">─</span>

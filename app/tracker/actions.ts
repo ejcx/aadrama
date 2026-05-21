@@ -28,6 +28,36 @@ function computeKdRatio(kills: number, deaths: number): number {
   return 0
 }
 
+function computeFragsPerScrim(kills: number, games: number): number | null {
+  if (games <= 0) return null
+  return Math.round((10 * kills) / games) / 10
+}
+
+async function getRankedKillsByPlayer(
+  gameNames: string[]
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>()
+  if (gameNames.length === 0) return result
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('elo_history')
+    .select('game_name_lower, kills')
+    .in('game_name_lower', gameNames)
+
+  if (error) {
+    console.error('Failed to fetch ranked kills:', error.message)
+    return result
+  }
+
+  for (const row of data || []) {
+    const key = row.game_name_lower
+    result.set(key, (result.get(key) ?? 0) + (row.kills ?? 0))
+  }
+
+  return result
+}
+
 // Search for players by name (case-insensitive substring match)
 export interface PlayerSearchResult {
   name: string
@@ -101,14 +131,20 @@ export async function getEloLeaderboard(limit = 100) {
     }
   }
 
+  const gameNames = (eloResult.data || []).map((p) => p.game_name_lower)
+  const rankedKillsMap = await getRankedKillsByPlayer(gameNames)
+
   // Merge ELO data with scrim stats (use defaults if stats not available)
-  const enrichedData = (eloResult.data || []).map(player => {
+  const enrichedData = (eloResult.data || []).map((player) => {
     const stats = statsMap.get(player.game_name_lower)
+    const rankedKills = rankedKillsMap.get(player.game_name_lower) ?? 0
     return {
       ...player,
       total_kills: stats?.total_kills || 0,
       total_deaths: stats?.total_deaths || 0,
       kd_ratio: stats?.kd_ratio || 0,
+      ranked_kills: rankedKills,
+      frags_per_scrim: computeFragsPerScrim(rankedKills, player.games_played),
     }
   })
 
@@ -206,6 +242,8 @@ async function getSeasonEloLeaderboard(
       total_kills: kd?.total_kills ?? stats.kills,
       total_deaths: kd?.total_deaths ?? 0,
       kd_ratio: kd?.kd_ratio ?? computeKdRatio(stats.kills, 0),
+      ranked_kills: stats.kills,
+      frags_per_scrim: computeFragsPerScrim(stats.kills, gamesPlayed),
     }
   })
 

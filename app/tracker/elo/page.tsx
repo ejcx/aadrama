@@ -15,6 +15,7 @@ interface EloPlayer {
   total_kills: number;
   total_deaths: number;
   kd_ratio: number;
+  frags_per_scrim: number | null;
 }
 
 export default async function EloRankingsPage() {
@@ -51,6 +52,7 @@ export default async function EloRankingsPage() {
     total_kills: p.total_kills,
     total_deaths: p.total_deaths,
     kd_ratio: p.kd_ratio,
+    frags_per_scrim: p.frags_per_scrim ?? null,
   }));
 
   return (
