@@ -37,10 +37,14 @@ const ELO_HISTORY_PAGE_SIZE = 1000
 
 type EloHistoryAggRow = {
   game_name_lower: string
+  scrim_id: string
   elo_change: number | null
   result: string
   kills: number | null
 }
+
+const SCRIM_ID_CHUNK = 80
+const SESSION_ID_CHUNK = 80
 
 /** Paginated elo_history fetch (Supabase caps at 1000 rows per request). */
 async function fetchSeasonEloHistory(season: 1 | 2): Promise<EloHistoryAggRow[]> {
@@ -50,7 +54,7 @@ async function fetchSeasonEloHistory(season: 1 | 2): Promise<EloHistoryAggRow[]>
   for (let from = 0; ; from += ELO_HISTORY_PAGE_SIZE) {
     let query = supabase
       .from('elo_history')
-      .select('game_name_lower, elo_change, result, kills')
+      .select('game_name_lower, scrim_id, elo_change, result, kills')
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
       .range(from, from + ELO_HISTORY_PAGE_SIZE - 1)
@@ -166,30 +170,35 @@ export async function getEloLeaderboard(limit = 100) {
 
   if (eloResult.error) throw new Error(`Failed to fetch ELO leaderboard: ${eloResult.error.message}`)
 
-  // Try to fetch scrim stats (optional, gracefully handle failure)
-  let statsResult
-  try {
-    statsResult = await supabase
-      .from('player_scrim_stats_mv')
-      .select('player_name_lower, total_scrim_kills, total_scrim_deaths, scrim_kd_ratio')
-  } catch (err) {
-    console.error('Failed to fetch player stats from materialized view:', err)
-    statsResult = { data: null, error: err }
-  }
-
-  // Create a map of player scrim stats for quick lookup
+  const gameNames = (eloResult.data || []).map((p) => p.game_name_lower)
   const statsMap = new Map<string, { total_kills: number; total_deaths: number; kd_ratio: number }>()
-  if (statsResult?.data && !statsResult.error) {
-    for (const stat of statsResult.data) {
-      statsMap.set(stat.player_name_lower, {
-        total_kills: stat.total_scrim_kills,
-        total_deaths: stat.total_scrim_deaths,
-        kd_ratio: stat.scrim_kd_ratio,
-      })
+
+  if (gameNames.length > 0) {
+    try {
+      const nameChunkSize = 100
+      for (let i = 0; i < gameNames.length; i += nameChunkSize) {
+        const nameChunk = gameNames.slice(i, i + nameChunkSize)
+        const { data, error } = await supabase
+          .from('player_scrim_stats_mv')
+          .select('player_name_lower, total_scrim_kills, total_scrim_deaths, scrim_kd_ratio')
+          .in('player_name_lower', nameChunk)
+
+        if (error) {
+          console.error('Failed to fetch player scrim stats:', error.message)
+          break
+        }
+        for (const stat of data || []) {
+          statsMap.set(stat.player_name_lower, {
+            total_kills: stat.total_scrim_kills,
+            total_deaths: stat.total_scrim_deaths,
+            kd_ratio: stat.scrim_kd_ratio,
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch player stats from materialized view:', err)
     }
   }
-
-  const gameNames = (eloResult.data || []).map((p) => p.game_name_lower)
   const rankedKillsMap = await getRankedKillsByPlayer(gameNames)
 
   // Merge ELO data with scrim stats (use defaults if stats not available)
@@ -240,8 +249,10 @@ async function getSeasonEloLeaderboard(
     string,
     { wins: number; losses: number; draws: number; eloSum: number; kills: number }
   >()
+  const scrimIds = new Set<string>()
 
   for (const row of history) {
+    scrimIds.add(row.scrim_id)
     const existing = agg.get(row.game_name_lower) || {
       wins: 0,
       losses: 0,
@@ -268,7 +279,7 @@ async function getSeasonEloLeaderboard(
   if (namesError) throw new Error(`Failed to fetch player names: ${namesError.message}`)
 
   const nameMap = new Map(eloRecords?.map((r) => [r.game_name_lower, r.game_name]) || [])
-  const kdMap = await getSeasonScrimKdStats(season, gameNames)
+  const kdMap = await getRankedScrimKdStats(Array.from(scrimIds), gameNames)
 
   const results: EloLeaderboardRow[] = Array.from(agg.entries()).map(([gameNameLower, stats]) => {
     const kd = kdMap.get(gameNameLower)
