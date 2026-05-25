@@ -18,6 +18,7 @@ import {
   SEASON_2_START_ISO,
   season1EloFromChanges,
 } from '@/lib/scrim/seasons'
+import { isCaptainsPickBlocked } from '@/lib/scrim/captains-pick'
 
 // Get current user info from Clerk
 async function getCurrentUser() {
@@ -33,6 +34,10 @@ async function getCurrentUser() {
 // Create a new scrim
 export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
   const { userId, userName } = await getCurrentUser()
+  const clerkUser = await currentUser()
+  if (input?.selection_mode === 'captains' && isCaptainsPickBlocked(clerkUser?.username)) {
+    throw new Error('Captains pick is not available for your account')
+  }
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -1172,6 +1177,11 @@ export async function setCaptains(
 
   const scrim = await getScrim(scrimId)
   if (!scrim) return { success: false, error: 'Scrim not found' }
+
+  const clerkUser = await currentUser()
+  if (isCaptainsPickBlocked(clerkUser?.username)) {
+    return { success: false, error: 'Captains pick is not available for your account' }
+  }
 
   // Only creator can set captains
   if (scrim.created_by !== userId) {

@@ -27,6 +27,7 @@ import {
   type DraftStatus,
 } from "./actions";
 import type { ScrimWithCounts, ScrimPlayer } from "@/lib/supabase/types";
+import { isCaptainsPickBlocked } from "@/lib/scrim/captains-pick";
 
 // Scrim status badges
 function StatusBadge({ status }: { status: string }) {
@@ -699,6 +700,13 @@ export default function ScrimClient() {
   const [selectedMap, setSelectedMap] = useState("");
   const [isRanked, setIsRanked] = useState(true);
   const [selectionMode, setSelectionMode] = useState<"random" | "skill_based" | "captains">("skill_based");
+  const captainsPickBlocked = isCaptainsPickBlocked(user?.username);
+
+  useEffect(() => {
+    if (captainsPickBlocked && selectionMode === "captains") {
+      setSelectionMode("skill_based");
+    }
+  }, [captainsPickBlocked, selectionMode]);
 
   // Time range state for recent scrims
   const [timeRange, setTimeRange] = useState<TimeRange>("30d");
@@ -910,17 +918,19 @@ export default function ScrimClient() {
                       >
                         ⚖️ Skill Based
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectionMode("captains")}
-                        className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-                          selectionMode === "captains"
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                        }`}
-                      >
-                        🎯 Captains Pick
-                      </button>
+                      {!captainsPickBlocked && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectionMode("captains")}
+                          className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                            selectionMode === "captains"
+                              ? "bg-blue-600 text-white"
+                              : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                          }`}
+                        >
+                          🎯 Captains Pick
+                        </button>
+                      )}
                     </div>
                     {selectionMode === "captains" && (
                       <p className="text-yellow-400 text-xs mt-2">
