@@ -939,7 +939,7 @@ export default function ScrimClient() {
                     )}
                     {selectionMode === "skill_based" && (
                       <p className="text-blue-400 text-xs mt-2">
-                        ℹ️ Teams balanced by skill: 50% ELO snake draft, 50% avg kills per scrim
+                        ℹ️ Teams balanced by ELO: 100 random splits, best balance wins
                       </p>
                     )}
                   </div>

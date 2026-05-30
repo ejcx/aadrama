@@ -1,16 +1,16 @@
 /**
- * Scrim team matchmaking (snake draft by skill metric + random reroll).
+ * Scrim team matchmaking (ELO-optimized random trials + snake draft for legacy SQL).
  *
  * Keep in sync with Supabase functions:
- * - assign_elo_balanced_teams / assign_kills_balanced_teams / assign_skill_based_teams
- * - assign_balanced_teams / assign_purely_random_teams
+ * - assign_elo_optimized_random_teams / assign_skill_based_teams
+ * - assign_elo_balanced_teams / assign_balanced_teams / assign_purely_random_teams
  *
  * Run: npm test -- lib/scrim/matchmaking.test.ts
  */
 
 export type Team = 'team_a' | 'team_b'
 
-export type SkillMetric = 'elo' | 'kills'
+export const DEFAULT_ELO_OPTIMIZATION_TRIALS = 100
 
 export interface RatedPlayer {
   id: string
@@ -41,11 +41,6 @@ export const DEFAULT_ELO = 1200
 export function avgKillsPerScrim(totalKills: number, totalScrims: number): number {
   if (totalScrims <= 0) return 0
   return totalKills / totalScrims
-}
-
-/** 50/50 pick for skill-based matchmaking. Matches assign_skill_based_teams (random() < 0.5). */
-export function pickSkillMetric(random: () => number = Math.random): SkillMetric {
-  return random() < 0.5 ? 'elo' : 'kills'
 }
 
 /** 1-based rank → team. Matches SQL in assign_*_balanced_teams migrations. */
@@ -130,32 +125,70 @@ export function assignKillsBalancedTeams(
   )
 }
 
-export interface AssignSkillBasedOptions extends AssignSnakeDraftOptions {
+export interface AssignEloOptimizedOptions {
+  minPlayers?: number
+  trials?: number
   random?: () => number
 }
 
-export interface SkillBasedAssignment {
-  metric: SkillMetric
-  assignments: Map<string, Team>
+/** @deprecated Use AssignEloOptimizedOptions */
+export type AssignSkillBasedOptions = AssignEloOptimizedOptions
+
+export function eloDifference(sums: { team_a: number; team_b: number }): number {
+  return Math.abs(sums.team_a - sums.team_b)
 }
 
-/** Skill-based: 50/50 snake draft by ELO or by avg kills per scrim. */
+/**
+ * Skill-based: try many random 50/50 splits, keep the one with smallest |ELO_A − ELO_B|.
+ * Matches assign_elo_optimized_random_teams / assign_skill_based_teams in Supabase.
+ */
+export function assignEloOptimizedRandomTeams(
+  players: MatchmakingPlayer[],
+  options: AssignEloOptimizedOptions = {}
+): Map<string, Team> {
+  const minPlayers = options.minPlayers ?? DEFAULT_MIN_PLAYERS
+  const trials = options.trials ?? DEFAULT_ELO_OPTIMIZATION_TRIALS
+  const random = options.random ?? Math.random
+
+  if (players.length < minPlayers) {
+    throw new Error(
+      `Cannot assign teams: need at least ${minPlayers} players (4v4), got ${players.length}`
+    )
+  }
+  if (players.length % 2 !== 0) {
+    throw new Error(
+      `Cannot assign teams: must have even number of players (got ${players.length})`
+    )
+  }
+
+  let bestAssignments: Map<string, Team> | null = null
+  let bestDiff = Infinity
+
+  for (let trial = 0; trial < trials; trial++) {
+    const assignments = assignRandomTeams(
+      players.map((p) => ({ id: p.id })),
+      { minPlayers, random }
+    )
+    const diff = eloDifference(sumEloByTeam(players, assignments))
+    if (diff < bestDiff) {
+      bestDiff = diff
+      bestAssignments = assignments
+    }
+  }
+
+  assertEvenTeams(bestAssignments!)
+  return bestAssignments!
+}
+
+/** Skill-based matchmaking (ELO-minimizing random search). */
 export function assignSkillBasedTeams(
   players: SkillBasedPlayer[],
   options: AssignSkillBasedOptions = {}
-): SkillBasedAssignment {
-  const metric = pickSkillMetric(options.random)
-  const assignments =
-    metric === 'elo'
-      ? assignSnakeDraftTeams(
-          players.map((p) => ({ id: p.id, elo: p.elo })),
-          options
-        )
-      : assignKillsBalancedTeams(
-          players.map((p) => ({ id: p.id, avgKillsPerScrim: p.avgKillsPerScrim })),
-          options
-        )
-  return { metric, assignments }
+): Map<string, Team> {
+  return assignEloOptimizedRandomTeams(
+    players.map((p) => ({ id: p.id, elo: p.elo })),
+    options
+  )
 }
 
 export interface AssignRandomTeamsOptions {

@@ -1,20 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
+  assignEloOptimizedRandomTeams,
   assignKillsBalancedTeams,
   assignRandomTeams,
   assignSkillBasedTeams,
   assignSnakeDraftTeams,
   avgKillsPerScrim,
   countTeams,
+  DEFAULT_ELO_OPTIMIZATION_TRIALS,
+  eloDifference,
   makeKillsLadder,
   makeLadder,
   makeSkillLadder,
-  pickSkillMetric,
   sumEloByTeam,
   sumRatingByTeam,
   teamForSnakeDraftRank,
   type MatchmakingPlayer,
-  type SkillBasedPlayer,
 } from './matchmaking'
 
 describe('teamForSnakeDraftRank', () => {
@@ -47,18 +48,6 @@ describe('avgKillsPerScrim', () => {
   it('returns 0 when no scrims', () => {
     expect(avgKillsPerScrim(0, 0)).toBe(0)
     expect(avgKillsPerScrim(10, 0)).toBe(0)
-  })
-})
-
-describe('pickSkillMetric', () => {
-  it('picks elo when random < 0.5', () => {
-    expect(pickSkillMetric(() => 0)).toBe('elo')
-    expect(pickSkillMetric(() => 0.49)).toBe('elo')
-  })
-
-  it('picks kills when random >= 0.5', () => {
-    expect(pickSkillMetric(() => 0.5)).toBe('kills')
-    expect(pickSkillMetric(() => 0.99)).toBe('kills')
   })
 })
 
@@ -114,32 +103,81 @@ describe('assignKillsBalancedTeams', () => {
   })
 })
 
+describe('assignEloOptimizedRandomTeams', () => {
+  it('assigns even teams for 10 players', () => {
+    const teams = assignEloOptimizedRandomTeams(makeLadder(10), {
+      random: () => 0.5,
+      trials: 10,
+    })
+    expect(countTeams(teams)).toEqual({ team_a: 5, team_b: 5 })
+  })
+
+  it('never does worse than the best of its random trials', () => {
+    const players = makeLadder(10, 1000, 50)
+    let seed = 0
+    const random = () => ((seed += 7) % 100) / 100
+
+    const optimized = assignEloOptimizedRandomTeams(players, { random, trials: 100 })
+    const optimizedDiff = eloDifference(sumEloByTeam(players, optimized))
+
+    let bestTrialDiff = Infinity
+    seed = 0
+    for (let trial = 0; trial < 100; trial++) {
+      const trialTeams = assignRandomTeams(
+        players.map((p) => ({ id: p.id })),
+        { random }
+      )
+      bestTrialDiff = Math.min(bestTrialDiff, eloDifference(sumEloByTeam(players, trialTeams)))
+    }
+
+    expect(optimizedDiff).toBe(bestTrialDiff)
+  })
+
+  it('finds zero ELO diff on a symmetric 8-player ladder', () => {
+    const players: MatchmakingPlayer[] = [
+      { id: 'a1', elo: 1300 },
+      { id: 'a2', elo: 1200 },
+      { id: 'b1', elo: 1300 },
+      { id: 'b2', elo: 1200 },
+      { id: 'c1', elo: 1100 },
+      { id: 'c2', elo: 1000 },
+      { id: 'd1', elo: 1100 },
+      { id: 'd2', elo: 1000 },
+    ]
+    let seed = 0
+    const teams = assignEloOptimizedRandomTeams(players, {
+      random: () => ((seed += 3) % 100) / 100,
+      trials: DEFAULT_ELO_OPTIMIZATION_TRIALS,
+    })
+    expect(eloDifference(sumEloByTeam(players, teams))).toBe(0)
+  })
+
+  it('rejects fewer than 8 players', () => {
+    expect(() =>
+      assignEloOptimizedRandomTeams(makeLadder(7), { trials: 1 })
+    ).toThrow(/at least 8 players/)
+  })
+})
+
 describe('assignSkillBasedTeams', () => {
   const players = makeSkillLadder(10)
 
-  it('uses ELO snake draft when random < 0.5', () => {
-    const { metric, assignments } = assignSkillBasedTeams(players, { random: () => 0 })
-    expect(metric).toBe('elo')
-    expect(assignments).toEqual(assignSnakeDraftTeams(players.map((p) => ({ id: p.id, elo: p.elo }))))
-  })
-
-  it('uses kills snake draft when random >= 0.5', () => {
-    const { metric, assignments } = assignSkillBasedTeams(players, { random: () => 0.5 })
-    expect(metric).toBe('kills')
-    expect(assignments).toEqual(
-      assignKillsBalancedTeams(
-        players.map((p) => ({ id: p.id, avgKillsPerScrim: p.avgKillsPerScrim }))
-      )
+  it('matches assignEloOptimizedRandomTeams (ELO only)', () => {
+    let seed = 0
+    const random = () => ((seed += 11) % 100) / 100
+    const skillTeams = assignSkillBasedTeams(players, { random, trials: 50 })
+    seed = 0
+    const eloTeams = assignEloOptimizedRandomTeams(
+      players.map((p) => ({ id: p.id, elo: p.elo })),
+      { random, trials: 50 }
     )
+    expect(skillTeams).toEqual(eloTeams)
   })
 
-  it('always produces even teams for either metric', () => {
-    const eloResult = assignSkillBasedTeams(players, { random: () => 0 })
-    const killsResult = assignSkillBasedTeams(players, { random: () => 0.5 })
-    expect(countTeams(eloResult.assignments)).toEqual({ team_a: 5, team_b: 5 })
-    expect(countTeams(killsResult.assignments)).toEqual({ team_a: 5, team_b: 5 })
+  it('produces even teams', () => {
+    const teams = assignSkillBasedTeams(players, { random: () => 0.3, trials: 20 })
+    expect(countTeams(teams)).toEqual({ team_a: 5, team_b: 5 })
   })
-
 })
 
 describe('assignRandomTeams', () => {
