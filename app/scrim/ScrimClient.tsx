@@ -9,6 +9,7 @@ import {
   joinScrim,
   leaveScrim,
   toggleReady,
+  tryStartGameIfReady,
   endGame,
   submitScore,
   cancelScrim,
@@ -133,10 +134,33 @@ function ScrimCard({
     }
   }, [expanded, scrim.id, scrim.status]);
 
+  useEffect(() => {
+    if (!expanded || scrim.status !== "waiting") return;
+    const interval = setInterval(loadPlayers, 5000);
+    return () => clearInterval(interval);
+  }, [expanded, scrim.status, scrim.id]);
+
   async function loadPlayers() {
     try {
       const data = await getScrimPlayers(scrim.id);
       setPlayers(data);
+
+      const everyoneReady = data.length > 0 && data.every((p) => p.is_ready);
+      const readyToStart =
+        data.length >= scrim.min_players_per_team * 2 &&
+        data.length % 2 === 0 &&
+        everyoneReady;
+
+      if (scrim.status === "waiting" && readyToStart) {
+        try {
+          await tryStartGameIfReady(scrim.id);
+          onRefresh();
+          const refreshed = await getScrimPlayers(scrim.id);
+          setPlayers(refreshed);
+        } catch (err) {
+          console.error(`[Scrim ${scrim.id}] Auto-start failed:`, err);
+        }
+      }
     } catch (err) {
       console.error("Failed to load players:", err);
     }

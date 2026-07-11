@@ -9,6 +9,7 @@ import {
   joinScrim,
   leaveScrim,
   toggleReady,
+  tryStartGameIfReady,
   endGame,
   submitScore,
   cancelScrim,
@@ -156,6 +157,26 @@ export default function ScrimDetailClient() {
       const scrimData = data.scrim;
       setScrim(scrimData);
       setPlayers(data.players);
+
+      const everyoneReady =
+        data.players.length > 0 && data.players.every((p) => p.is_ready);
+      const readyToStart =
+        data.players.length >= scrimData.min_players_per_team * 2 &&
+        data.players.length % 2 === 0 &&
+        everyoneReady;
+
+      if (scrimData.status === "waiting" && readyToStart) {
+        try {
+          await tryStartGameIfReady(scrimId);
+          const refreshed = await getScrimDetails(scrimId);
+          if (refreshed.scrim) {
+            setScrim(refreshed.scrim);
+            setPlayers(refreshed.players);
+          }
+        } catch (err) {
+          console.error(`[Scrim ${scrimId}] Auto-start failed:`, err);
+        }
+      }
 
       // Set score submissions
       if (scrimData.status === "scoring" || scrimData.status === "finalized") {

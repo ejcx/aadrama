@@ -1,5 +1,12 @@
 'use server'
 
+import {
+  type BadgeCatalogEntry,
+  type BadgeHolderSummary,
+  buildBadgeCatalogEntry,
+  orderedCatalogBadgeTypes,
+} from '@/lib/badges/catalog'
+import type { PlayerBadge } from '@/lib/supabase/types'
 import { createClient } from '@/lib/supabase/server'
 import { SEASON_2_START_ISO, season1EloFromChanges } from '@/lib/scrim/seasons'
 import {
@@ -901,8 +908,6 @@ export async function getPlayerStatsByMap(
 }
 
 // Get all badges earned by a player (most recent first).
-import type { PlayerBadge } from '@/lib/supabase/types'
-
 export async function getPlayerBadges(playerName: string): Promise<PlayerBadge[]> {
   const supabase = await createClient()
   const trimmed = playerName.trim()
@@ -936,6 +941,85 @@ export async function getPlayerBadges(playerName: string): Promise<PlayerBadge[]
   }
 
   return (byDisplayName || []) as PlayerBadge[]
+}
+
+const BADGE_AWARD_PAGE_SIZE = 1000
+
+type BadgeAwardRow = Pick<
+  PlayerBadge,
+  'badge_type' | 'game_name' | 'game_name_lower' | 'earned_at'
+>
+
+async function fetchAllBadgeAwardRows(): Promise<BadgeAwardRow[]> {
+  const supabase = await createClient()
+  const rows: BadgeAwardRow[] = []
+
+  for (let from = 0; ; from += BADGE_AWARD_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('player_badges')
+      .select('badge_type, game_name, game_name_lower, earned_at')
+      .order('earned_at', { ascending: false })
+      .range(from, from + BADGE_AWARD_PAGE_SIZE - 1)
+
+    if (error) {
+      console.error('Failed to fetch badge catalog rows:', error.message)
+      break
+    }
+
+    const page = (data ?? []) as BadgeAwardRow[]
+    rows.push(...page)
+    if (page.length < BADGE_AWARD_PAGE_SIZE) break
+  }
+
+  return rows
+}
+
+function aggregateBadgeHolders(rows: BadgeAwardRow[]): Map<string, BadgeHolderSummary[]> {
+  const byType = new Map<string, Map<string, BadgeHolderSummary>>()
+
+  for (const row of rows) {
+    let players = byType.get(row.badge_type)
+    if (!players) {
+      players = new Map()
+      byType.set(row.badge_type, players)
+    }
+
+    const existing = players.get(row.game_name_lower)
+    if (existing) {
+      existing.count += 1
+      if (row.earned_at < existing.firstEarnedAt) {
+        existing.firstEarnedAt = row.earned_at
+      }
+      if (row.earned_at > existing.lastEarnedAt) {
+        existing.lastEarnedAt = row.earned_at
+      }
+      existing.game_name = row.game_name
+    } else {
+      players.set(row.game_name_lower, {
+        game_name: row.game_name,
+        game_name_lower: row.game_name_lower,
+        count: 1,
+        firstEarnedAt: row.earned_at,
+        lastEarnedAt: row.earned_at,
+      })
+    }
+  }
+
+  const result = new Map<string, BadgeHolderSummary[]>()
+  for (const [badgeType, players] of Array.from(byType.entries())) {
+    result.set(badgeType, [...Array.from(players.values())])
+  }
+  return result
+}
+
+/** Full badge catalog with holder lists for the badges page. */
+export async function getBadgeCatalog(): Promise<BadgeCatalogEntry[]> {
+  const rows = await fetchAllBadgeAwardRows()
+  const holdersByType = aggregateBadgeHolders(rows)
+
+  return orderedCatalogBadgeTypes().map((badgeType) =>
+    buildBadgeCatalogEntry(badgeType, holdersByType.get(badgeType) ?? [])
+  )
 }
 
 export interface RankedPlayerOption {

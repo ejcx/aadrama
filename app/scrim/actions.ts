@@ -194,6 +194,11 @@ export async function toggleReady(scrimId: string): Promise<ScrimPlayer> {
   return data
 }
 
+/** Start the scrim when all players are ready (idempotent; safe to call from polling). */
+export async function tryStartGameIfReady(scrimId: string): Promise<void> {
+  return checkAndStartGame(scrimId)
+}
+
 // Check if all players are ready and start the game
 async function checkAndStartGame(scrimId: string): Promise<void> {
   const supabase = await createClient()
