@@ -16,12 +16,15 @@ export type Winner = 'team_a' | 'team_b' | 'draw'
 
 export type SelectionMode = 'random' | 'skill_based' | 'captains'
 
+export type MapChoice = 'manual' | 'tiered'
+
 export interface Scrim {
   id: string
   created_by: string
   created_by_name: string | null
   title: string | null
   map: string | null
+  map_choice: MapChoice
   max_players_per_team: number
   min_players_per_team: number
   status: ScrimStatus
@@ -80,6 +83,7 @@ export interface ScrimScoreSubmission {
 export interface CreateScrimInput {
   title?: string
   map?: string
+  map_choice?: MapChoice
   max_players_per_team?: number
   min_players_per_team?: number
   is_ranked?: boolean

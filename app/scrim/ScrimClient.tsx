@@ -27,9 +27,14 @@ import {
   draftPlayer,
   type DraftStatus,
 } from "./actions";
-import type { ScrimWithCounts, ScrimPlayer } from "@/lib/supabase/types";
+import type { ScrimWithCounts, ScrimPlayer, MapChoice } from "@/lib/supabase/types";
 import { isCaptainsPickBlocked } from "@/lib/scrim/captains-pick";
 
+function scrimMapLabel(scrim: Pick<ScrimWithCounts, "map" | "map_choice">): string | null {
+  if (scrim.map) return scrim.map;
+  if (scrim.map_choice === "tiered") return "TIERED (pending)";
+  return null;
+}
 // Scrim status badges
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
@@ -203,10 +208,20 @@ function ScrimCard({
     <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-3">
         <div>
-          <h3 className="text-white font-semibold text-lg flex items-center gap-2">
-            {scrim.map && <span className="text-cyan-400">🗺️ {scrim.map}</span>}
-            {!scrim.map && (scrim.title || `Scrim #${scrim.id.slice(0, 8)}`)}
-          </h3>
+          {(() => {
+            const mapLabel = scrimMapLabel(scrim);
+            return (
+              <h3 className="text-white font-semibold text-lg flex items-center gap-2 flex-wrap">
+                {mapLabel && <span className="text-cyan-400">🗺️ {mapLabel}</span>}
+                {!mapLabel && (scrim.title || `Scrim #${scrim.id.slice(0, 8)}`)}
+                {scrim.map_choice === "tiered" && scrim.map && (
+                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-cyan-900/40 text-cyan-300 border border-cyan-700/40">
+                    TIERED
+                  </span>
+                )}
+              </h3>
+            );
+          })()}
           <p className="text-gray-400 text-sm">
             Created by {scrim.created_by_name || "Unknown"}
           </p>
@@ -479,25 +494,32 @@ function ScrimCard({
 
           {/* Team assignments (in_progress or scoring) */}
           {(scrim.status === "in_progress" || scrim.status === "scoring" || scrim.status === "finalized") && (
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <h4 className="text-blue-400 font-medium mb-2">Team A</h4>
-                <div className="space-y-1">
-                  {teamA.map(p => (
-                    <div key={p.id} className="text-gray-300 text-sm">
-                      {p.user_name}
-                    </div>
-                  ))}
+            <div className="mb-4">
+              {scrim.map_choice === "tiered" && (
+                <p className="text-amber-300/90 text-xs mb-3 bg-amber-900/20 border border-amber-700/40 rounded px-3 py-2">
+                  Lower average ELO team should get the easiest side first.
+                </p>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-blue-400 font-medium mb-2">Team A</h4>
+                  <div className="space-y-1">
+                    {teamA.map(p => (
+                      <div key={p.id} className="text-gray-300 text-sm">
+                        {p.user_name}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <h4 className="text-red-400 font-medium mb-2">Team B</h4>
-                <div className="space-y-1">
-                  {teamB.map(p => (
-                    <div key={p.id} className="text-gray-300 text-sm">
-                      {p.user_name}
-                    </div>
-                  ))}
+                <div>
+                  <h4 className="text-red-400 font-medium mb-2">Team B</h4>
+                  <div className="space-y-1">
+                    {teamB.map(p => (
+                      <div key={p.id} className="text-gray-300 text-sm">
+                        {p.user_name}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -722,6 +744,7 @@ export default function ScrimClient() {
   const [creating, setCreating] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [selectedMap, setSelectedMap] = useState("");
+  const [mapChoice, setMapChoice] = useState<MapChoice>("manual");
   const [isRanked, setIsRanked] = useState(true);
   const [selectionMode, setSelectionMode] = useState<"random" | "skill_based" | "captains">("skill_based");
   const captainsPickBlocked = isCaptainsPickBlocked(user?.username);
@@ -836,14 +859,19 @@ export default function ScrimClient() {
   }
   
   function handleCreateScrim() {
-    if (!selectedMap) {
+    if (mapChoice === "manual" && !selectedMap) {
       alert("Please select a map");
       return;
     }
     setCreating(true);
     startTransition(async () => {
       try {
-        await createScrim({ map: selectedMap, is_ranked: isRanked, selection_mode: selectionMode });
+        await createScrim({
+          map: mapChoice === "manual" ? selectedMap : undefined,
+          map_choice: mapChoice,
+          is_ranked: isRanked,
+          selection_mode: selectionMode,
+        });
         setSelectedMap("");
         await loadScrims();
       } catch (err) {
@@ -886,24 +914,69 @@ export default function ScrimClient() {
             <h2 className="text-white font-semibold mb-4">Create New Scrim</h2>
             {user ? (
               <>
-                <div className="flex flex-col sm:flex-row gap-3 mb-3">
-                  <select
-                    value={selectedMap}
-                    onChange={(e) => setSelectedMap(e.target.value)}
-                    className="flex-1 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white"
-                  >
-                    <option value="">Select a map...</option>
-                    {availableMaps.map(map => (
-                      <option key={map} value={map}>{map}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={handleCreateScrim}
-                    disabled={creating || isPending || !isLoaded || !selectedMap}
-                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
-                  >
-                    {creating ? "Creating..." : "Create Scrim"}
-                  </button>
+                <div className="flex flex-col gap-3 mb-3">
+                  <div>
+                    <label className="text-white text-sm font-medium mb-2 block">Map Choice:</label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMapChoice("manual")}
+                        className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                          mapChoice === "manual"
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                        }`}
+                      >
+                        Specific Map
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMapChoice("tiered")}
+                        className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
+                          mapChoice === "tiered"
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                        }`}
+                      >
+                        TIERED
+                      </button>
+                    </div>
+                    {mapChoice === "tiered" && (
+                      <p className="text-cyan-400 text-xs mt-2">
+                        Weighted random map assigned after teams are set (~2/3 Tier 1). Lower avg ELO team gets the easiest side first.
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {mapChoice === "manual" ? (
+                      <select
+                        value={selectedMap}
+                        onChange={(e) => setSelectedMap(e.target.value)}
+                        className="flex-1 px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white"
+                      >
+                        <option value="">Select a map...</option>
+                        {availableMaps.map(map => (
+                          <option key={map} value={map}>{map}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="flex-1 px-4 py-3 bg-gray-800/60 border border-cyan-700/40 rounded-lg text-cyan-300 text-sm flex items-center">
+                        Map rolls from the tiered pool when the game starts
+                      </div>
+                    )}
+                    <button
+                      onClick={handleCreateScrim}
+                      disabled={
+                        creating ||
+                        isPending ||
+                        !isLoaded ||
+                        (mapChoice === "manual" && !selectedMap)
+                      }
+                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+                    >
+                      {creating ? "Creating..." : "Create Scrim"}
+                    </button>
+                  </div>
                 </div>
                 <div className="flex flex-col gap-3">
                   <label className="flex items-center gap-2 cursor-pointer">

@@ -19,6 +19,7 @@ import {
   season1EloFromChanges,
 } from '@/lib/scrim/seasons'
 import { isCaptainsPickBlocked } from '@/lib/scrim/captains-pick'
+import { pickTieredMap } from '@/lib/scrim/tiered-maps'
 
 // Get current user info from Clerk
 async function getCurrentUser() {
@@ -40,13 +41,19 @@ export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
   }
   const supabase = await createClient()
 
+  const mapChoice = input?.map_choice === 'tiered' ? 'tiered' : 'manual'
+  if (mapChoice === 'manual' && !input?.map) {
+    throw new Error('Map is required')
+  }
+
   const { data, error } = await supabase
     .from('scrims')
     .insert({
       created_by: userId,
       created_by_name: userName,
       title: input?.title || null,
-      map: input?.map || null,
+      map: mapChoice === 'tiered' ? null : (input?.map || null),
+      map_choice: mapChoice,
       max_players_per_team: input?.max_players_per_team || 8,
       min_players_per_team: input?.min_players_per_team || 4, // 4v4 minimum
       is_ranked: input?.is_ranked !== false, // Default to ranked
@@ -62,6 +69,30 @@ export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
 
   revalidatePath('/scrim')
   return data
+}
+
+/** Assign a weighted random map for tiered scrims once teams are set (idempotent). */
+async function assignTieredMapIfNeeded(scrimId: string): Promise<void> {
+  const supabase = await createClient()
+  const scrim = await getScrim(scrimId)
+  if (!scrim) return
+  if (scrim.map_choice !== 'tiered') return
+  if (scrim.map) return // already assigned
+
+  const map = pickTieredMap()
+  const { error } = await supabase
+    .from('scrims')
+    .update({ map })
+    .eq('id', scrimId)
+    .is('map', null)
+    .eq('map_choice', 'tiered')
+
+  if (error) {
+    console.error(`[Scrim ${scrimId}] Failed to assign tiered map:`, error)
+    throw new Error(`Failed to assign tiered map: ${error.message}`)
+  }
+
+  console.log(`[Scrim ${scrimId}] Tiered map assigned: ${map}`)
 }
 
 // Get all active scrims (waiting or in progress)
@@ -267,6 +298,7 @@ async function checkAndStartGame(scrimId: string): Promise<void> {
     }
 
     console.log(`[Scrim ${scrimId}] Skill-based teams assigned successfully! Game started.`)
+    await assignTieredMapIfNeeded(scrimId)
   } else {
     // Random mode - assign teams randomly
     console.log(`[Scrim ${scrimId}] Random mode - calling assign_random_teams...`)
@@ -278,6 +310,7 @@ async function checkAndStartGame(scrimId: string): Promise<void> {
     }
 
     console.log(`[Scrim ${scrimId}] Teams assigned successfully! Game started.`)
+    await assignTieredMapIfNeeded(scrimId)
   }
 }
 
@@ -1306,6 +1339,16 @@ export async function draftPlayer(scrimId: string, pickedUserId: string): Promis
 
   if (error) {
     return { success: false, error: error.message }
+  }
+
+  // When draft completes, status becomes in_progress — assign tiered map if needed
+  const updated = await getScrim(scrimId)
+  if (updated?.status === 'in_progress') {
+    try {
+      await assignTieredMapIfNeeded(scrimId)
+    } catch (err) {
+      console.error(`[Scrim ${scrimId}] Tiered map assign after draft failed:`, err)
+    }
   }
 
   revalidatePath('/scrim')

@@ -305,8 +305,17 @@ export default function ScrimDetailClient() {
         <div className="mb-8">
           <div className="flex flex-wrap items-center gap-3 mb-2">
             <h1 className="text-white text-2xl sm:text-3xl font-bold">
-              {scrim.map ? `🗺️ ${scrim.map}` : scrim.title || `Scrim #${scrim.id.slice(0, 8)}`}
+              {scrim.map
+                ? `🗺️ ${scrim.map}`
+                : scrim.map_choice === "tiered"
+                  ? "🗺️ TIERED (pending)"
+                  : scrim.title || `Scrim #${scrim.id.slice(0, 8)}`}
             </h1>
+            {scrim.map_choice === "tiered" && (
+              <span className="px-2 py-1 rounded-full text-xs font-medium bg-cyan-900/40 text-cyan-300 border border-cyan-700/40">
+                TIERED
+              </span>
+            )}
                       {scrim.is_ranked && (
                           <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-600/20 text-yellow-400 border border-yellow-600/30">
                               Ranked
@@ -317,6 +326,11 @@ export default function ScrimDetailClient() {
           <p className="text-gray-400">
             Created by {scrim.created_by_name || "Unknown"} • {new Date(scrim.created_at).toLocaleString()}
           </p>
+          {scrim.map_choice === "tiered" && !scrim.map && (
+            <p className="text-cyan-400/80 text-sm mt-2">
+              Map will be assigned from the tiered pool once teams are set.
+            </p>
+          )}
           {scrim.status === "waiting" && <ExpiresIn expiresAt={scrim.expires_at} />}
         </div>
 
@@ -487,12 +501,41 @@ export default function ScrimDetailClient() {
                 const teamBTotal = teamBElos.reduce((sum, e) => sum + e, 0);
                 const teamAAvg = teamAElos.length > 0 ? Math.round(teamATotal / teamAElos.length) : 0;
                 const teamBAvg = teamBElos.length > 0 ? Math.round(teamBTotal / teamBElos.length) : 0;
+                const lowerAvgTeam =
+                  teamAAvg > 0 && teamBAvg > 0
+                    ? teamAAvg <= teamBAvg
+                      ? "Team A"
+                      : "Team B"
+                    : null;
                 
                 return (
+                  <>
+                  {scrim.map_choice === "tiered" && (
+                    <p className="text-amber-300/90 text-sm mb-4 bg-amber-900/20 border border-amber-700/40 rounded-lg px-4 py-3">
+                      Lower average ELO team should get the easiest side first
+                      {lowerAvgTeam ? (
+                        <>
+                          {" "}
+                          — currently <span className="font-semibold text-amber-200">{lowerAvgTeam}</span>
+                          {teamAAvg > 0 && teamBAvg > 0 && (
+                            <span className="text-amber-300/70">
+                              {" "}(avg {Math.min(teamAAvg, teamBAvg)} vs {Math.max(teamAAvg, teamBAvg)})
+                            </span>
+                          )}
+                        </>
+                      ) : null}
+                      .
+                    </p>
+                  )}
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-blue-400 font-semibold text-lg">Team A</h3>
+                        <h3 className="text-blue-400 font-semibold text-lg">
+                          Team A
+                          {lowerAvgTeam === "Team A" && scrim.map_choice === "tiered" && (
+                            <span className="ml-2 text-amber-300 text-xs font-normal">easiest side first</span>
+                          )}
+                        </h3>
                         {teamATotal > 0 && (
                           <div className="text-right">
                             <span className="text-blue-300 text-sm font-mono">{teamATotal} ELO</span>
@@ -525,7 +568,12 @@ export default function ScrimDetailClient() {
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-red-400 font-semibold text-lg">Team B</h3>
+                        <h3 className="text-red-400 font-semibold text-lg">
+                          Team B
+                          {lowerAvgTeam === "Team B" && scrim.map_choice === "tiered" && (
+                            <span className="ml-2 text-amber-300 text-xs font-normal">easiest side first</span>
+                          )}
+                        </h3>
                         {teamBTotal > 0 && (
                           <div className="text-right">
                             <span className="text-red-300 text-sm font-mono">{teamBTotal} ELO</span>
@@ -557,6 +605,7 @@ export default function ScrimDetailClient() {
                       </div>
                     </div>
                   </div>
+                  </>
                 );
               })()}
 
