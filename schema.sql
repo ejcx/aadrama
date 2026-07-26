@@ -84,6 +84,11 @@ create table public.game_sessions (
 
   server_name text not null,
 
+  -- Rules-of-engagement violations per team
+  roe_team0 integer not null default 0,
+
+  roe_team1 integer not null default 0,
+
   created_at timestamp without time zone not null default now(),
 
   constraint game_sessions_pkey primary key (session_id)

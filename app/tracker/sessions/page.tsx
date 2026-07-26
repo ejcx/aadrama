@@ -118,19 +118,44 @@ const SessionsPage = () => {
         params.append("limit", limit.toString());
 
         const response = await fetch(`${API_BASE}/sessions?${params.toString()}`);
-        const data = await response.json();
+        const text = await response.text();
+        let data: unknown = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch {
+          throw new Error(
+            response.ok
+              ? "Invalid sessions response"
+              : text.trim() || `Sessions API error (${response.status})`
+          );
+        }
+        if (!response.ok) {
+          const message =
+            typeof data === "object" &&
+            data !== null &&
+            "error" in data &&
+            typeof (data as { error: unknown }).error === "string"
+              ? (data as { error: string }).error
+              : text.trim() || `Sessions API error (${response.status})`;
+          throw new Error(message);
+        }
 
         if (Array.isArray(data)) {
           setSessions(data);
-        } else if (data.sessions && Array.isArray(data.sessions)) {
-          setSessions(data.sessions);
+        } else if (
+          data &&
+          typeof data === "object" &&
+          "sessions" in data &&
+          Array.isArray((data as { sessions: Session[] }).sessions)
+        ) {
+          setSessions((data as { sessions: Session[] }).sessions);
         } else {
           setSessions([]);
         }
         setError(null);
       } catch (err) {
         console.error("Failed to fetch sessions:", err);
-        setError("Failed to fetch sessions");
+        setError(err instanceof Error ? err.message : "Failed to fetch sessions");
         setSessions([]);
       } finally {
         setLoading(false);
