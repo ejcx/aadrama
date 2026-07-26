@@ -57,6 +57,24 @@ describe('absoluteWeight', () => {
   })
 })
 
+describe('TIERED_MAPS names', () => {
+  it('uses tracker / map-picker spellings for known renames', () => {
+    const names = new Set(TIERED_MAPS.map(m => m.name))
+    expect(names.has('Headquarters Raid')).toBe(true)
+    expect(names.has('HQ Raid')).toBe(false)
+    expect(names.has('MOUT McKenna')).toBe(true)
+    expect(names.has('MOUT Mckenna')).toBe(false)
+    expect(names.has('SF Taiga')).toBe(true)
+    expect(names.has('SF Talga')).toBe(false)
+    expect(names.has('JRTC Farm Raid')).toBe(true)
+    expect(names.has('JRTC Farm')).toBe(false)
+    expect(names.has('SMU GH RiverVillage')).toBe(true)
+    expect(names.has('SMU GH SFOldTown')).toBe(true)
+    expect(names.has('SMU GH SFFloodgate')).toBe(true)
+    expect(names.has('SMU GH SFRefinery')).toBe(true)
+  })
+})
+
 describe('pickTieredMap', () => {
   it('returns a known map name', () => {
     const name = pickTieredMap(() => 0)

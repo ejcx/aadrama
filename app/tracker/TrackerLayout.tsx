@@ -9,7 +9,8 @@ interface TrackerLayoutProps {
 }
 
 const tabs = [
-  { name: "ELO Rankings", href: "/tracker/elo" },
+  { name: "Scrim Rankings", href: "/tracker/elo" },
+  { name: "King of the Hill", href: "/tracker/koth" },
   { name: "Badges", href: "/tracker/badges" },
   { name: "Teammate Stats", href: "/tracker/teammates" },
   { name: "Top Players", href: "/tracker/top-players" },

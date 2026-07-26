@@ -161,6 +161,19 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
                 </span>
               </a>
             </div>
+            <div>
+              <a
+                href="/koth"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`block text-left transition-colors font-semibold text-sm py-2 lg:py-0 ${
+                  pathname === '/koth' || pathname?.startsWith('/koth/')
+                    ? 'text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                King of the Hill
+              </a>
+            </div>
             <div className="pt-4 mt-4 border-t border-gray-700">
               <a
                 href="/2025-winter-classic"

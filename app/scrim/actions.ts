@@ -19,7 +19,6 @@ import {
   season1EloFromChanges,
 } from '@/lib/scrim/seasons'
 import { isCaptainsPickBlocked } from '@/lib/scrim/captains-pick'
-import { pickTieredMap } from '@/lib/scrim/tiered-maps'
 
 // Get current user info from Clerk
 async function getCurrentUser() {
@@ -74,25 +73,18 @@ export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
 /** Assign a weighted random map for tiered scrims once teams are set (idempotent). */
 async function assignTieredMapIfNeeded(scrimId: string): Promise<void> {
   const supabase = await createClient()
-  const scrim = await getScrim(scrimId)
-  if (!scrim) return
-  if (scrim.map_choice !== 'tiered') return
-  if (scrim.map) return // already assigned
-
-  const map = pickTieredMap()
-  const { error } = await supabase
-    .from('scrims')
-    .update({ map })
-    .eq('id', scrimId)
-    .is('map', null)
-    .eq('map_choice', 'tiered')
+  const { data, error } = await supabase.rpc('assign_tiered_map_if_needed', {
+    p_scrim_id: scrimId,
+  })
 
   if (error) {
     console.error(`[Scrim ${scrimId}] Failed to assign tiered map:`, error)
     throw new Error(`Failed to assign tiered map: ${error.message}`)
   }
 
-  console.log(`[Scrim ${scrimId}] Tiered map assigned: ${map}`)
+  if (data) {
+    console.log(`[Scrim ${scrimId}] Tiered map assigned/confirmed: ${data}`)
+  }
 }
 
 // Get all active scrims (waiting or in progress)

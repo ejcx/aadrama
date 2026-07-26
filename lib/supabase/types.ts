@@ -147,6 +147,90 @@ export interface EloLeaderboardEntry {
   updated_at: string
 }
 
+// King of the Hill
+export type KothStatus =
+  | 'waiting'
+  | 'in_progress'
+  | 'scoring'
+  | 'finalized'
+  | 'expired'
+  | 'cancelled'
+
+export type KothFormat = 1 | 2 | 3
+
+export interface KothMatch {
+  id: string
+  created_by: string
+  created_by_name: string | null
+  format: KothFormat
+  map: string
+  team_a_name: string
+  team_b_name: string
+  team_a_id: string | null
+  team_b_id: string | null
+  status: KothStatus
+  team_a_score: number | null
+  team_b_score: number | null
+  winner: Winner | null
+  elo_processed_at: string | null
+  created_at: string
+  expires_at: string
+  started_at: string | null
+  finished_at: string | null
+  finalized_at: string | null
+}
+
+export interface KothMatchWithCounts extends KothMatch {
+  player_count: number
+  ready_count: number
+  team_a_count: number
+  team_b_count: number
+  score_submission_count: number
+}
+
+export interface KothMatchPlayer {
+  id: string
+  match_id: string
+  user_id: string
+  user_name: string
+  team: Team
+  is_ready: boolean
+  joined_at: string
+  ready_at: string | null
+}
+
+export interface KothScoreSubmission {
+  id: string
+  match_id: string
+  user_id: string
+  user_name: string | null
+  team_a_score: number
+  team_b_score: number
+  submitted_at: string
+}
+
+export interface KothTeam {
+  id: string
+  format: KothFormat
+  roster_key: string
+  name: string
+  member_user_ids: string[]
+  member_names: string[]
+  elo: number
+  games_played: number
+  wins: number
+  losses: number
+  draws: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateKothMatchInput {
+  format: KothFormat
+  map: string
+  teamName: string
+}
+
 // Badges - pin-style awards displayed on a player's profile.
 import type { BadgeType as PlayerBadgeType } from '@/lib/badges/constants'
 export type { BadgeType } from '@/lib/badges/constants'

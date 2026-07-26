@@ -50,6 +50,7 @@ export const TIER_TOTALS: Record<MapTier, number> = {
 /**
  * Maps and within-tier relative weights from the spreadsheet.
  * FLS assault had 0% and is omitted (never selectable).
+ * Names must match the map picker / tracker (`get_distinct_maps` / player_stats.map).
  */
 export const TIERED_MAPS: readonly TieredMapEntry[] = [
   // Tier 1
@@ -58,10 +59,10 @@ export const TIERED_MAPS: readonly TieredMapEntry[] = [
   { name: 'Weapons Cache', tier: 1, relativeWeight: 9 },
   { name: 'Collapsed Tunnel', tier: 1, relativeWeight: 9 },
   { name: 'Urban Assault', tier: 1, relativeWeight: 14 },
-  { name: 'MOUT Mckenna', tier: 1, relativeWeight: 15 },
+  { name: 'MOUT McKenna', tier: 1, relativeWeight: 15 },
   // Tier 2
   { name: 'Mountain Ambush', tier: 2, relativeWeight: 2 },
-  { name: 'HQ Raid', tier: 2, relativeWeight: 2.5 },
+  { name: 'Headquarters Raid', tier: 2, relativeWeight: 2.5 },
   { name: 'SF Sandstorm', tier: 2, relativeWeight: 3 },
   { name: 'Weapons Cache SE', tier: 2, relativeWeight: 1.5 },
   { name: 'SF CSAR', tier: 2, relativeWeight: 2 },
@@ -70,14 +71,14 @@ export const TIERED_MAPS: readonly TieredMapEntry[] = [
   { name: 'River Basin', tier: 2, relativeWeight: 1 },
   { name: 'Canyon', tier: 2, relativeWeight: 2.5 },
   // Tier 3
-  { name: 'JRTC Farm', tier: 3, relativeWeight: 1 },
+  { name: 'JRTC Farm Raid', tier: 3, relativeWeight: 1 },
   { name: 'Woodland Outpost', tier: 3, relativeWeight: 1 },
   { name: 'Border', tier: 3, relativeWeight: 1 },
   { name: 'Radio Tower', tier: 3, relativeWeight: 0.25 },
-  { name: 'SF Talga', tier: 3, relativeWeight: 0.25 },
+  { name: 'SF Taiga', tier: 3, relativeWeight: 0.25 },
   { name: 'Pipeline SF', tier: 3, relativeWeight: 0.4 },
   { name: 'Bridge SE', tier: 3, relativeWeight: 1.1 },
-  { name: 'River Village', tier: 3, relativeWeight: 1.2 },
+  { name: 'SMU GH RiverVillage', tier: 3, relativeWeight: 1.2 },
   // Tier 4
   { name: 'SF Hospital', tier: 4, relativeWeight: 0.05 },
   { name: 'SF Dockside', tier: 4, relativeWeight: 0.05 },
@@ -88,7 +89,7 @@ export const TIERED_MAPS: readonly TieredMapEntry[] = [
   { name: 'SF Courtyard', tier: 4, relativeWeight: 0.25 },
   // Tier 5
   { name: 'Rummage', tier: 5, relativeWeight: 0.12 },
-  { name: 'SF Old Town', tier: 5, relativeWeight: 0.1 },
+  { name: 'SMU GH SFOldTown', tier: 5, relativeWeight: 0.1 },
   { name: 'SF Blizzard', tier: 5, relativeWeight: 0.075 },
   { name: 'SF Recon', tier: 5, relativeWeight: 0.03 },
   { name: 'SF Arctic', tier: 5, relativeWeight: 0.02 },
@@ -97,8 +98,8 @@ export const TIERED_MAPS: readonly TieredMapEntry[] = [
   // Tier 6 (FLS assault omitted — 0% in spreadsheet)
   { name: 'District', tier: 6, relativeWeight: 0.071 },
   { name: 'SF PCR', tier: 6, relativeWeight: 0.01 },
-  { name: 'SF Floodgate', tier: 6, relativeWeight: 0.01 },
-  { name: 'SF Refinery', tier: 6, relativeWeight: 0.005 },
+  { name: 'SMU GH SFFloodgate', tier: 6, relativeWeight: 0.01 },
+  { name: 'SMU GH SFRefinery', tier: 6, relativeWeight: 0.005 },
   { name: 'Steamroller', tier: 6, relativeWeight: 0.002 },
   { name: 'SF Extraction', tier: 6, relativeWeight: 0.002 },
 ] as const
