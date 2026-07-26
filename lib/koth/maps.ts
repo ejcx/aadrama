@@ -6,6 +6,12 @@ export const KOTH_MAPS = [
   'Insurgent Camp',
   'Rummage',
   'District',
+  'Collapsed Tunnel',
+  'Bridge Crossing',
+  'Aztec',
+  'Dusk',
+  'SF CSAR',
+  'Swamp Raid',
 ] as const
 
 export type KothMap = (typeof KOTH_MAPS)[number]
