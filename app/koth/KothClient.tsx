@@ -18,7 +18,7 @@ import {
   getRecentKothMatches,
   getKothMatchPlayers,
 } from "./actions";
-import { KOTH_MAPS } from "@/lib/koth/maps";
+import { getKothMapsForFormat } from "@/lib/koth/maps";
 import { formatLabel, playersPerTeam, type KothFormat } from "@/lib/koth/format";
 import type { KothMatchWithCounts, KothMatchPlayer } from "@/lib/supabase/types";
 
@@ -437,8 +437,15 @@ export default function KothClient() {
   const [creating, setCreating] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [format, setFormat] = useState<KothFormat>(1);
-  const [map, setMap] = useState<string>(KOTH_MAPS[0]);
+  const [map, setMap] = useState<string>("Pool Day");
   const [teamName, setTeamName] = useState("");
+  const availableMaps = getKothMapsForFormat(format);
+
+  useEffect(() => {
+    if (!availableMaps.includes(map)) {
+      setMap(availableMaps[0]);
+    }
+  }, [format, availableMaps, map]);
 
   useEffect(() => {
     loadMatches();
@@ -534,18 +541,27 @@ export default function KothClient() {
                 </div>
                 <div>
                   <label className="text-white text-sm font-medium mb-2 block">Map</label>
-                  <select
-                    value={map}
-                    onChange={(e) => setMap(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white"
-                  >
-                    {KOTH_MAPS.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-gray-500 text-xs mt-1">No random maps — you pick it.</p>
+                  {format === 1 ? (
+                    <div className="px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white">
+                      Pool Day
+                      <p className="text-gray-500 text-xs mt-1">1v1 is Pool Day only.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        value={map}
+                        onChange={(e) => setMap(e.target.value)}
+                        className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white"
+                      >
+                        {availableMaps.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-gray-500 text-xs mt-1">No random maps — you pick it.</p>
+                    </>
+                  )}
                 </div>
                 <div>
                   <label className="text-white text-sm font-medium mb-2 block">Your team name</label>

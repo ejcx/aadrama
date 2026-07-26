@@ -5,7 +5,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
 import { calculateTeamEloChange, type KothMatchResult } from '@/lib/koth/elo'
 import { playersPerTeam, totalPlayersNeeded, type KothFormat } from '@/lib/koth/format'
-import { isKothMap } from '@/lib/koth/maps'
+import { isKothMapForFormat } from '@/lib/koth/maps'
 import { buildRosterKey } from '@/lib/koth/roster'
 import type {
   CreateKothMatchInput,
@@ -39,8 +39,12 @@ export async function createKothMatch(input: CreateKothMatchInput): Promise<Koth
   if (format !== 1 && format !== 2 && format !== 3) {
     throw new Error('Format must be 1v1, 2v2, or 3v3')
   }
-  if (!isKothMap(input.map)) {
-    throw new Error('Invalid King of the Hill map')
+  if (!isKothMapForFormat(format, input.map)) {
+    throw new Error(
+      format === 1
+        ? '1v1 matches can only be played on Pool Day'
+        : 'Invalid King of the Hill map'
+    )
   }
   const teamName = input.teamName.trim()
   if (!teamName) throw new Error('Team name is required')
