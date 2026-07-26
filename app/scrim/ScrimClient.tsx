@@ -30,6 +30,17 @@ import {
 import type { ScrimWithCounts, ScrimPlayer, MapChoice } from "@/lib/supabase/types";
 import { isCaptainsPickBlocked } from "@/lib/scrim/captains-pick";
 
+/** Poll interval for live scrim/lobby/draft updates (3–5s range). */
+const SCRIM_POLL_MS = 4000;
+
+const LIVE_SCRIM_STATUSES = new Set([
+  "waiting",
+  "ready_check",
+  "drafting",
+  "in_progress",
+  "scoring",
+]);
+
 function scrimMapLabel(scrim: Pick<ScrimWithCounts, "map" | "map_choice">): string | null {
   if (scrim.map) return scrim.map;
   if (scrim.map_choice === "tiered") return "TIERED (pending)";
@@ -127,24 +138,6 @@ function ScrimCard({
   const teamB = players.filter(p => p.team === "team_b");
   const unassigned = players.filter(p => !p.team);
 
-  useEffect(() => {
-    if (expanded) {
-      loadPlayers();
-      if (scrim.status === "in_progress") {
-        loadRerollStatus();
-      }
-      if (scrim.status === "drafting") {
-        loadDraftStatus();
-      }
-    }
-  }, [expanded, scrim.id, scrim.status]);
-
-  useEffect(() => {
-    if (!expanded || scrim.status !== "waiting") return;
-    const interval = setInterval(loadPlayers, 5000);
-    return () => clearInterval(interval);
-  }, [expanded, scrim.status, scrim.id]);
-
   async function loadPlayers() {
     try {
       const data = await getScrimPlayers(scrim.id);
@@ -188,6 +181,35 @@ function ScrimCard({
       console.error("Failed to load draft status:", err);
     }
   }
+
+  async function refreshExpandedState() {
+    await loadPlayers();
+    if (scrim.status === "drafting") {
+      try {
+        const status = await getDraftStatus(scrim.id);
+        setDraftStatus(status);
+        // Draft may have just finished — refresh list so status flips to in_progress.
+        if (!status.isDrafting) {
+          onRefresh();
+        }
+      } catch (err) {
+        console.error("Failed to load draft status:", err);
+      }
+    }
+    if (scrim.status === "in_progress") {
+      await loadRerollStatus();
+    }
+  }
+
+  useEffect(() => {
+    if (!expanded || !LIVE_SCRIM_STATUSES.has(scrim.status)) return;
+
+    void refreshExpandedState();
+    const interval = setInterval(() => {
+      void refreshExpandedState();
+    }, SCRIM_POLL_MS);
+    return () => clearInterval(interval);
+  }, [expanded, scrim.id, scrim.status]);
   
   function handleAction(action: () => Promise<unknown>) {
     setLoading(true);
@@ -798,8 +820,8 @@ export default function ScrimClient() {
     loadActiveScrims();
     loadMaps();
     loadScrimMaps();
-    // Poll for active scrims every 10 seconds
-    const interval = setInterval(loadActiveScrims, 10000);
+    // Keep lobby status, player counts, and ready counts fresh.
+    const interval = setInterval(loadActiveScrims, SCRIM_POLL_MS);
     return () => clearInterval(interval);
   }, []);
 

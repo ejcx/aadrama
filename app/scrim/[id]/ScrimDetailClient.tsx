@@ -25,17 +25,25 @@ import {
   getRerollStatus,
   getPotatoVoteStatus,
   votePotato,
+  setCaptains,
+  getDraftStatus,
+  draftPlayer,
+  type DraftStatus,
   type RerollStatus,
   type PotatoVoteStatus,
 } from "../actions";
 import type { ScrimWithCounts, ScrimPlayer, ScrimScoreSubmission } from "@/lib/supabase/types";
 import { SessionContent } from "../../tracker/session/SessionContent";
 
+/** Poll interval for live scrim/lobby/draft updates (3–5s range). */
+const SCRIM_POLL_MS = 4000;
+
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     waiting: "bg-yellow-600 text-yellow-100",
     ready_check: "bg-blue-600 text-blue-100",
+    drafting: "bg-violet-600 text-violet-100",
     in_progress: "bg-green-600 text-green-100",
     scoring: "bg-purple-600 text-purple-100",
     finalized: "bg-gray-600 text-gray-100",
@@ -46,6 +54,7 @@ function StatusBadge({ status }: { status: string }) {
   const labels: Record<string, string> = {
     waiting: "Waiting for Players",
     ready_check: "Ready Check",
+    drafting: "Drafting",
     in_progress: "In Progress",
     scoring: "Awaiting Scores",
     finalized: "Finalized",
@@ -118,6 +127,9 @@ export default function ScrimDetailClient() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<DraftStatus | null>(null);
+  const [selectedCaptainA, setSelectedCaptainA] = useState("");
+  const [selectedCaptainB, setSelectedCaptainB] = useState("");
 
   // Form states
   const [scoreA, setScoreA] = useState("");
@@ -139,8 +151,8 @@ export default function ScrimDetailClient() {
     loadScrimData();
     // Check if user is admin
     isCurrentUserAdmin().then(setIsAdmin);
-    // Poll every 5 seconds for real-time updates
-    const interval = setInterval(loadScrimData, 5000);
+    // Keep players, ready state, and teams in sync.
+    const interval = setInterval(loadScrimData, SCRIM_POLL_MS);
     return () => clearInterval(interval);
   }, [scrimId]);
 
@@ -228,6 +240,18 @@ export default function ScrimDetailClient() {
         }
       } else {
         setRerollStatus(null);
+      }
+
+      // Load draft status while captains are picking teams
+      if (scrimData.status === "drafting") {
+        try {
+          const status = await getDraftStatus(scrimId);
+          setDraftStatus(status);
+        } catch (err) {
+          console.error("Failed to load draft status:", err);
+        }
+      } else {
+        setDraftStatus(null);
       }
 
       if (scrimData.status === "finalized") {
@@ -432,12 +456,24 @@ export default function ScrimDetailClient() {
                   <>
                     <button
                       onClick={() => handleAction(() => toggleReady(scrimId))}
-                      disabled={isPending}
+                      disabled={
+                        isPending ||
+                        (scrim.selection_mode === "captains" &&
+                          !scrim.captain_a_user_id &&
+                          !scrim.captain_b_user_id)
+                      }
                       className={`px-6 py-2 rounded-lg font-medium ${
                         myPlayer?.is_ready
                           ? "bg-yellow-600 hover:bg-yellow-500 text-white"
                           : "bg-green-600 hover:bg-green-500 text-white"
                       }`}
+                      title={
+                        scrim.selection_mode === "captains" &&
+                        !scrim.captain_a_user_id &&
+                        !scrim.captain_b_user_id
+                          ? "Waiting for creator to select captains"
+                          : ""
+                      }
                     >
                       {myPlayer?.is_ready ? "Cancel Ready" : "Ready Up"}
                     </button>
@@ -472,7 +508,164 @@ export default function ScrimDetailClient() {
                   ✓ All players ready! Game will start automatically
                 </p>
               )}
+
+              {/* Captain selection (creator, captains mode) */}
+              {scrim.selection_mode === "captains" && isCreator && (
+                <div className="mt-6 p-4 bg-blue-900/30 border border-blue-700 rounded-lg">
+                  <h3 className="text-blue-400 font-medium mb-3">🎯 Select Team Captains</h3>
+                  {!scrim.captain_a_user_id || !scrim.captain_b_user_id ? (
+                    <>
+                      <p className="text-gray-300 text-sm mb-3">
+                        Choose two players to be team captains. They will draft teams in snake draft order.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-blue-300 text-sm block mb-2">Captain A</label>
+                          <select
+                            value={selectedCaptainA}
+                            onChange={(e) => setSelectedCaptainA(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm"
+                          >
+                            <option value="">Select Captain A...</option>
+                            {players.map(p => (
+                              <option key={p.id} value={p.user_id} disabled={p.user_id === selectedCaptainB}>
+                                {p.user_name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-red-300 text-sm block mb-2">Captain B</label>
+                          <select
+                            value={selectedCaptainB}
+                            onChange={(e) => setSelectedCaptainB(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm"
+                          >
+                            <option value="">Select Captain B...</option>
+                            {players.map(p => (
+                              <option key={p.id} value={p.user_id} disabled={p.user_id === selectedCaptainA}>
+                                {p.user_name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() =>
+                          handleAction(async () => {
+                            if (!selectedCaptainA || !selectedCaptainB) {
+                              throw new Error("Please select both captains");
+                            }
+                            const result = await setCaptains(scrimId, selectedCaptainA, selectedCaptainB);
+                            if (!result.success) {
+                              throw new Error(result.error || "Failed to set captains");
+                            }
+                          })
+                        }
+                        disabled={isPending || !selectedCaptainA || !selectedCaptainB}
+                        className="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded text-sm font-medium"
+                      >
+                        Set Captains
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-sm">
+                      <p className="text-gray-300 mb-2">Captains selected:</p>
+                      <div className="flex gap-4">
+                        <span className="text-blue-400">🎯 {scrim.captain_a_name}</span>
+                        <span className="text-red-400">🎯 {scrim.captain_b_name}</span>
+                      </div>
+                      <p className="text-yellow-400 text-xs mt-2">
+                        Waiting for all players to ready up...
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
+          )}
+
+          {/* Captain Draft */}
+          {scrim.status === "drafting" && draftStatus && (
+            <div className="mb-2">
+              <h2 className="text-purple-400 text-xl font-semibold mb-4">🎯 Captain Draft - Snake Pick</h2>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-3">
+                  <h3 className="text-blue-400 font-medium mb-2 flex items-center gap-2">
+                    Team A
+                    {draftStatus.currentDrafter === "captain_a" && (
+                      <span className="text-xs bg-blue-600 px-2 py-1 rounded">Picking...</span>
+                    )}
+                  </h3>
+                  <div className="space-y-1">
+                    {draftStatus.teamA.map(p => (
+                      <div key={p.id} className="text-gray-300 text-sm">
+                        {p.user_id === draftStatus.captainAUserId && "🎯 "}
+                        {p.user_name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-red-900/30 border border-red-700 rounded-lg p-3">
+                  <h3 className="text-red-400 font-medium mb-2 flex items-center gap-2">
+                    Team B
+                    {draftStatus.currentDrafter === "captain_b" && (
+                      <span className="text-xs bg-red-600 px-2 py-1 rounded">Picking...</span>
+                    )}
+                  </h3>
+                  <div className="space-y-1">
+                    {draftStatus.teamB.map(p => (
+                      <div key={p.id} className="text-gray-300 text-sm">
+                        {p.user_id === draftStatus.captainBUserId && "🎯 "}
+                        {p.user_name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {draftStatus.undrafted.length > 0 && (
+                <div className="mb-3">
+                  <h3 className="text-gray-400 text-sm font-medium mb-2">Available Players:</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {draftStatus.undrafted.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() =>
+                          handleAction(async () => {
+                            if (!draftStatus.isMyTurn) {
+                              throw new Error("It's not your turn to pick!");
+                            }
+                            const result = await draftPlayer(scrimId, p.user_id);
+                            if (!result.success) {
+                              throw new Error(result.error || "Failed to draft player");
+                            }
+                          })
+                        }
+                        disabled={isPending || !draftStatus.isMyTurn}
+                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                          draftStatus.isMyTurn
+                            ? "bg-purple-600 hover:bg-purple-500 text-white"
+                            : "bg-gray-700 text-gray-400 cursor-not-allowed"
+                        }`}
+                      >
+                        {p.user_name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {draftStatus.isMyTurn ? (
+                <p className="text-green-400 text-sm">✓ Your turn to pick!</p>
+              ) : (
+                <p className="text-gray-400 text-sm">
+                  Waiting for{" "}
+                  {draftStatus.currentDrafter === "captain_a"
+                    ? draftStatus.captainAName
+                    : draftStatus.captainBName}{" "}
+                  to pick...
+                </p>
+              )}
+            </div>
           )}
 
           {/* Teams (in_progress, scoring, finalized) */}
