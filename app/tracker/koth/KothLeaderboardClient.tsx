@@ -38,7 +38,7 @@ export default function KothLeaderboardClient({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <p className="text-gray-400 text-sm">
           Team ELO by format. Same roster shares a rating; play matches on{" "}
-          <Link href="/koth" className="text-blue-400 hover:underline">
+          <Link href="/koth" className="aa-link hover:underline">
             King of the Hill
           </Link>
           .
@@ -49,11 +49,7 @@ export default function KothLeaderboardClient({
               key={f}
               type="button"
               onClick={() => setFormat(f)}
-              className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-                format === f
-                  ? "bg-amber-700 text-white"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600"
-              }`}
+              className={format === f ? "aa-chip-active !px-3.5 !py-2 !text-sm" : "aa-chip !px-3.5 !py-2 !text-sm"}
             >
               {formatLabel(f)}
             </button>
@@ -61,32 +57,32 @@ export default function KothLeaderboardClient({
         </div>
       </div>
 
-      <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-          <h2 className="text-white font-semibold">{formatLabel(format)} Team Rankings</h2>
+      <div className="aa-table-wrap">
+        <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-white">{formatLabel(format)} Team Rankings</h2>
           {isPending && <span className="text-gray-500 text-xs">Loading…</span>}
         </div>
 
         {teams.length === 0 ? (
-          <div className="py-12 text-center text-gray-400">
+          <div className="py-12 text-center text-gray-500 text-sm">
             No ranked {formatLabel(format)} teams yet
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-gray-400 border-b border-gray-700">
-                  <th className="px-4 py-3">#</th>
-                  <th className="px-4 py-3">Team</th>
-                  <th className="px-4 py-3">Roster</th>
-                  <th className="px-4 py-3 text-right">ELO</th>
-                  <th className="px-4 py-3 text-right">W-L-D</th>
-                  <th className="px-4 py-3 text-right">Games</th>
+                <tr className="text-left text-gray-500 border-b border-gray-800">
+                  <th className="px-4 py-3 font-medium">#</th>
+                  <th className="px-4 py-3 font-medium">Team</th>
+                  <th className="px-4 py-3 font-medium">Roster</th>
+                  <th className="px-4 py-3 text-right font-medium">ELO</th>
+                  <th className="px-4 py-3 text-right font-medium">W-L-D</th>
+                  <th className="px-4 py-3 text-right font-medium">Games</th>
                 </tr>
               </thead>
               <tbody>
                 {teams.map((team, i) => (
-                  <tr key={team.id} className="border-b border-gray-800 hover:bg-gray-800/40">
+                  <tr key={team.id} className="border-b border-gray-800/80 hover:bg-white/[0.02]">
                     <td className="px-4 py-3 text-gray-500">{i + 1}</td>
                     <td className="px-4 py-3 text-white font-medium">{team.name}</td>
                     <td className="px-4 py-3 text-gray-400">

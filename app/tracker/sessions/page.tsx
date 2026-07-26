@@ -162,7 +162,7 @@ const SessionsPage = () => {
   return (
     <TrackerLayout>
       {/* Filters */}
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+      <div className="aa-panel p-3 sm:p-4 mb-4 sm:mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div>
             <label className="block text-gray-300 text-xs sm:text-sm mb-1">Start Time</label>
@@ -170,7 +170,7 @@ const SessionsPage = () => {
               type="datetime-local"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+              className="aa-input text-xs sm:text-sm"
             />
           </div>
           <div>
@@ -179,7 +179,7 @@ const SessionsPage = () => {
               type="datetime-local"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+              className="aa-input text-xs sm:text-sm"
             />
           </div>
           <div>
@@ -187,7 +187,7 @@ const SessionsPage = () => {
             <select
               value={selectedMap}
               onChange={(e) => setSelectedMap(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+              className="aa-input text-xs sm:text-sm"
             >
               <option value="">All Maps</option>
               {maps.map((map, index) => (
@@ -205,7 +205,7 @@ const SessionsPage = () => {
               onChange={(e) => setLimit(parseInt(e.target.value) || 50)}
               min="1"
               max="500"
-              className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+              className="aa-input text-xs sm:text-sm"
             />
           </div>
         </div>
@@ -223,11 +223,11 @@ const SessionsPage = () => {
 
       {/* Content */}
       {!loading && (
-        <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
+        <div className="aa-table-wrap">
           <div className="overflow-x-auto">
             <table className="w-full text-white text-xs sm:text-sm min-w-[600px]">
               <thead>
-                <tr className="border-b border-gray-700 bg-gray-800">
+                <tr className="border-b border-gray-800 bg-gray-900/80 text-gray-500">
                   <th className="py-2 sm:py-3 px-2 sm:px-4 w-10">
                     <input
                       type="checkbox"
@@ -258,7 +258,7 @@ const SessionsPage = () => {
                   sessions.map((session) => (
                     <tr
                       key={session.session_id}
-                      className={`border-b border-gray-800 hover:bg-gray-800 cursor-pointer ${selectedSessions.has(session.session_id) ? "bg-cyan-900/30" : ""
+                      className={`border-b border-gray-800/80 hover:bg-white/[0.02] cursor-pointer ${selectedSessions.has(session.session_id) ? "bg-cyan-900/30" : ""
                         }`}
                       onClick={() => toggleSessionSelection(session.session_id)}
                     >
@@ -273,7 +273,7 @@ const SessionsPage = () => {
                       <td className="py-2 sm:py-3 px-2 sm:px-4" onClick={(e) => e.stopPropagation()}>
                         <SessionHoverPopover
                           session={session}
-                          className="text-blue-400 hover:text-blue-300 hover:underline font-mono text-xs truncate block max-w-[100px] sm:max-w-none"
+                          className="aa-link hover:underline font-mono text-xs truncate block max-w-[100px] sm:max-w-none"
                         />
                       </td>
                       <td className="py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">

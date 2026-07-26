@@ -8,7 +8,7 @@ export default async function KothRankingsPage() {
   const teams = await getKothLeaderboard(initialFormat);
 
   return (
-    <TrackerLayout title="King of the Hill">
+    <TrackerLayout title="King of the Hill" subtitle="Team ELO by format — 1v1, 2v2, 3v3">
       <KothLeaderboardClient initialFormat={initialFormat} initialTeams={teams} />
     </TrackerLayout>
   );

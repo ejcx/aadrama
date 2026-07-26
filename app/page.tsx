@@ -87,7 +87,7 @@ const Home = () => {
 
   return (
     <SidebarLayout>
-      <div className="relative min-h-screen">
+      <div className="relative min-h-screen aa-page-bg">
         <div
           className="pointer-events-none absolute inset-0 opacity-40"
           style={{
@@ -277,6 +277,13 @@ const Home = () => {
               </div>
             )}
           </section>
+
+          <p className="pt-4 text-center text-xs text-gray-600">
+            <Link href="/downloads" className="aa-link hover:underline">
+              Downloads
+            </Link>{" "}
+            are available here from time to time.
+          </p>
         </div>
       </div>
     </SidebarLayout>

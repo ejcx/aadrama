@@ -56,7 +56,7 @@ export default async function EloRankingsPage() {
   }));
 
   return (
-    <TrackerLayout title="Scrim Rankings">
+    <TrackerLayout title="Scrim Rankings" subtitle="Season and lifetime competitive ELO">
       <EloClient initialData={{ eloPlayers, maps }} />
     </TrackerLayout>
   );

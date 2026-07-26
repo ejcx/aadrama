@@ -154,7 +154,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
 
   return (
     <div className="space-y-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
+      <div className="aa-panel p-4">
         <div className="flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <span className="text-gray-300 text-sm font-medium">Leaderboard:</span>
@@ -163,11 +163,9 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                 type="button"
                 onClick={() => switchSeason("cumulative")}
                 disabled={tableLoading}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                  seasonView === "cumulative"
-                    ? "bg-white text-black"
-                    : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
-                }`}
+                className={
+                  seasonView === "cumulative" ? "aa-chip-active !px-3.5 !py-2 !text-sm" : "aa-chip !px-3.5 !py-2 !text-sm"
+                }
               >
                 Cumulative
               </button>
@@ -175,11 +173,11 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                 type="button"
                 onClick={() => switchSeason("season2")}
                 disabled={tableLoading}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                className={
                   seasonView === "season2"
-                    ? "bg-purple-600 text-white"
-                    : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
-                }`}
+                    ? "inline-flex items-center rounded-md border border-violet-700/50 bg-violet-950/80 px-3.5 py-2 text-sm font-medium text-violet-200"
+                    : "aa-chip !px-3.5 !py-2 !text-sm"
+                }
               >
                 {SEASON_2_LABEL}
               </button>
@@ -187,11 +185,11 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                 type="button"
                 onClick={() => switchSeason("season1")}
                 disabled={tableLoading}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                className={
                   seasonView === "season1"
-                    ? "bg-amber-600 text-white"
-                    : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
-                }`}
+                    ? "inline-flex items-center rounded-md border border-amber-700/50 bg-amber-950/80 px-3.5 py-2 text-sm font-medium text-amber-200"
+                    : "aa-chip !px-3.5 !py-2 !text-sm"
+                }
               >
                 {SEASON_1_LABEL}
               </button>
@@ -216,13 +214,13 @@ export default function EloClient({ initialData }: { initialData: InitialData })
         </div>
       </div>
 
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-4">
+      <div className="aa-panel p-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <label className="text-gray-300 text-sm font-medium">Filter by Map:</label>
           <select
             value={selectedMap}
             onChange={(e) => setSelectedMap(e.target.value)}
-            className="flex-1 max-w-xs px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white"
+            className="flex-1 max-w-xs px-4 py-2 aa-select"
           >
             <option value="">All Maps (Overall ELO)</option>
             {maps.map((map) => (
@@ -248,13 +246,13 @@ export default function EloClient({ initialData }: { initialData: InitialData })
       </div>
 
       {tableLoading && (
-        <div className="bg-gray-900 border border-gray-700 rounded-lg p-8 text-center text-gray-400">
+        <div className="aa-panel p-8 text-center text-gray-400">
           {seasonLoading || isPending ? "Loading leaderboard..." : "Loading map statistics..."}
         </div>
       )}
 
       {!tableLoading && selectedMap && mapStats && (
-        <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
+        <div className="aa-table-wrap">
           {mapStats.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
               No ranked games found on {selectedMap}
@@ -264,7 +262,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
             <div className="overflow-x-auto">
               <table className="w-full text-white text-xs sm:text-sm min-w-[550px]">
                 <thead>
-                  <tr className="border-b border-gray-700 bg-gray-800">
+                  <tr className="border-b border-gray-800 bg-gray-900/80 text-gray-500">
                     <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Rank</th>
                     <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Player</th>
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Map ELO</th>
@@ -277,7 +275,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                   {mapStats.map((player, index) => (
                     <tr
                       key={player.game_name_lower}
-                      className="border-b border-gray-800 hover:bg-gray-800"
+                      className="border-b border-gray-800/80 hover:bg-white/[0.02]"
                     >
                       <td className="py-2 sm:py-3 px-2 sm:px-4">
                         <span
@@ -297,7 +295,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                       <td className="py-2 sm:py-3 px-2 sm:px-4">
                         <Link
                           href={`/tracker/player/${encodeURIComponent(player.game_name)}`}
-                          className="text-blue-400 hover:text-blue-300 hover:underline font-medium"
+                          className="aa-link hover:underline font-medium"
                         >
                           {player.game_name}
                         </Link>
@@ -342,7 +340,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
       )}
 
       {!tableLoading && !selectedMap && (
-        <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
+        <div className="aa-table-wrap">
           {eloPlayers.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
               {seasonView === "season2"
@@ -359,7 +357,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                 }`}
               >
                 <thead>
-                  <tr className="border-b border-gray-700 bg-gray-800">
+                  <tr className="border-b border-gray-800 bg-gray-900/80 text-gray-500">
                     <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Rank</th>
                     <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Player</th>
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">ELO</th>
@@ -379,7 +377,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                   {eloPlayers.map((player, index) => (
                     <tr
                       key={player.game_name_lower}
-                      className="border-b border-gray-800 hover:bg-gray-800"
+                      className="border-b border-gray-800/80 hover:bg-white/[0.02]"
                     >
                       <td className="py-2 sm:py-3 px-2 sm:px-4">
                         <span
@@ -399,7 +397,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                       <td className="py-2 sm:py-3 px-2 sm:px-4">
                         <Link
                           href={`/tracker/player/${encodeURIComponent(player.game_name)}`}
-                          className="text-blue-400 hover:text-blue-300 hover:underline font-medium"
+                          className="aa-link hover:underline font-medium"
                         >
                           {player.game_name}
                         </Link>

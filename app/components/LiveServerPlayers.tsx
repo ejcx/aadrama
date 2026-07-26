@@ -85,12 +85,6 @@ function MatchMeta({ serverInfo }: { serverInfo: LiveServerInfo }) {
       value: `${serverInfo.honor_team0} / ${serverInfo.honor_team1}`,
     });
   }
-  if (serverInfo.roe_team0 != null || serverInfo.roe_team1 != null) {
-    bits.push({
-      label: "Team ROE",
-      value: `${serverInfo.roe_team0 ?? 0} / ${serverInfo.roe_team1 ?? 0}`,
-    });
-  }
 
   if (bits.length === 0) return null;
 

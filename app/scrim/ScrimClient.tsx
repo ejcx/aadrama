@@ -38,14 +38,14 @@ function scrimMapLabel(scrim: Pick<ScrimWithCounts, "map" | "map_choice">): stri
 // Scrim status badges
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    waiting: "bg-yellow-600 text-yellow-100",
-    ready_check: "bg-blue-600 text-blue-100",
-    drafting: "bg-purple-600 text-purple-100",
-    in_progress: "bg-green-600 text-green-100",
-    scoring: "bg-purple-600 text-purple-100",
-    finalized: "bg-gray-600 text-gray-100",
-    expired: "bg-red-900 text-red-200",
-    cancelled: "bg-gray-700 text-gray-300",
+    waiting: "border-amber-800/50 bg-amber-950/80 text-amber-300",
+    ready_check: "border-sky-800/50 bg-sky-950/80 text-sky-300",
+    drafting: "border-violet-800/50 bg-violet-950/80 text-violet-300",
+    in_progress: "border-emerald-800/50 bg-emerald-950/80 text-emerald-300",
+    scoring: "border-violet-800/50 bg-violet-950/80 text-violet-300",
+    finalized: "border-gray-700 bg-gray-900 text-gray-400",
+    expired: "border-red-900/50 bg-red-950/80 text-red-300",
+    cancelled: "border-gray-800 bg-gray-950 text-gray-500",
   };
 
   const labels: Record<string, string> = {
@@ -60,7 +60,7 @@ function StatusBadge({ status }: { status: string }) {
   };
   
   return (
-    <span className={`px-2 py-1 rounded text-xs font-semibold ${styles[status] || "bg-gray-600"}`}>
+    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${styles[status] || "border-gray-800 bg-gray-900 text-gray-400"}`}>
       {labels[status] || status}
     </span>
   );
@@ -205,7 +205,7 @@ function ScrimCard({
   }
   
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6">
+    <div className="aa-panel p-4 sm:p-5 transition-colors hover:border-gray-700">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-3">
         <div>
           {(() => {
@@ -884,25 +884,26 @@ export default function ScrimClient() {
   
   return (
     <SidebarLayout>
-      <div className="flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 py-6 sm:py-12">
-        <div className="flex flex-col items-start space-y-6 sm:space-y-8 w-full max-w-4xl">
+      <div className="aa-page-bg relative min-h-screen">
+        <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-10 md:px-8">
           {/* Header */}
-          <div className="flex items-center justify-between w-full">
-            <h1 className="text-white text-2xl sm:text-3xl md:text-4xl font-bold">
-              AA Scrim
-            </h1>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h1 className="aa-section-title text-2xl sm:text-3xl">Scrim</h1>
+              <p className="aa-section-sub">Create lobbies, ready up, and get matched</p>
+            </div>
             {user ? (
               <UserButton 
                 afterSignOutUrl="/"
                 appearance={{
                   elements: {
-                    avatarBox: "w-10 h-10"
+                    avatarBox: "w-9 h-9"
                   }
                 }}
               />
             ) : (
               <SignInButton mode="modal">
-                <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+                <button className="aa-btn-primary">
                   Sign In
                 </button>
               </SignInButton>
@@ -910,8 +911,8 @@ export default function ScrimClient() {
           </div>
           
           {/* Create scrim */}
-          <div className="w-full bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6">
-            <h2 className="text-white font-semibold mb-4">Create New Scrim</h2>
+          <div className="aa-panel w-full p-4 sm:p-6">
+            <h2 className="mb-4 text-sm font-semibold text-white">Create New Scrim</h2>
             {user ? (
               <>
                 <div className="flex flex-col gap-3 mb-3">
@@ -921,22 +922,14 @@ export default function ScrimClient() {
                       <button
                         type="button"
                         onClick={() => setMapChoice("manual")}
-                        className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-                          mapChoice === "manual"
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                        }`}
+                        className={mapChoice === "manual" ? "aa-chip-active !px-3.5 !py-2 !text-sm" : "aa-chip !px-3.5 !py-2 !text-sm"}
                       >
                         Specific Map
                       </button>
                       <button
                         type="button"
                         onClick={() => setMapChoice("tiered")}
-                        className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-                          mapChoice === "tiered"
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                        }`}
+                        className={mapChoice === "tiered" ? "aa-chip-active !px-3.5 !py-2 !text-sm" : "aa-chip !px-3.5 !py-2 !text-sm"}
                       >
                         TIERED
                       </button>
@@ -996,22 +989,14 @@ export default function ScrimClient() {
                       <button
                         type="button"
                         onClick={() => setSelectionMode("random")}
-                        className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-                          selectionMode === "random"
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                        }`}
+                        className={selectionMode === "random" ? "aa-chip-active !px-3.5 !py-2 !text-sm" : "aa-chip !px-3.5 !py-2 !text-sm"}
                       >
                         🎲 Random
                       </button>
                       <button
                         type="button"
                         onClick={() => setSelectionMode("skill_based")}
-                        className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-                          selectionMode === "skill_based"
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                        }`}
+                        className={selectionMode === "skill_based" ? "aa-chip-active !px-3.5 !py-2 !text-sm" : "aa-chip !px-3.5 !py-2 !text-sm"}
                       >
                         ⚖️ Skill Based
                       </button>
@@ -1019,11 +1004,7 @@ export default function ScrimClient() {
                         <button
                           type="button"
                           onClick={() => setSelectionMode("captains")}
-                          className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-                            selectionMode === "captains"
-                              ? "bg-blue-600 text-white"
-                              : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                          }`}
+                          className={selectionMode === "captains" ? "aa-chip-active !px-3.5 !py-2 !text-sm" : "aa-chip !px-3.5 !py-2 !text-sm"}
                         >
                           🎯 Captains Pick
                         </button>
@@ -1059,9 +1040,15 @@ export default function ScrimClient() {
           
           {/* Active Scrims */}
           <div className="w-full">
-            <h2 className="text-white text-xl font-bold mb-4">Active Scrims</h2>
+            <div className="mb-4">
+              <h2 className="aa-section-title">Active Scrims</h2>
+              <p className="aa-section-sub">Open lobbies waiting to start</p>
+            </div>
             {loading ? (
-              <div className="text-gray-400">Loading scrims...</div>
+              <div className="mt-2 space-y-3">
+                <div className="h-24 aa-panel animate-pulse" />
+                <div className="h-24 aa-panel animate-pulse" />
+              </div>
             ) : activeScrims.length > 0 ? (
               <div className="space-y-4">
                 {activeScrims.map(scrim => (
@@ -1075,7 +1062,7 @@ export default function ScrimClient() {
                 ))}
               </div>
             ) : (
-              <div className="py-8 border-2 border-dashed border-gray-600 rounded-lg text-center">
+              <div className="rounded-xl border border-dashed border-gray-800 py-10 text-center">
                 <div className="text-gray-400 text-lg mb-2">No active scrims</div>
                 <div className="text-gray-500 text-sm">Create one to get started!</div>
               </div>
@@ -1084,10 +1071,10 @@ export default function ScrimClient() {
           
           {/* Recent Scrims */}
           <div className="w-full">
-            <h2 className="text-white text-xl font-bold mb-4">Recent Scrims</h2>
+            <div className="mb-4"><h2 className="aa-section-title">Recent Scrims</h2><p className="aa-section-sub">Finalized matches</p></div>
 
             {/* Time Range Filters */}
-            <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 sm:p-4 mb-4">
+            <div className="aa-panel p-3 sm:p-4 mb-4">
               {/* Time Range Quick Buttons */}
               <div className="mb-4">
                 <label className="block text-gray-300 text-xs sm:text-sm mb-2">Time Range</label>
@@ -1102,10 +1089,7 @@ export default function ScrimClient() {
                     <button
                       key={option.value}
                       onClick={() => handleTimeRangeChange(option.value as TimeRange)}
-                      className={`px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors ${timeRange === option.value
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600"
-                        }`}
+                      className={timeRange === option.value ? "aa-chip-active" : "aa-chip"}
                     >
                       {option.label}
                     </button>
@@ -1210,7 +1194,7 @@ export default function ScrimClient() {
                 ))}
               </div>
               ) : (
-                <div className="py-8 border-2 border-dashed border-gray-600 rounded-lg text-center">
+                <div className="rounded-xl border border-dashed border-gray-800 py-10 text-center">
                   <div className="text-gray-400 text-lg mb-2">No scrims found</div>
                   <div className="text-gray-500 text-sm">Try adjusting the time range</div>
               </div>

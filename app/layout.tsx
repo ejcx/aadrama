@@ -18,21 +18,21 @@ export default async function RootLayout({
     <ClerkProvider
       appearance={{
         variables: {
-          colorPrimary: '#3b82f6',
-          colorBackground: '#111827',
-          colorInputBackground: '#1f2937',
+          colorPrimary: '#0891b2',
+          colorBackground: '#030712',
+          colorInputBackground: '#030712',
           colorInputText: '#ffffff',
           colorText: '#ffffff',
         },
         elements: {
-          formButtonPrimary: 'bg-blue-500 hover:bg-blue-600',
-          card: 'bg-gray-900 border border-gray-700',
+          formButtonPrimary: 'bg-cyan-700 hover:bg-cyan-600',
+          card: 'bg-gray-950 border border-gray-800',
           headerTitle: 'text-white',
           headerSubtitle: 'text-gray-400',
-          socialButtonsBlockButton: 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700',
+          socialButtonsBlockButton: 'bg-gray-900 border-gray-800 text-white hover:bg-gray-800',
           formFieldLabel: 'text-gray-300',
-          formFieldInput: 'bg-gray-800 border-gray-700 text-white',
-          footerActionLink: 'text-blue-400 hover:text-blue-300',
+          formFieldInput: 'bg-gray-950 border-gray-800 text-white',
+          footerActionLink: 'text-cyan-400 hover:text-cyan-300',
         },
       }}
     >

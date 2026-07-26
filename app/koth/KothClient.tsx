@@ -149,7 +149,7 @@ function MatchCard({
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
+    <div className="aa-table-wrap">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
@@ -220,7 +220,7 @@ function MatchCard({
                   onChange={(e) => setRenameValue(e.target.value)}
                   placeholder={myPlayer?.team === "team_a" ? match.team_a_name : match.team_b_name}
                   maxLength={32}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white text-sm"
+                  className="w-full px-3 py-2 aa-input text-sm"
                 />
               </div>
               <button
@@ -308,7 +308,7 @@ function MatchCard({
                   min={0}
                   value={scoreA}
                   onChange={(e) => setScoreA(e.target.value)}
-                  className="w-24 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white"
+                  className="w-24 px-3 py-2 aa-input"
                 />
               </div>
               <span className="text-gray-500 pb-2">–</span>
@@ -319,7 +319,7 @@ function MatchCard({
                   min={0}
                   value={scoreB}
                   onChange={(e) => setScoreB(e.target.value)}
-                  className="w-24 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white"
+                  className="w-24 px-3 py-2 aa-input"
                 />
               </div>
               <button
@@ -347,7 +347,7 @@ function MatchCard({
             </div>
           )}
 
-          <Link href={`/koth/${match.id}`} className="text-blue-400 text-sm hover:underline">
+          <Link href={`/koth/${match.id}`} className="aa-link text-sm hover:underline">
             Open match page →
           </Link>
         </div>
@@ -486,14 +486,14 @@ export default function KothClient() {
 
   return (
     <SidebarLayout>
-      <div className="min-h-screen p-4 sm:p-6 lg:p-8">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <div className="aa-page-bg relative min-h-screen">
+        <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-10 md:px-8">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">King of the Hill</h1>
-              <p className="text-gray-400 text-sm mt-1">
-                Preset-map team fights. Rankings live under{" "}
-                <Link href="/tracker/koth" className="text-blue-400 hover:underline">
+              <h1 className="aa-section-title text-2xl sm:text-3xl">King of the Hill</h1>
+              <p className="aa-section-sub">
+                Preset-map team fights. Rankings under{" "}
+                <Link href="/tracker/koth" className="aa-link hover:underline">
                   Tracker → King of the Hill
                 </Link>
                 .
@@ -509,14 +509,14 @@ export default function KothClient() {
                 />
               ) : (
                 <SignInButton mode="modal">
-                  <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+                  <button className="aa-btn-primary">
                     Sign In
                   </button>
                 </SignInButton>
               ))}
           </div>
 
-          <div className="w-full bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6">
+          <div className="w-full aa-panel p-4 sm:p-6">
             <h2 className="text-white font-semibold mb-4">Start a Match</h2>
             {user ? (
               <div className="space-y-4">
@@ -528,11 +528,7 @@ export default function KothClient() {
                         key={f}
                         type="button"
                         onClick={() => setFormat(f)}
-                        className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-                          format === f
-                            ? "bg-amber-700 text-white"
-                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                        }`}
+                        className={format === f ? "aa-chip-active !px-3.5 !py-2 !text-sm" : "aa-chip !px-3.5 !py-2 !text-sm"}
                       >
                         {formatLabel(f)}
                       </button>
@@ -542,7 +538,7 @@ export default function KothClient() {
                 <div>
                   <label className="text-white text-sm font-medium mb-2 block">Map</label>
                   {format === 1 ? (
-                    <div className="px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white">
+                    <div className="px-4 py-3 aa-select">
                       Pool Day
                       <p className="text-gray-500 text-xs mt-1">1v1 is Pool Day only.</p>
                     </div>
@@ -551,7 +547,7 @@ export default function KothClient() {
                       <select
                         value={map}
                         onChange={(e) => setMap(e.target.value)}
-                        className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white"
+                        className="w-full px-4 py-3 aa-select"
                       >
                         {availableMaps.map((m) => (
                           <option key={m} value={m}>
@@ -570,14 +566,14 @@ export default function KothClient() {
                     onChange={(e) => setTeamName(e.target.value)}
                     maxLength={32}
                     placeholder="e.g. Hill Lords"
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white"
+                    className="w-full px-4 py-3 aa-select"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={handleCreate}
                   disabled={creating || isPending || !isLoaded || !teamName.trim()}
-                  className="px-6 py-3 bg-amber-700 hover:bg-amber-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+                  className="aa-btn-primary px-6 py-3"
                 >
                   {creating ? "Creating…" : `Create ${formatLabel(format)}`}
                 </button>
@@ -630,7 +626,7 @@ export default function KothClient() {
                   <Link
                     key={m.id}
                     href={`/koth/${m.id}`}
-                    className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 hover:bg-gray-800/50 transition-colors"
+                    className="aa-panel p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 hover:bg-gray-800/50 transition-colors"
                   >
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="text-amber-400">{formatLabel(m.format as KothFormat)}</span>

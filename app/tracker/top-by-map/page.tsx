@@ -140,7 +140,7 @@ const TopByMapPage = () => {
   return (
     <TrackerLayout>
       {/* Filters */}
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+      <div className="aa-panel p-3 sm:p-4 mb-4 sm:mb-6">
         {/* Time Range Quick Buttons */}
         <div className="mb-4">
           <label className="block text-gray-300 text-xs sm:text-sm mb-2">Time Range</label>
@@ -157,8 +157,8 @@ const TopByMapPage = () => {
                 onClick={() => handleTimeRangeChange(option.value as TimeRange)}
                 className={`px-3 py-1.5 rounded text-xs sm:text-sm font-medium transition-colors ${
                   timeRange === option.value
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600"
+                    ? "aa-chip-active !text-xs sm:!text-sm !px-3 !py-1.5"
+                    : "aa-chip !text-xs sm:!text-sm !px-3 !py-1.5"
                 }`}
               >
                 {option.label}
@@ -176,7 +176,7 @@ const TopByMapPage = () => {
                 type="datetime-local"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+                className="aa-input text-xs sm:text-sm"
               />
             </div>
             <div>
@@ -185,7 +185,7 @@ const TopByMapPage = () => {
                 type="datetime-local"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+                className="aa-input text-xs sm:text-sm"
               />
             </div>
           </div>
@@ -198,7 +198,7 @@ const TopByMapPage = () => {
             <select
               value={selectedMap}
               onChange={(e) => setSelectedMap(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+              className="aa-input text-xs sm:text-sm"
             >
               <option value="">Select a map</option>
               {maps.map((map, index) => (
@@ -213,7 +213,7 @@ const TopByMapPage = () => {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as "kd" | "kills" | "games")}
-              className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+              className="aa-input text-xs sm:text-sm"
             >
               <option value="kills">Kills</option>
               <option value="kd">K/D Ratio</option>
@@ -228,7 +228,7 @@ const TopByMapPage = () => {
               onChange={(e) => setLimit(parseInt(e.target.value) || 50)}
               min="1"
               max="500"
-              className="w-full bg-gray-800 border border-gray-600 rounded px-2 sm:px-3 py-2 text-white text-xs sm:text-sm"
+              className="aa-input text-xs sm:text-sm"
             />
           </div>
         </div>
@@ -246,7 +246,7 @@ const TopByMapPage = () => {
 
       {/* Content */}
       {!loading && selectedMap ? (
-        <div className="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
+        <div className="aa-table-wrap">
           <div className="p-3 sm:p-4 border-b border-gray-700">
             <h2 className="text-white text-lg sm:text-xl font-bold break-words">
               Top Players - {selectedMap}
@@ -255,7 +255,7 @@ const TopByMapPage = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-white text-xs sm:text-sm min-w-[450px]">
               <thead>
-                <tr className="border-b border-gray-700 bg-gray-800">
+                <tr className="border-b border-gray-800 bg-gray-900/80 text-gray-500">
                   <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Rank</th>
                   <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Player</th>
                   <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Kills</th>
@@ -269,13 +269,13 @@ const TopByMapPage = () => {
                   topPlayersByMap.map((player, index) => (
                     <tr
                       key={player.player_name}
-                      className="border-b border-gray-800 hover:bg-gray-800"
+                      className="border-b border-gray-800/80 hover:bg-white/[0.02]"
                     >
                       <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-400">#{index + 1}</td>
                       <td className="py-2 sm:py-3 px-2 sm:px-4">
                         <Link
                           href={`/tracker/player/${encodeURIComponent(player.player_name)}`}
-                          className="text-blue-400 hover:text-blue-300 hover:underline font-medium truncate block max-w-[120px] sm:max-w-none"
+                          className="aa-link hover:underline font-medium truncate block max-w-[120px] sm:max-w-none"
                         >
                           {player.player_name}
                         </Link>
@@ -309,7 +309,7 @@ const TopByMapPage = () => {
         </div>
       ) : (
         !loading && (
-          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 sm:p-8 text-center text-gray-400">
+          <div className="aa-panel p-6 sm:p-8 text-center text-gray-400">
             Please select a map to view top players
           </div>
         )
