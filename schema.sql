@@ -12,6 +12,12 @@ create table public.player_stats (
 
   deaths integer not null,
 
+  -- Rules of engagement: times this player shot a teammate
+  roe integer not null default 0,
+
+  -- Times this player reconnected during the session
+  reconnects integer not null default 0,
+
   player_honor integer not null,
 
   time timestamp without time zone not null,

@@ -91,7 +91,7 @@ const PlayerSearch = ({
         onFocus={() => query.trim() && results.length > 0 && setShowDropdown(true)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-blue-500"
+        className="w-full bg-gray-950/80 border border-gray-800 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-cyan-700/80 focus:ring-1 focus:ring-cyan-800/40 transition-colors"
       />
 
       {/* Loading indicator */}
@@ -103,12 +103,12 @@ const PlayerSearch = ({
 
       {/* Dropdown results */}
       {showDropdown && results.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg max-h-80 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1.5 bg-gray-950 border border-gray-800 rounded-xl shadow-xl max-h-80 overflow-y-auto">
           {results.map((player, index) => (
             <button
               key={`${player.name}-${index}`}
               onClick={() => handlePlayerClick(player.name)}
-              className="w-full px-3 py-2 text-left hover:bg-gray-700 transition-colors flex justify-between items-center border-b border-gray-700 last:border-b-0"
+              className="w-full px-4 py-2.5 text-left hover:bg-white/[0.04] transition-colors flex justify-between items-center border-b border-gray-800/80 last:border-b-0"
             >
               <span className="text-white font-medium truncate">
                 {player.name}

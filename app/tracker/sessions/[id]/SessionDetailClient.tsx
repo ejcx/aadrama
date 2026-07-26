@@ -25,12 +25,18 @@ interface SessionPlayer {
   name: string;
   kills: number;
   deaths: number;
+  /** Rules of engagement: times this player shot a teammate */
+  roe?: number;
+  /** Times this player reconnected during the session */
+  reconnects?: number;
   player_honor?: number;
 }
 
 interface SessionAnalytics {
   total_kills?: number;
   total_deaths?: number;
+  total_roe?: number;
+  total_reconnects?: number;
   player_count?: number;
   duration?: number;
 }
@@ -39,6 +45,8 @@ interface AggregatedPlayer {
   name: string;
   kills: number;
   deaths: number;
+  roe: number;
+  reconnects: number;
 }
 
 const SessionDetailClient = () => {
@@ -224,14 +232,20 @@ const SessionDetailClient = () => {
     allPlayers.forEach((players) => {
       players.forEach((player) => {
         const existing = playerMap.get(player.name);
+        const roe = player.roe ?? 0;
+        const reconnects = player.reconnects ?? 0;
         if (existing) {
           existing.kills += player.kills;
           existing.deaths += player.deaths;
+          existing.roe += roe;
+          existing.reconnects += reconnects;
         } else {
           playerMap.set(player.name, {
             name: player.name,
             kills: player.kills,
             deaths: player.deaths,
+            roe,
+            reconnects,
           });
         }
       });
@@ -294,13 +308,30 @@ const SessionDetailClient = () => {
   const getAggregatedAnalytics = () => {
     let totalKills = 0;
     let totalDeaths = 0;
+    let totalRoe = 0;
+    let totalReconnects = 0;
     
     allAnalytics.forEach((analytics) => {
       totalKills += analytics.total_kills || 0;
       totalDeaths += analytics.total_deaths || 0;
+      totalRoe += analytics.total_roe || 0;
+      totalReconnects += analytics.total_reconnects || 0;
     });
+
+    if (totalRoe === 0 || totalReconnects === 0) {
+      let playerRoe = 0;
+      let playerReconnects = 0;
+      allPlayers.forEach((players) => {
+        players.forEach((player) => {
+          playerRoe += player.roe ?? 0;
+          playerReconnects += player.reconnects ?? 0;
+        });
+      });
+      if (totalRoe === 0) totalRoe = playerRoe;
+      if (totalReconnects === 0) totalReconnects = playerReconnects;
+    }
     
-    return { totalKills, totalDeaths };
+    return { totalKills, totalDeaths, totalRoe, totalReconnects };
   };
 
   const isMultipleSessions = sessions.length > 1;
@@ -448,12 +479,12 @@ const SessionDetailClient = () => {
           </div>
 
           {/* Session Analytics */}
-          {(aggregatedAnalytics.totalKills > 0 || aggregatedAnalytics.totalDeaths > 0) && (
+          {(aggregatedAnalytics.totalKills > 0 || aggregatedAnalytics.totalDeaths > 0 || aggregatedAnalytics.totalRoe > 0 || aggregatedAnalytics.totalReconnects > 0) && (
             <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 mb-4 sm:mb-6">
               <h2 className="text-white text-lg sm:text-xl font-bold mb-3 sm:mb-4">
                 {isMultipleSessions ? 'Combined Statistics' : 'Session Statistics'}
               </h2>
-              <div className="grid grid-cols-3 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
                 <div>
                   <div className="text-gray-400 text-xs sm:text-sm mb-1">Total Kills</div>
                   <div className="text-xl sm:text-2xl font-bold text-green-400">{aggregatedAnalytics.totalKills}</div>
@@ -461,6 +492,14 @@ const SessionDetailClient = () => {
                 <div>
                   <div className="text-gray-400 text-xs sm:text-sm mb-1">Total Deaths</div>
                   <div className="text-xl sm:text-2xl font-bold text-red-400">{aggregatedAnalytics.totalDeaths}</div>
+                </div>
+                <div>
+                  <div className="text-gray-400 text-xs sm:text-sm mb-1">Total ROE</div>
+                  <div className="text-xl sm:text-2xl font-bold text-amber-400">{aggregatedAnalytics.totalRoe}</div>
+                </div>
+                <div>
+                  <div className="text-gray-400 text-xs sm:text-sm mb-1">Reconnects</div>
+                  <div className="text-xl sm:text-2xl font-bold text-sky-400">{aggregatedAnalytics.totalReconnects}</div>
                 </div>
                 {aggregatedInfo.totalDuration > 0 && (
                   <div>
@@ -491,6 +530,8 @@ const SessionDetailClient = () => {
                       <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Player</th>
                       <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Kills</th>
                       <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Deaths</th>
+                      <th className="text-center py-2 sm:py-3 px-2 sm:px-4" title="Rules of engagement (teammate shots)">ROE</th>
+                      <th className="text-center py-2 sm:py-3 px-2 sm:px-4" title="Reconnects">RC</th>
                       <th className="text-center py-2 sm:py-3 px-2 sm:px-4">K/D</th>
                     </tr>
                   </thead>
@@ -511,6 +552,8 @@ const SessionDetailClient = () => {
                         </td>
                         <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-green-400">{player.kills}</td>
                         <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-red-400">{player.deaths}</td>
+                        <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-amber-400">{player.roe}</td>
+                        <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-sky-400">{player.reconnects}</td>
                         <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
                           {calculateKD(player.kills, player.deaths)}
                         </td>

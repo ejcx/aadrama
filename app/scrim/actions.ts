@@ -542,6 +542,10 @@ export interface SessionPlayer {
   name: string
   kills: number
   deaths: number
+  /** Rules of engagement: times this player shot a teammate */
+  roe?: number
+  /** Times this player reconnected during the session */
+  reconnects?: number
   player_honor?: number
 }
 
@@ -553,6 +557,8 @@ export interface SessionStats {
   players: SessionPlayer[]
   total_kills: number
   total_deaths: number
+  total_roe: number
+  total_reconnects: number
 }
 
 const TRACKER_API = "https://server-details.ej.workers.dev"
@@ -597,6 +603,12 @@ export async function getSessionStats(sessionIds: string): Promise<SessionStats[
         players,
         total_kills: analyticsData.total_kills || players.reduce((sum, p) => sum + p.kills, 0),
         total_deaths: analyticsData.total_deaths || players.reduce((sum, p) => sum + p.deaths, 0),
+        total_roe:
+          analyticsData.total_roe ||
+          players.reduce((sum, p) => sum + (p.roe ?? 0), 0),
+        total_reconnects:
+          analyticsData.total_reconnects ||
+          players.reduce((sum, p) => sum + (p.reconnects ?? 0), 0),
       })
     } catch (err) {
       console.error(`Failed to fetch session ${id}:`, err)

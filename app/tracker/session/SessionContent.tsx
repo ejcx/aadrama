@@ -22,12 +22,18 @@ interface SessionPlayer {
   name: string;
   kills: number;
   deaths: number;
+  /** Rules of engagement: times this player shot a teammate */
+  roe?: number;
+  /** Times this player reconnected during the session */
+  reconnects?: number;
   player_honor?: number;
 }
 
 interface SessionAnalytics {
   total_kills?: number;
   total_deaths?: number;
+  total_roe?: number;
+  total_reconnects?: number;
   player_count?: number;
   duration?: number;
 }
@@ -36,6 +42,8 @@ interface AggregatedPlayer {
   name: string;
   kills: number;
   deaths: number;
+  roe: number;
+  reconnects: number;
 }
 
 interface SessionContentProps {
@@ -213,14 +221,20 @@ export const SessionContent = ({ sessionIds, compact = false }: SessionContentPr
     allPlayers.forEach((players) => {
       players.forEach((player) => {
         const existing = playerMap.get(player.name);
+        const roe = player.roe ?? 0;
+        const reconnects = player.reconnects ?? 0;
         if (existing) {
           existing.kills += player.kills;
           existing.deaths += player.deaths;
+          existing.roe += roe;
+          existing.reconnects += reconnects;
         } else {
           playerMap.set(player.name, {
             name: player.name,
             kills: player.kills,
             deaths: player.deaths,
+            roe,
+            reconnects,
           });
         }
       });
@@ -283,13 +297,31 @@ export const SessionContent = ({ sessionIds, compact = false }: SessionContentPr
   const getAggregatedAnalytics = () => {
     let totalKills = 0;
     let totalDeaths = 0;
+    let totalRoe = 0;
+    let totalReconnects = 0;
     
     allAnalytics.forEach((analytics) => {
       totalKills += analytics.total_kills || 0;
       totalDeaths += analytics.total_deaths || 0;
+      totalRoe += analytics.total_roe || 0;
+      totalReconnects += analytics.total_reconnects || 0;
     });
+
+    // Fall back to summing player fields if analytics doesn't include them yet
+    if (totalRoe === 0 || totalReconnects === 0) {
+      let playerRoe = 0;
+      let playerReconnects = 0;
+      allPlayers.forEach((players) => {
+        players.forEach((player) => {
+          playerRoe += player.roe ?? 0;
+          playerReconnects += player.reconnects ?? 0;
+        });
+      });
+      if (totalRoe === 0) totalRoe = playerRoe;
+      if (totalReconnects === 0) totalReconnects = playerReconnects;
+    }
     
-    return { totalKills, totalDeaths };
+    return { totalKills, totalDeaths, totalRoe, totalReconnects };
   };
 
   const isMultipleSessions = sessions.length > 1;
@@ -388,12 +420,12 @@ export const SessionContent = ({ sessionIds, compact = false }: SessionContentPr
       </div>
 
       {/* Session Analytics */}
-      {(aggregatedAnalytics.totalKills > 0 || aggregatedAnalytics.totalDeaths > 0) && (
+      {(aggregatedAnalytics.totalKills > 0 || aggregatedAnalytics.totalDeaths > 0 || aggregatedAnalytics.totalRoe > 0 || aggregatedAnalytics.totalReconnects > 0) && (
         <div className={`bg-gray-900 border border-gray-700 rounded-lg ${compact ? "p-3" : "p-4 sm:p-6"}`}>
           <h2 className={`text-white font-bold ${compact ? "text-base mb-2" : "text-lg sm:text-xl mb-3 sm:mb-4"}`}>
             {isMultipleSessions ? 'Combined Statistics' : 'Session Statistics'}
           </h2>
-          <div className={`grid grid-cols-3 ${compact ? "gap-2" : "gap-3 sm:gap-4"}`}>
+          <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 ${compact ? "gap-2" : "gap-3 sm:gap-4"}`}>
             <div>
               <div className="text-gray-400 text-xs mb-0.5">Total Kills</div>
               <div className={`font-bold text-green-400 ${compact ? "text-lg" : "text-xl sm:text-2xl"}`}>{aggregatedAnalytics.totalKills}</div>
@@ -401,6 +433,14 @@ export const SessionContent = ({ sessionIds, compact = false }: SessionContentPr
             <div>
               <div className="text-gray-400 text-xs mb-0.5">Total Deaths</div>
               <div className={`font-bold text-red-400 ${compact ? "text-lg" : "text-xl sm:text-2xl"}`}>{aggregatedAnalytics.totalDeaths}</div>
+            </div>
+            <div>
+              <div className="text-gray-400 text-xs mb-0.5">Total ROE</div>
+              <div className={`font-bold text-amber-400 ${compact ? "text-lg" : "text-xl sm:text-2xl"}`}>{aggregatedAnalytics.totalRoe}</div>
+            </div>
+            <div>
+              <div className="text-gray-400 text-xs mb-0.5">Reconnects</div>
+              <div className={`font-bold text-sky-400 ${compact ? "text-lg" : "text-xl sm:text-2xl"}`}>{aggregatedAnalytics.totalReconnects}</div>
             </div>
             {aggregatedInfo.totalDuration > 0 && (
               <div>
@@ -431,6 +471,8 @@ export const SessionContent = ({ sessionIds, compact = false }: SessionContentPr
                   <th className={`text-left ${compact ? "py-1 px-2" : "py-2 sm:py-3 px-2 sm:px-4"}`}>Player</th>
                   <th className={`text-center ${compact ? "py-1 px-2" : "py-2 sm:py-3 px-2 sm:px-4"}`}>K</th>
                   <th className={`text-center ${compact ? "py-1 px-2" : "py-2 sm:py-3 px-2 sm:px-4"}`}>D</th>
+                  <th className={`text-center ${compact ? "py-1 px-2" : "py-2 sm:py-3 px-2 sm:px-4"}`} title="Rules of engagement (teammate shots)">ROE</th>
+                  <th className={`text-center ${compact ? "py-1 px-2" : "py-2 sm:py-3 px-2 sm:px-4"}`} title="Reconnects">RC</th>
                   <th className={`text-center ${compact ? "py-1 px-2" : "py-2 sm:py-3 px-2 sm:px-4"}`}>K/D</th>
                 </tr>
               </thead>
@@ -452,6 +494,8 @@ export const SessionContent = ({ sessionIds, compact = false }: SessionContentPr
                     </td>
                     <td className={`text-center text-green-400 ${compact ? "py-1 px-2" : "py-2 sm:py-3 px-2 sm:px-4"}`}>{player.kills}</td>
                     <td className={`text-center text-red-400 ${compact ? "py-1 px-2" : "py-2 sm:py-3 px-2 sm:px-4"}`}>{player.deaths}</td>
+                    <td className={`text-center text-amber-400 ${compact ? "py-1 px-2" : "py-2 sm:py-3 px-2 sm:px-4"}`}>{player.roe}</td>
+                    <td className={`text-center text-sky-400 ${compact ? "py-1 px-2" : "py-2 sm:py-3 px-2 sm:px-4"}`}>{player.reconnects}</td>
                     <td className={`text-center ${compact ? "py-1 px-2" : "py-2 sm:py-3 px-2 sm:px-4"}`}>
                       {calculateKD(player.kills, player.deaths)}
                     </td>
