@@ -13,7 +13,9 @@ function hasNumber(n: number | undefined): n is number {
 
 export function LiveServerPlayers({ serverInfo }: { serverInfo: LiveServerInfo }) {
   const players = serverInfo.player_list || [];
-  const teamIds = [...new Set(players.map((p) => p.team).filter((t) => t != null))] as number[];
+  const teamIds = Array.from(
+    new Set(players.map((p) => p.team).filter((t) => t != null))
+  ) as number[];
   const canSplitTeams = teamIds.length >= 2;
 
   const sorted = (list: LivePlayer[]) => [...list].sort((a, b) => b.kills - a.kills);
