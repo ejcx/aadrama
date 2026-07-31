@@ -15,6 +15,7 @@ export const BADGE_TYPES = [
   'elo_milestone_1350',
   'elo_milestone_1400',
   'elo_milestone_1450',
+  'elo_milestone_1500',
   'scrim_top_frag',
   'scrimlord',
   'cal_i_activity_confirmed',
@@ -112,6 +113,12 @@ export const BADGE_META: Record<BadgeType, BadgeMeta> = {
     description: 'Reached 1450 cumulative ranked ELO.',
     src: '/badges/elo-milestone-1450.svg',
     accent: '#eab308',
+  },
+  elo_milestone_1500: {
+    label: 'ELO 1500',
+    description: 'Reached 1500 cumulative ranked ELO.',
+    src: '/badges/elo-milestone-1500.svg',
+    accent: '#22d3ee',
   },
   scrim_top_frag: {
     label: 'Scrim Top Frag',

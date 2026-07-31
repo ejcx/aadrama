@@ -35,6 +35,7 @@ export const BADGE_CATALOG_SECTIONS: BadgeCatalogSection[] = [
       'elo_milestone_1350',
       'elo_milestone_1400',
       'elo_milestone_1450',
+      'elo_milestone_1500',
     ],
   },
   {

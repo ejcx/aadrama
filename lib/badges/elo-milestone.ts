@@ -7,6 +7,7 @@ export const ELO_MILESTONE_TIERS = [
   { threshold: 1350, badgeType: 'elo_milestone_1350' as const },
   { threshold: 1400, badgeType: 'elo_milestone_1400' as const },
   { threshold: 1450, badgeType: 'elo_milestone_1450' as const },
+  { threshold: 1500, badgeType: 'elo_milestone_1500' as const },
 ] as const
 
 export const ELO_MILESTONE_BADGE_TYPES: readonly BadgeType[] = ELO_MILESTONE_TIERS.map(
