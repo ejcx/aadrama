@@ -77,15 +77,15 @@ export const TIERED_MAPS: readonly TieredMapEntry[] = [
   { name: 'SMU GH RiverVillage', tier: 3, relativeWeight: 1.2 },
   { name: 'District', tier: 3, relativeWeight: 2 },
   { name: '[AA3] Impact', tier: 3, relativeWeight: 3 },
-  { name: 'Weapons Cache SE', tier: 3, relativeWeight: 1.5 },
+  { name: 'Weapons Cache SE', tier: 3, relativeWeight: 1 },
   // Tier 4
   { name: 'SF Hospital', tier: 4, relativeWeight: 0.4 },
   { name: 'SF Dockside', tier: 4, relativeWeight: 0.1 },
   { name: 'Swamp Raid', tier: 4, relativeWeight: 0.4 },
-  { name: 'SF Village', tier: 4, relativeWeight: 0.2 },
   { name: 'SF Oasis', tier: 4, relativeWeight: 0.2 },
   { name: 'SF PCR', tier: 4, relativeWeight: 0.2 },
   // Tier 5
+  { name: 'SF Village', tier: 5, relativeWeight: 0.2 },
   { name: 'SF Courtyard', tier: 5, relativeWeight: 0.1 },
   { name: 'SF Taiga', tier: 5, relativeWeight: 0.2 },
   { name: 'Pipeline SF', tier: 5, relativeWeight: 0.2 },
@@ -93,16 +93,16 @@ export const TIERED_MAPS: readonly TieredMapEntry[] = [
   { name: 'SMU GH SFOldTown', tier: 5, relativeWeight: 0.1 },
   { name: 'SF Blizzard', tier: 5, relativeWeight: 0.1 },
   { name: 'Bridge Crossing', tier: 5, relativeWeight: 0.1 },
-  { name: 'Radio Tower', tier: 5, relativeWeight: 0.1 },
   // Tier 6 (FLS assault omitted — 0% in spreadsheet)
-  // { name: 'SMU GH SFFloodgate', tier: 6, relativeWeight: 0.01 },
-  // { name: 'SMU GH SFRefinery', tier: 6, relativeWeight: 0.005 },
-  // { name: 'Steamroller', tier: 6, relativeWeight: 0.002 },
-  // { name: 'SF Extraction', tier: 6, relativeWeight: 0.002 },
-  // { name: 'Mountain Pass', tier: 4, relativeWeight: 0.05 },
-  //   { name: 'SF Recon', tier: 5, relativeWeight: 0.03 },
-  // { name: 'SF Arctic', tier: 5, relativeWeight: 0.02 },
-  // { name: 'SF Water Treatment', tier: 5, relativeWeight: 0.035 },
+  { name: 'Radio Tower', tier: 6, relativeWeight: 0.05 },
+  { name: 'SMU GH SFFloodgate', tier: 6, relativeWeight: 0.01 },
+  { name: 'SMU GH SFRefinery', tier: 6, relativeWeight: 0.005 },
+  { name: 'Steamroller', tier: 6, relativeWeight: 0.002 },
+  { name: 'SF Extraction', tier: 6, relativeWeight: 0.05 },
+  { name: 'Mountain Pass', tier: 6, relativeWeight: 0.02 },
+  { name: 'SF Recon', tier: 6, relativeWeight: 0.02 },
+  { name: 'SF Arctic', tier: 6, relativeWeight: 0.02 },
+  { name: 'SF Water Treatment', tier: 6, relativeWeight: 0.035 },
 ] as const
 
 /** Absolute selection weight for a map (tier total × within-tier share). */
