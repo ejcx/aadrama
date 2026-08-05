@@ -20,8 +20,8 @@ export interface TieredMapEntry {
 
 /** Slow descending weights for tiers 2–6 (sum = 15). */
 const LOWER_TIER_WEIGHTS = {
-  2: 5,
-  3: 4,
+  2: 12,
+  3: 6,
   4: 3,
   5: 2,
   6: 1,
