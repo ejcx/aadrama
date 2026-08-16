@@ -260,15 +260,26 @@ export default function EloClient({ initialData }: { initialData: InitialData })
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-white text-xs sm:text-sm min-w-[550px]">
+              <table
+                className={`w-full text-white text-xs sm:text-sm ${
+                  show7DayChange ? "min-w-[880px]" : "min-w-[780px]"
+                }`}
+              >
                 <thead>
                   <tr className="border-b border-gray-800 bg-gray-900/80 text-gray-500">
                     <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Rank</th>
                     <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Player</th>
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Map ELO</th>
+                    {show7DayChange && (
+                      <th className="text-center py-2 sm:py-3 px-2 sm:px-4">7d Change</th>
+                    )}
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Games</th>
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">W-L-D</th>
                     <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Win%</th>
+                    <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Frags/Scrim</th>
+                    <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Scrim Kills</th>
+                    <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Scrim Deaths</th>
+                    <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Scrim K/D</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -305,6 +316,23 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                           {player.map_elo}
                         </span>
                       </td>
+                      {show7DayChange && (
+                        <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
+                          {player.elo_change_7d !== 0 ? (
+                            <span
+                              className={`font-semibold ${
+                                player.elo_change_7d > 0 ? "text-green-400" : "text-red-400"
+                              }`}
+                            >
+                              {player.elo_change_7d > 0 ? "▲" : "▼"}{" "}
+                              {player.elo_change_7d > 0 ? "+" : ""}
+                              {player.elo_change_7d}
+                            </span>
+                          ) : (
+                            <span className="text-gray-500">─</span>
+                          )}
+                        </td>
+                      )}
                       <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-gray-300">
                         {player.games_played}
                       </td>
@@ -329,6 +357,38 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                         ) : (
                           <span className="text-gray-500">─</span>
                         )}
+                      </td>
+                      <td className="text-center py-2 sm:py-3 px-2 sm:px-4 tabular-nums">
+                        {player.frags_per_scrim != null ? (
+                          <span className="text-amber-300/90 font-medium">
+                            {player.frags_per_scrim}
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">─</span>
+                        )}
+                      </td>
+                      <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
+                        <span className="text-cyan-400 font-medium">
+                          {player.total_kills.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
+                        <span className="text-red-300">
+                          {player.total_deaths.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
+                        <span
+                          className={`font-bold ${
+                            player.kd_ratio >= 1.5
+                              ? "text-green-400"
+                              : player.kd_ratio >= 1.0
+                              ? "text-yellow-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          {player.kd_ratio === 999.99 ? "∞" : player.kd_ratio.toFixed(2)}
+                        </span>
                       </td>
                     </tr>
                   ))}

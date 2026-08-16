@@ -794,6 +794,11 @@ export interface MapPlayerStats {
   draws: number
   games_played: number
   map_elo: number // Calculated as 1200 + sum of all ELO changes on this map
+  total_kills: number
+  total_deaths: number
+  kd_ratio: number
+  frags_per_scrim: number | null
+  elo_change_7d: number
 }
 
 // Same derivation as getPlayerStatsByMap but for one player over time: 1200 + cumulative elo_change on that map.
@@ -833,8 +838,11 @@ export async function getPlayerStatsByMap(
 
   type MapHistoryRow = {
     game_name_lower: string
+    scrim_id: string
     result: string
     elo_change: number | null
+    kills: number | null
+    created_at: string
   }
 
   const data: MapHistoryRow[] = []
@@ -843,8 +851,11 @@ export async function getPlayerStatsByMap(
       .from('elo_history')
       .select(`
         game_name_lower,
+        scrim_id,
         result,
         elo_change,
+        kills,
+        created_at,
         scrims!inner(map, finalized_at)
       `)
       .eq('scrims.map', map)
@@ -867,15 +878,38 @@ export async function getPlayerStatsByMap(
     if (rows.length < ELO_HISTORY_PAGE_SIZE) break
   }
 
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  let since7d = sevenDaysAgo.toISOString()
+  if (options?.season2 && sevenDaysAgo < new Date(SEASON_2_START_ISO)) {
+    since7d = SEASON_2_START_ISO
+  }
+
   // Aggregate stats per player
-  const playerMap = new Map<string, { wins: number; losses: number; draws: number; eloSum: number }>()
-  
+  const playerMap = new Map<
+    string,
+    { wins: number; losses: number; draws: number; eloSum: number; kills: number; eloChange7d: number }
+  >()
+  const scrimIds = new Set<string>()
+
   for (const record of data) {
-    const existing = playerMap.get(record.game_name_lower) || { wins: 0, losses: 0, draws: 0, eloSum: 0 }
+    scrimIds.add(record.scrim_id)
+    const existing = playerMap.get(record.game_name_lower) || {
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      eloSum: 0,
+      kills: 0,
+      eloChange7d: 0,
+    }
     if (record.result === 'win') existing.wins++
     else if (record.result === 'loss') existing.losses++
     else existing.draws++
     existing.eloSum += record.elo_change || 0
+    existing.kills += record.kills ?? 0
+    if (!options?.season1 && record.created_at >= since7d) {
+      existing.eloChange7d += record.elo_change || 0
+    }
     playerMap.set(record.game_name_lower, existing)
   }
 
@@ -883,23 +917,44 @@ export async function getPlayerStatsByMap(
   const gameNames = Array.from(playerMap.keys())
   if (gameNames.length === 0) return []
 
-  const { data: eloRecords } = await supabase
-    .from('player_elo')
-    .select('game_name, game_name_lower')
-    .in('game_name_lower', gameNames)
+  const nameMap = new Map<string, string>()
+  const nameChunkSize = 100
+  for (let i = 0; i < gameNames.length; i += nameChunkSize) {
+    const chunk = gameNames.slice(i, i + nameChunkSize)
+    const { data: eloRecords, error: namesError } = await supabase
+      .from('player_elo')
+      .select('game_name, game_name_lower')
+      .in('game_name_lower', chunk)
 
-  const nameMap = new Map(eloRecords?.map(r => [r.game_name_lower, r.game_name]) || [])
+    if (namesError) {
+      throw new Error(`Failed to fetch player names: ${namesError.message}`)
+    }
+    for (const r of eloRecords || []) {
+      nameMap.set(r.game_name_lower, r.game_name)
+    }
+  }
+
+  const kdMap = await getRankedScrimKdStats(Array.from(scrimIds), gameNames)
 
   // Build result array
-  const results: MapPlayerStats[] = Array.from(playerMap.entries()).map(([gameNameLower, stats]) => ({
-    game_name: nameMap.get(gameNameLower) || gameNameLower,
-    game_name_lower: gameNameLower,
-    wins: stats.wins,
-    losses: stats.losses,
-    draws: stats.draws,
-    games_played: stats.wins + stats.losses + stats.draws,
-    map_elo: 1200 + stats.eloSum,
-  }))
+  const results: MapPlayerStats[] = Array.from(playerMap.entries()).map(([gameNameLower, stats]) => {
+    const kd = kdMap.get(gameNameLower)
+    const gamesPlayed = stats.wins + stats.losses + stats.draws
+    return {
+      game_name: nameMap.get(gameNameLower) || gameNameLower,
+      game_name_lower: gameNameLower,
+      wins: stats.wins,
+      losses: stats.losses,
+      draws: stats.draws,
+      games_played: gamesPlayed,
+      map_elo: 1200 + stats.eloSum,
+      total_kills: kd?.total_kills ?? stats.kills,
+      total_deaths: kd?.total_deaths ?? 0,
+      kd_ratio: kd?.kd_ratio ?? computeKdRatio(stats.kills, 0),
+      frags_per_scrim: computeFragsPerScrim(stats.kills, gamesPlayed),
+      elo_change_7d: stats.eloChange7d,
+    }
+  })
 
   // Sort by map_elo descending
   results.sort((a, b) => b.map_elo - a.map_elo)
