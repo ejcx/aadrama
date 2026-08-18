@@ -65,6 +65,7 @@ export interface ScrimPlayer {
   is_ready: boolean
   team: Team | null
   voted_reroll: boolean
+  voted_map_reroll: boolean
   joined_at: string
   ready_at: string | null
 }

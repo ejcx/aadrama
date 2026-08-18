@@ -23,6 +23,8 @@ import {
   getScrimDetails,
   voteReroll,
   getRerollStatus,
+  voteMapReroll,
+  getMapRerollStatus,
   getPotatoVoteStatus,
   votePotato,
   setCaptains,
@@ -30,6 +32,7 @@ import {
   draftPlayer,
   type DraftStatus,
   type RerollStatus,
+  type MapRerollStatus,
   type PotatoVoteStatus,
 } from "../actions";
 import type { ScrimWithCounts, ScrimPlayer, ScrimScoreSubmission } from "@/lib/supabase/types";
@@ -106,6 +109,7 @@ export default function ScrimDetailClient() {
   const [players, setPlayers] = useState<ScrimPlayer[]>([]);
     const [scoreSubmissions, setScoreSubmissions] = useState<ScrimScoreSubmission[]>([]);
     const [rerollStatus, setRerollStatus] = useState<RerollStatus | null>(null);
+    const [mapRerollStatus, setMapRerollStatus] = useState<MapRerollStatus | null>(null);
     const [potatoStatus, setPotatoStatus] = useState<PotatoVoteStatus | null>(null);
     const [eloChanges, setEloChanges] = useState<Map<string, { change: number; eloBefore: number; eloAfter: number }>>(new Map());
     const [playerElos, setPlayerElos] = useState<Map<string, number>>(new Map()); // gameNameLower -> current elo (for non-finalized scrims)
@@ -238,8 +242,21 @@ export default function ScrimDetailClient() {
         } catch (err) {
           console.error("Failed to load reroll status:", err);
         }
+
+        if (scrimData.map_choice === "tiered" && scrimData.map) {
+          try {
+            const mapStatus = await getMapRerollStatus(scrimId);
+            setMapRerollStatus(mapStatus);
+          } catch (err) {
+            console.error("Failed to load map reroll status:", err);
+            setMapRerollStatus(null);
+          }
+        } else {
+          setMapRerollStatus(null);
+        }
       } else {
         setRerollStatus(null);
+        setMapRerollStatus(null);
       }
 
       // Load draft status while captains are picking teams
@@ -858,6 +875,71 @@ export default function ScrimDetailClient() {
                       }`}
                     >
                       {rerollStatus.myVote ? "Remove Vote" : "Vote to Reroll"}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Reroll Map Section (tiered only, after map assigned) */}
+              {scrim.status === "in_progress" &&
+                scrim.map_choice === "tiered" &&
+                scrim.map &&
+                mapRerollStatus && (
+                <div className="mt-6 p-4 bg-cyan-900/20 border border-cyan-700/50 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-cyan-400 font-semibold">🗺️ Reroll Map</h3>
+                    <div className="text-sm">
+                      <span className={`font-mono ${mapRerollStatus.votesForReroll >= mapRerollStatus.votesNeeded ? 'text-green-400' : 'text-gray-400'}`}>
+                        {mapRerollStatus.votesForReroll}/{mapRerollStatus.votesNeeded}
+                      </span>
+                      <span className="text-gray-500 ml-1">votes needed</span>
+                    </div>
+                  </div>
+
+                  <p className="text-gray-400 text-sm mb-3">
+                    Don&apos;t like the rolled map? Players can vote to pick another from the tiered pool.
+                    <span className="text-cyan-400"> The current map ({scrim.map}) will be excluded from the reroll.</span>
+                  </p>
+
+                  <div className="h-2 bg-gray-700 rounded-full mb-3 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${mapRerollStatus.votesForReroll >= mapRerollStatus.votesNeeded ? 'bg-green-500' : 'bg-cyan-500'}`}
+                      style={{ width: `${Math.min(100, (mapRerollStatus.votesForReroll / mapRerollStatus.votesNeeded) * 100)}%` }}
+                    />
+                  </div>
+
+                  {mapRerollStatus.voters.length > 0 && (
+                    <div className="text-sm text-gray-400 mb-3">
+                      Voted: {mapRerollStatus.voters.join(", ")}
+                    </div>
+                  )}
+
+                  {isParticipant && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const result = await voteMapReroll(scrimId);
+                          setMapRerollStatus(result.status);
+                          if (result.rerolled) {
+                            alert(
+                              result.newMap
+                                ? `Map rerolled to ${result.newMap}!`
+                                : "Map has been rerolled!"
+                            );
+                            await loadScrimData();
+                          }
+                        } catch (err) {
+                          alert(err instanceof Error ? err.message : "Failed to vote");
+                        }
+                      }}
+                      disabled={isPending}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        mapRerollStatus.myVote
+                          ? "bg-gray-600 hover:bg-gray-500 text-white"
+                          : "bg-cyan-600 hover:bg-cyan-500 text-white"
+                      }`}
+                    >
+                      {mapRerollStatus.myVote ? "Remove Vote" : "Vote to Reroll Map"}
                     </button>
                   )}
                 </div>

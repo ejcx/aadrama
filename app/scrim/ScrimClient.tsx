@@ -22,6 +22,9 @@ import {
   voteReroll,
   getRerollStatus,
   type RerollStatus,
+  voteMapReroll,
+  getMapRerollStatus,
+  type MapRerollStatus,
   setCaptains,
   getDraftStatus,
   draftPlayer,
@@ -121,6 +124,7 @@ function ScrimCard({
   const [scoreB, setScoreB] = useState("");
   const [trackerInput, setTrackerInput] = useState("");
   const [rerollStatus, setRerollStatus] = useState<RerollStatus | null>(null);
+  const [mapRerollStatus, setMapRerollStatus] = useState<MapRerollStatus | null>(null);
   const [draftStatus, setDraftStatus] = useState<DraftStatus | null>(null);
   const [selectedCaptainA, setSelectedCaptainA] = useState("");
   const [selectedCaptainB, setSelectedCaptainB] = useState("");
@@ -173,6 +177,19 @@ function ScrimCard({
     }
   }
 
+  async function loadMapRerollStatus() {
+    if (scrim.map_choice !== "tiered" || !scrim.map) {
+      setMapRerollStatus(null);
+      return;
+    }
+    try {
+      const status = await getMapRerollStatus(scrim.id);
+      setMapRerollStatus(status);
+    } catch (err) {
+      console.error("Failed to load map reroll status:", err);
+    }
+  }
+
   async function loadDraftStatus() {
     try {
       const status = await getDraftStatus(scrim.id);
@@ -198,6 +215,10 @@ function ScrimCard({
     }
     if (scrim.status === "in_progress") {
       await loadRerollStatus();
+      await loadMapRerollStatus();
+    } else {
+      setRerollStatus(null);
+      setMapRerollStatus(null);
     }
   }
 
@@ -590,6 +611,60 @@ function ScrimCard({
                   }`}
                 >
                   {rerollStatus.myVote ? "Remove Vote" : "Vote to Reroll"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Reroll Map (tiered scrims only, after map is assigned) */}
+          {scrim.status === "in_progress" &&
+            scrim.map_choice === "tiered" &&
+            scrim.map &&
+            mapRerollStatus && (
+            <div className="p-3 bg-cyan-900/20 border border-cyan-700/50 rounded-lg mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-cyan-400 text-sm font-medium">🗺️ Reroll Map</span>
+                <span className="text-xs">
+                  <span className={`font-mono ${mapRerollStatus.votesForReroll >= mapRerollStatus.votesNeeded ? 'text-green-400' : 'text-gray-400'}`}>
+                    {mapRerollStatus.votesForReroll}/{mapRerollStatus.votesNeeded}
+                  </span>
+                  <span className="text-gray-500 ml-1">votes</span>
+                </span>
+              </div>
+              {mapRerollStatus.voters.length > 0 && (
+                <div className="text-xs text-gray-400 mb-2">
+                  Voted: {mapRerollStatus.voters.join(", ")}
+                </div>
+              )}
+              {isParticipant && (
+                <button
+                  onClick={async () => {
+                    setLoading(true);
+                    try {
+                      const result = await voteMapReroll(scrim.id);
+                      setMapRerollStatus(result.status);
+                      if (result.rerolled) {
+                        alert(
+                          result.newMap
+                            ? `Map rerolled to ${result.newMap}!`
+                            : "Map has been rerolled!"
+                        );
+                        onRefresh();
+                      }
+                    } catch (err) {
+                      alert(err instanceof Error ? err.message : "Failed to vote");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading || isPending}
+                  className={`px-3 py-1 rounded text-sm ${
+                    mapRerollStatus.myVote
+                      ? "bg-gray-600 hover:bg-gray-500 text-white"
+                      : "bg-cyan-600 hover:bg-cyan-500 text-white"
+                  }`}
+                >
+                  {mapRerollStatus.myVote ? "Remove Vote" : "Vote to Reroll Map"}
                 </button>
               )}
             </div>
