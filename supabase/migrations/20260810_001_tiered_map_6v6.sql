@@ -10,7 +10,7 @@ UPDATE public.scrims SET map = 'SMU GH SFOldTown' WHERE map = 'SF Old Town';
 UPDATE public.scrims SET map = 'SMU GH SFFloodgate' WHERE map = 'SF Floodgate';
 UPDATE public.scrims SET map = 'SMU GH SFRefinery' WHERE map = 'SF Refinery';
 
-CREATE OR REPLACE FUNCTION public.assign_tiered_map_if_needed(p_scrim_id UUID)
+CREATE OR REPLACE FUNCTION public.assign_tiered_map_six_plus(p_scrim_id UUID)
 RETURNS TEXT
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -44,42 +44,45 @@ BEGIN
   -- Map names must match get_distinct_maps / player_stats.map
   WITH pool AS (
     SELECT * FROM (VALUES
-      ('Insurgent Camp', 0.1600000000000000),
-      ('MOUT McKenna', 0.1333333333333333),
-      ('Urban Assault', 0.1244444444444444),
-      ('Pipeline', 0.0990000000000000),
-      ('Weapons Cache', 0.0800000000000000),
-      ('Collapsed Tunnel', 0.0800000000000000),
-      ('Canyon', 0.0583369175627240),
-      ('Woodland Outpost', 0.0583369175627240),
-      ('SF Sandstorm', 0.0456078431372549),
-      ('Headquarters Raid', 0.0456078431372549),
-      ('District', 0.0277777777777778),
-      ('SF CSAR', 0.0130718954248366),
-      ('Dusk', 0.0130718954248366),
-      ('[AA3] Impact', 0.0130718954248366),
-      ('SMU GH RiverVillage', 0.0130718954248366),
-      ('Mountain Ambush', 0.0188398692810458),
-      ('Bridge SE', 0.0157706093189964),
-      ('JRTC Farm Raid', 0.0130718954248366),
-      ('River Basin', 0.0123369175627240),
-      ('SF Dockside', 0.0117777777777778),
-      ('SF Hospital', 0.0117777777777778),
-      ('Border', 0.0083369175627240),
-      ('Mountain Pass SE', 0.0082679738562092),
-      ('Weapons Cache SE', 0.0038039215686275),
+      ('Insurgent Camp', 0.1000000000000000),
+      ('Urban Assault', 0.1000000000000000),
+      ('MOUT McKenna', 0.1000000000000000),
+      ('Dusk', 0.1000000000000000),
+      ('Canyon', 0.1000000000000000),
+      ('Woodland Outpost', 0.1000000000000000),
+      ('SF Sandstorm', 0.1000000000000000),
+      ('Weapons Cache SE', 0.0830718954248366),
+      ('Mountain Ambush', 0.0830718954248366),
+      ('SF Hospital', 0.0672043010752688),
+      ('SMU GH RiverVillage', 0.0672043010752688),
+      ('[AA3] Impact', 0.0503369175627240),
+      ('Border', 0.0503369175627240),
+      ('Mountain Pass SE', 0.0297706093189964),
+      ('River Basin', 0.0222222222222222),
+      ('Bridge SE', 0.0222222222222222),
+      ('Headquarters Raid', 0.0222222222222222),
+      ('District', 0.0222222222222222),
       ('Swamp Raid', 0.0222222222222222),
-      ('Rummage', 0.0066666666666667),
-      ('SF Blizzard', 0.0066666666666667),
-      ('Pipeline SF', 0.0022222222222222),
-      ('SF PCR', 0.0022222222222222),
-      ('SF Oasis', 0.00081111111111111),
-      ('Bridge Crossing', 0.00048888888888889),
-      ('SMU GH SFOldTown', 0.00048888888888889),
-      ('SF Extraction', 0.00048888888888889)
-      ('SF Taiga', 0.00035842293906810),
-      ('SF Arctic', 0.000017777777777778),
-      ('Mountain Pass', 0.0000777777777777),
+      ('SF PCR', 0.0222222222222222),
+      ('SF Dockside', 0.0111111111111111),
+      ('SF Oasis', 0.0111111111111111),
+      ('SF Blizzard', 0.0111111111111111),
+      ('JRTC Farm Raid', 0.0050000000000000),
+      ('SF Courtyard', 0.0050000000000000),
+      ('SF Village', 0.0050000000000000),
+      ('Rummage', 0.0050000000000000),
+      ('Pipeline', 0.0050000000000000),
+      ('SMU GH SFOldTown', 0.0050000000000000),
+      ('Weapons Cache', 0.0050000000000000),
+      ('SF Taiga', 0.0035842293906810),
+      ('Radio Tower', 0.00025842293906810),
+      ('SF Recon', 0.000026666666666667),
+      ('SF Arctic', 0.00017777777777778),
+      ('SF Water Treatment', 0.00031111111111111),
+      ('SMU GH SFFloodgate', 0.00022222222222222),
+      ('SMU GH SFRefinery', 0.000011111111111111),
+      ('Steamroller', 0.00004444444444444),
+      ('SF Extraction', 0.0004444444444444)
     ) AS t(map_name, weight)
   ),
   totals AS (
@@ -116,5 +119,5 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.assign_tiered_map_if_needed IS
+COMMENT ON FUNCTION public.assign_tiered_map_six_plus IS
   'For map_choice=tiered scrims with null map: weighted-random assign a map. Names match get_distinct_maps. Idempotent. SECURITY DEFINER.';
