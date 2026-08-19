@@ -230,7 +230,7 @@ function ScrimCard({
       void refreshExpandedState();
     }, SCRIM_POLL_MS);
     return () => clearInterval(interval);
-  }, [expanded, scrim.id, scrim.status]);
+  }, [expanded, scrim.id, scrim.status, scrim.map, scrim.map_choice]);
   
   function handleAction(action: () => Promise<unknown>) {
     setLoading(true);
@@ -619,21 +619,20 @@ function ScrimCard({
           {/* Reroll Map (tiered scrims only, after map is assigned) */}
           {scrim.status === "in_progress" &&
             scrim.map_choice === "tiered" &&
-            scrim.map &&
-            mapRerollStatus && (
+            !!scrim.map && (
             <div className="p-3 bg-cyan-900/20 border border-cyan-700/50 rounded-lg mb-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-cyan-400 text-sm font-medium">🗺️ Reroll Map</span>
                 <span className="text-xs">
-                  <span className={`font-mono ${mapRerollStatus.votesForReroll >= mapRerollStatus.votesNeeded ? 'text-green-400' : 'text-gray-400'}`}>
-                    {mapRerollStatus.votesForReroll}/{mapRerollStatus.votesNeeded}
+                  <span className={`font-mono ${(mapRerollStatus?.votesForReroll ?? 0) >= (mapRerollStatus?.votesNeeded ?? 1) ? 'text-green-400' : 'text-gray-400'}`}>
+                    {mapRerollStatus?.votesForReroll ?? 0}/{mapRerollStatus?.votesNeeded ?? "—"}
                   </span>
                   <span className="text-gray-500 ml-1">votes</span>
                 </span>
               </div>
-              {mapRerollStatus.voters.length > 0 && (
+              {(mapRerollStatus?.voters.length ?? 0) > 0 && (
                 <div className="text-xs text-gray-400 mb-2">
-                  Voted: {mapRerollStatus.voters.join(", ")}
+                  Voted: {mapRerollStatus!.voters.join(", ")}
                 </div>
               )}
               {isParticipant && (
@@ -657,14 +656,14 @@ function ScrimCard({
                       setLoading(false);
                     }
                   }}
-                  disabled={loading || isPending}
+                  disabled={loading || isPending || !mapRerollStatus}
                   className={`px-3 py-1 rounded text-sm ${
-                    mapRerollStatus.myVote
+                    mapRerollStatus?.myVote
                       ? "bg-gray-600 hover:bg-gray-500 text-white"
                       : "bg-cyan-600 hover:bg-cyan-500 text-white"
                   }`}
                 >
-                  {mapRerollStatus.myVote ? "Remove Vote" : "Vote to Reroll Map"}
+                  {mapRerollStatus?.myVote ? "Remove Vote" : "Vote to Reroll Map"}
                 </button>
               )}
             </div>

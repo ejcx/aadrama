@@ -883,14 +883,13 @@ export default function ScrimDetailClient() {
               {/* Reroll Map Section (tiered only, after map assigned) */}
               {scrim.status === "in_progress" &&
                 scrim.map_choice === "tiered" &&
-                scrim.map &&
-                mapRerollStatus && (
+                !!scrim.map && (
                 <div className="mt-6 p-4 bg-cyan-900/20 border border-cyan-700/50 rounded-lg">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-cyan-400 font-semibold">🗺️ Reroll Map</h3>
                     <div className="text-sm">
-                      <span className={`font-mono ${mapRerollStatus.votesForReroll >= mapRerollStatus.votesNeeded ? 'text-green-400' : 'text-gray-400'}`}>
-                        {mapRerollStatus.votesForReroll}/{mapRerollStatus.votesNeeded}
+                      <span className={`font-mono ${(mapRerollStatus?.votesForReroll ?? 0) >= (mapRerollStatus?.votesNeeded ?? 1) ? 'text-green-400' : 'text-gray-400'}`}>
+                        {mapRerollStatus?.votesForReroll ?? 0}/{mapRerollStatus?.votesNeeded ?? "—"}
                       </span>
                       <span className="text-gray-500 ml-1">votes needed</span>
                     </div>
@@ -903,14 +902,14 @@ export default function ScrimDetailClient() {
 
                   <div className="h-2 bg-gray-700 rounded-full mb-3 overflow-hidden">
                     <div
-                      className={`h-full transition-all duration-300 ${mapRerollStatus.votesForReroll >= mapRerollStatus.votesNeeded ? 'bg-green-500' : 'bg-cyan-500'}`}
-                      style={{ width: `${Math.min(100, (mapRerollStatus.votesForReroll / mapRerollStatus.votesNeeded) * 100)}%` }}
+                      className={`h-full transition-all duration-300 ${(mapRerollStatus?.votesForReroll ?? 0) >= (mapRerollStatus?.votesNeeded ?? 1) ? 'bg-green-500' : 'bg-cyan-500'}`}
+                      style={{ width: `${Math.min(100, ((mapRerollStatus?.votesForReroll ?? 0) / Math.max(1, mapRerollStatus?.votesNeeded ?? 1)) * 100)}%` }}
                     />
                   </div>
 
-                  {mapRerollStatus.voters.length > 0 && (
+                  {(mapRerollStatus?.voters.length ?? 0) > 0 && (
                     <div className="text-sm text-gray-400 mb-3">
-                      Voted: {mapRerollStatus.voters.join(", ")}
+                      Voted: {mapRerollStatus!.voters.join(", ")}
                     </div>
                   )}
 
@@ -932,14 +931,14 @@ export default function ScrimDetailClient() {
                           alert(err instanceof Error ? err.message : "Failed to vote");
                         }
                       }}
-                      disabled={isPending}
+                      disabled={isPending || !mapRerollStatus}
                       className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        mapRerollStatus.myVote
+                        mapRerollStatus?.myVote
                           ? "bg-gray-600 hover:bg-gray-500 text-white"
                           : "bg-cyan-600 hover:bg-cyan-500 text-white"
                       }`}
                     >
-                      {mapRerollStatus.myVote ? "Remove Vote" : "Vote to Reroll Map"}
+                      {mapRerollStatus?.myVote ? "Remove Vote" : "Vote to Reroll Map"}
                     </button>
                   )}
                 </div>

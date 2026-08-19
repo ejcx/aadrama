@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { revalidatePath } from 'next/cache'
-import type { CreateScrimInput, Scrim, ScrimPlayer, ScrimWithCounts, ScrimScoreSubmission } from '@/lib/supabase/types'
+import type { CreateScrimInput, MapChoice, Scrim, ScrimPlayer, ScrimWithCounts, ScrimScoreSubmission } from '@/lib/supabase/types'
 import { hasBadgeForSession } from '@/lib/badges/award'
 import { isBadgeGoForward } from '@/lib/badges/constants'
 import {
@@ -101,7 +101,7 @@ export async function getActiveScrims(): Promise<ScrimWithCounts[]> {
     .order('created_at', { ascending: false })
   
   if (error) throw new Error(`Failed to fetch scrims: ${error.message}`)
-  return data || []
+  return await withMapChoice(data || [])
 }
 
 // Get a single scrim by ID
@@ -114,8 +114,42 @@ export async function getScrim(scrimId: string): Promise<ScrimWithCounts | null>
     .eq('id', scrimId)
     .single()
   
-  if (error) return null
-  return data
+  if (error || !data) return null
+  const [scrim] = await withMapChoice([data])
+  return scrim
+}
+
+/**
+ * scrims_with_counts expands s.* at CREATE VIEW time. If the view was not
+ * recreated after map_choice was added, patch it from public.scrims.
+ */
+async function withMapChoice<T extends { id: string; map_choice?: MapChoice | null }>(
+  rows: T[]
+): Promise<(T & { map_choice: MapChoice })[]> {
+  if (rows.length === 0) return []
+
+  const missing = rows.filter((r) => r.map_choice == null)
+  if (missing.length === 0) {
+    return rows.map((r) => ({ ...r, map_choice: r.map_choice as MapChoice }))
+  }
+
+  const supabase = await createClient()
+  const { data: patches } = await supabase
+    .from('scrims')
+    .select('id, map_choice')
+    .in(
+      'id',
+      missing.map((r) => r.id)
+    )
+
+  const byId = new Map(
+    (patches || []).map((p) => [p.id, (p.map_choice as MapChoice) || 'manual'])
+  )
+
+  return rows.map((r) => ({
+    ...r,
+    map_choice: (r.map_choice as MapChoice | null | undefined) ?? byId.get(r.id) ?? 'manual',
+  }))
 }
 
 // Get players for a scrim
@@ -667,7 +701,7 @@ export async function getRecentScrims(options?: {
     .limit(limit)
   
   if (error) throw new Error(`Failed to fetch recent scrims: ${error.message}`)
-  return data || []
+  return await withMapChoice(data || [])
 }
 
 // Get unique maps from scrims (for filtering)
@@ -1014,47 +1048,51 @@ export interface MapRerollStatus {
 export async function getMapRerollStatus(scrimId: string): Promise<MapRerollStatus> {
   const supabase = await createClient()
 
-  const { data: status, error: statusError } = await supabase.rpc('get_map_reroll_status', {
-    p_scrim_id: scrimId,
-  })
-
-  if (statusError) {
-    console.error('Failed to get map reroll status:', statusError)
-    throw new Error(`Failed to get map reroll status: ${statusError.message}`)
-  }
-
-  const { data: players, error: playersError } = await supabase
+  // Prefer computing from players so status works even if the RPC is missing.
+  // Fall back gracefully if voted_map_reroll column is not migrated yet.
+  const withVote = await supabase
     .from('scrim_players')
     .select('user_id, user_name, voted_map_reroll')
     .eq('scrim_id', scrimId)
     .not('team', 'is', null)
 
-  if (playersError) {
-    throw new Error(`Failed to get players: ${playersError.message}`)
+  let players: { user_id: string; user_name: string; voted_map_reroll?: boolean | null }[] =
+    withVote.data || []
+
+  if (withVote.error) {
+    console.error('Failed to get map reroll votes (column may be missing):', withVote.error)
+    const fallback = await supabase
+      .from('scrim_players')
+      .select('user_id, user_name')
+      .eq('scrim_id', scrimId)
+      .not('team', 'is', null)
+
+    if (fallback.error) {
+      throw new Error(`Failed to get players: ${fallback.error.message}`)
+    }
+    players = fallback.data || []
   }
+
+  const totalPlayers = players.length
+  const votesNeeded = Math.floor(totalPlayers / 2) + 1
+  const voters = players.filter((p) => p.voted_map_reroll).map((p) => p.user_name)
+  const votesForReroll = voters.length
 
   let myVote = false
   try {
     const { userId } = await getCurrentUser()
-    const myPlayer = players?.find((p) => p.user_id === userId)
-    myVote = myPlayer?.voted_map_reroll || false
+    const myPlayer = players.find((p) => p.user_id === userId)
+    myVote = Boolean(myPlayer && 'voted_map_reroll' in myPlayer && myPlayer.voted_map_reroll)
   } catch {
     // Not logged in
   }
 
-  const statusRow = status?.[0] || {
-    total_players: 0,
-    votes_for_reroll: 0,
-    votes_needed: 1,
-    can_reroll: false,
-  }
-
   return {
-    totalPlayers: statusRow.total_players,
-    votesForReroll: statusRow.votes_for_reroll,
-    votesNeeded: statusRow.votes_needed,
-    canReroll: statusRow.can_reroll,
-    voters: players?.filter((p) => p.voted_map_reroll).map((p) => p.user_name) || [],
+    totalPlayers,
+    votesForReroll,
+    votesNeeded,
+    canReroll: votesForReroll >= votesNeeded,
+    voters,
     myVote,
   }
 }
@@ -1095,7 +1133,10 @@ export async function voteMapReroll(
     .eq('id', player.id)
 
   if (updateError) {
-    throw new Error(`Failed to update map reroll vote: ${updateError.message}`)
+    throw new Error(
+      `Failed to update map reroll vote: ${updateError.message}. ` +
+        'If this persists, the map-reroll database migration may not be applied yet.'
+    )
   }
 
   let rerolled = false
@@ -1109,6 +1150,10 @@ export async function voteMapReroll(
 
     if (rerollError) {
       console.error('Failed to check/execute map reroll:', rerollError)
+      throw new Error(
+        `Map reroll vote saved, but could not execute reroll: ${rerollError.message}. ` +
+          'Apply migration 20260818_001_reroll_tiered_map.sql if it has not been run.'
+      )
     } else if (typeof rerollResult === 'string' && rerollResult.length > 0) {
       rerolled = true
       newMap = rerollResult
