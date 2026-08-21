@@ -473,6 +473,72 @@ function PotatoBadgeStack({ badges }: { badges: PlayerBadge[] }) {
   );
 }
 
+function OwenBadgeStack({ badges }: { badges: PlayerBadge[] }) {
+  const meta = getBadgeMeta("owen");
+  const count = badges.length;
+  const stackLayers = Math.min(count, STACKED_BADGE_MAX);
+  const showCount = count > 1;
+  const stackWidth =
+    48 + (stackLayers - 1) * STACKED_BADGE_LAYER_OFFSET + (showCount ? 22 : 0);
+
+  const recentDates = badges
+    .slice(0, 5)
+    .map((b) => new Date(b.earned_at).toLocaleDateString());
+
+  return (
+    <BadgeTooltip
+      trigger={
+        <div
+          className="relative group flex-shrink-0 self-start outline-none cursor-default"
+          style={{ width: stackWidth, minHeight: 56 }}
+          aria-label={`${count} Owen award${count !== 1 ? "s" : ""}`}
+        >
+          {Array.from({ length: stackLayers }, (_, i) => (
+            <div
+              key={i}
+              className="absolute top-0 transition-transform duration-200 group-hover:scale-105"
+              style={{
+                left: i * STACKED_BADGE_LAYER_OFFSET,
+                zIndex: i + 1,
+                opacity: i === stackLayers - 1 ? 1 : 0.92 - i * 0.08,
+                transform: `rotate(${i * 4 - (stackLayers - 1) * 2}deg)`,
+              }}
+            >
+              <BadgeMedalCore meta={meta} />
+            </div>
+          ))}
+
+          {showCount && (
+            <div
+              className="
+                absolute -top-0.5 z-20 min-w-[1.35rem] h-[1.35rem] px-1
+                rounded-full bg-amber-900 border-2 border-amber-500/80
+                flex items-center justify-center shadow-md
+              "
+              style={{ left: (stackLayers - 1) * STACKED_BADGE_LAYER_OFFSET + 38 }}
+            >
+              <span className="text-[10px] sm:text-xs font-bold text-amber-100 leading-none tabular-nums">
+                {count}
+              </span>
+            </div>
+          )}
+        </div>
+      }
+    >
+      <p className="font-semibold whitespace-nowrap" style={{ color: meta.accent }}>
+        Owen ×{count}
+      </p>
+      <p className="text-gray-400 text-[11px] leading-snug mt-0.5">{meta.description}</p>
+      {count > 1 && (
+        <p className="text-gray-500 text-[10px] mt-1">
+          Recent: {recentDates.join(", ")}
+          {count > 5 ? ` +${count - 5} more` : ""}
+        </p>
+      )}
+    </BadgeTooltip>
+  );
+}
+
 function TopFragBadgeStack({ badges }: { badges: PlayerBadge[] }) {
   const meta = getBadgeMeta("scrim_top_frag");
   const count = badges.length;
@@ -638,6 +704,7 @@ function partitionBadges(badges: PlayerBadge[]) {
   let combatPatch: PlayerBadge | null = null;
   let vitality: PlayerBadge | null = null;
   const potato: PlayerBadge[] = [];
+  const owen: PlayerBadge[] = [];
   const topFrag: PlayerBadge[] = [];
   const other: PlayerBadge[] = [];
 
@@ -678,6 +745,8 @@ function partitionBadges(badges: PlayerBadge[]) {
       vitality = b;
     } else if (b.badge_type === "potato") {
       potato.push(b);
+    } else if (b.badge_type === "owen") {
+      owen.push(b);
     } else if (b.badge_type === "scrim_top_frag") {
       topFrag.push(b);
     } else {
@@ -689,6 +758,7 @@ function partitionBadges(badges: PlayerBadge[]) {
     new Date(b.earned_at).getTime() - new Date(a.earned_at).getTime();
 
   potato.sort(byEarnedDesc);
+  owen.sort(byEarnedDesc);
   topFrag.sort(byEarnedDesc);
 
   // Combat patch and scrim activity are mutually exclusive (< 50 vs 50+ ranked scrims).
@@ -703,6 +773,7 @@ function partitionBadges(badges: PlayerBadge[]) {
     scrimActivity,
     eloMilestone,
     potato,
+    owen,
     topFrag,
     other,
   };
@@ -726,6 +797,7 @@ function BadgeRack({
     scrimActivity,
     eloMilestone,
     potato,
+    owen,
     topFrag,
     other,
   } = partitionBadges(badges);
@@ -757,6 +829,7 @@ function BadgeRack({
         <BadgeMedal key={b.id} badge={b} />
       ))}
       {topFrag.length > 0 && <TopFragBadgeStack badges={topFrag} />}
+      {owen.length > 0 && <OwenBadgeStack badges={owen} />}
       {potato.length > 0 && <PotatoBadgeStack badges={potato} />}
     </div>
   );

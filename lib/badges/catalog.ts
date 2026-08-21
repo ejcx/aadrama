@@ -4,6 +4,7 @@ import { BADGE_TYPES, getBadgeMeta } from './constants'
 /** Badges that can be earned multiple times (once per scrim or manual award). */
 export const REPEATABLE_BADGE_TYPES = new Set<BadgeType>([
   'potato',
+  'owen',
   'scrim_top_frag',
   'rage_quit',
 ])
@@ -21,7 +22,7 @@ export type BadgeCatalogSection = {
 export const BADGE_CATALOG_SECTIONS: BadgeCatalogSection[] = [
   {
     title: 'Scrim Awards',
-    badgeTypes: ['potato', 'scrim_top_frag', 'rage_quit'],
+    badgeTypes: ['owen', 'potato', 'scrim_top_frag', 'rage_quit'],
   },
   {
     title: 'Streaks',

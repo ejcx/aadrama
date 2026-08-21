@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Scrim, Winner } from '@/lib/supabase/types'
 import { awardBadge, hasBadgeForSession } from './award'
-import { isBadgeGoForward } from './constants'
+import { isBadgeGoForward, isOwenBadgeGoForward } from './constants'
 
 export type ScrimPlayerKillStats = {
   gameName: string
@@ -14,8 +14,11 @@ export async function processScrimAutoBadges(
   supabase: SupabaseClient,
   scrim: Scrim,
   playerStats: ScrimPlayerKillStats[]
-): Promise<{ potatoAutoAwarded: string[] }> {
-  const result = { potatoAutoAwarded: [] as string[] }
+): Promise<{ potatoAutoAwarded: string[]; owenAutoAwarded: string[] }> {
+  const result = {
+    potatoAutoAwarded: [] as string[],
+    owenAutoAwarded: [] as string[],
+  }
 
   if (scrim.status !== 'finalized' || !isBadgeGoForward(scrim.finalized_at)) {
     return result
@@ -30,6 +33,7 @@ export async function processScrimAutoBadges(
   }
 
   const sessionId = scrim.id
+  const owenGoForward = isOwenBadgeGoForward(scrim.finalized_at)
 
   for (const player of playerStats) {
     if (player.kills === 1) {
@@ -41,6 +45,17 @@ export async function processScrimAutoBadges(
         earnedAt: scrim.finalized_at ?? undefined,
       })
       if (awarded) result.potatoAutoAwarded.push(player.gameNameLower)
+    }
+
+    if (owenGoForward && player.kills === 0) {
+      const { awarded } = await awardBadge(supabase, {
+        badgeType: 'owen',
+        gameName: player.gameName,
+        gameNameLower: player.gameNameLower,
+        sessionId,
+        earnedAt: scrim.finalized_at ?? undefined,
+      })
+      if (awarded) result.owenAutoAwarded.push(player.gameNameLower)
     }
   }
 

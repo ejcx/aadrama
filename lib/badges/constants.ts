@@ -1,8 +1,12 @@
 /** Badges only apply to scrims finalized on or after this instant (go-forward). */
 export const BADGES_GO_FORWARD_CUTOFF = new Date('2026-05-16T00:00:00.000Z')
 
+/** Owen (0 kills) is go-forward from this date — no historical backfill. */
+export const OWEN_BADGE_GO_FORWARD_CUTOFF = new Date('2026-08-21T00:00:00.000Z')
+
 export const BADGE_TYPES = [
   'potato',
+  'owen',
   'rage_quit',
   'vitality',
   'season_1_champion',
@@ -41,6 +45,12 @@ export const BADGE_META: Record<BadgeType, BadgeMeta> = {
     description: 'Voted worst performer by the losing team, or earned with a heroic 1-kill game.',
     src: '/badges/potato.svg',
     accent: '#a06a36',
+  },
+  owen: {
+    label: 'Owen',
+    description: 'Finished a ranked scrim with 0 kills. Wow.',
+    src: '/badges/owen.png',
+    accent: '#d4af5f',
   },
   rage_quit: {
     label: 'Rage Quit',
@@ -167,6 +177,11 @@ export const BADGE_META: Record<BadgeType, BadgeMeta> = {
 export function isBadgeGoForward(finalizedAt: string | null | undefined): boolean {
   if (!finalizedAt) return false
   return new Date(finalizedAt) >= BADGES_GO_FORWARD_CUTOFF
+}
+
+export function isOwenBadgeGoForward(finalizedAt: string | null | undefined): boolean {
+  if (!finalizedAt) return false
+  return new Date(finalizedAt) >= OWEN_BADGE_GO_FORWARD_CUTOFF
 }
 
 const FALLBACK_BADGE_META: BadgeMeta = {
