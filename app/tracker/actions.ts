@@ -1333,3 +1333,88 @@ export async function getTeammateStats(
 
   return computeTeammateStats(games, displayNames, normalized)
 }
+
+export type RosterEloLookup = {
+  elo: number
+  gamesPlayed: number
+  tracker: string
+  ranked: boolean
+}
+
+/** Match roster aliases to player_elo (exact lower name, then display-name ilike). */
+export async function lookupRosterElos(
+  players: { name: string; aliases: string[] }[]
+): Promise<Record<string, RosterEloLookup>> {
+  const result: Record<string, RosterEloLookup> = {}
+  const aliases = [
+    ...new Set(
+      players.flatMap((p) =>
+        [p.name, ...p.aliases].map((a) => a.toLowerCase().trim()).filter(Boolean)
+      )
+    ),
+  ]
+  if (aliases.length === 0) return result
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('player_elo')
+    .select('game_name, game_name_lower, elo, games_played')
+    .in('game_name_lower', aliases)
+
+  if (error) {
+    console.error('Failed to lookup roster ELOs:', error.message)
+    return result
+  }
+
+  const byLower = new Map(
+    (data ?? []).map((row) => [row.game_name_lower, row])
+  )
+
+  const unresolved: { name: string; aliases: string[] }[] = []
+  for (const player of players) {
+    const candidates = [player.name, ...player.aliases]
+      .map((a) => a.toLowerCase().trim())
+      .filter(Boolean)
+      .map((alias) => byLower.get(alias))
+      .filter((row): row is NonNullable<typeof row> => Boolean(row))
+
+    const best = candidates.sort(
+      (a, b) => (b.games_played ?? 0) - (a.games_played ?? 0)
+    )[0]
+
+    if (best) {
+      result[player.name] = {
+        elo: best.elo,
+        gamesPlayed: best.games_played ?? 0,
+        tracker: best.game_name,
+        ranked: (best.games_played ?? 0) > 0,
+      }
+    } else {
+      unresolved.push(player)
+    }
+  }
+
+  for (const player of unresolved) {
+    const query = player.aliases[0] || player.name
+    if (!query.trim() || query.toLowerCase() === 'unknown') continue
+
+    const { data: fuzzy } = await supabase
+      .from('player_elo')
+      .select('game_name, game_name_lower, elo, games_played')
+      .ilike('game_name_lower', `%${query.toLowerCase().trim()}%`)
+      .order('games_played', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (fuzzy) {
+      result[player.name] = {
+        elo: fuzzy.elo,
+        gamesPlayed: fuzzy.games_played ?? 0,
+        tracker: fuzzy.game_name,
+        ranked: (fuzzy.games_played ?? 0) > 0,
+      }
+    }
+  }
+
+  return result
+}

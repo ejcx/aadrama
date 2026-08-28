@@ -187,6 +187,23 @@ const SidebarLayout = ({ children }: SidebarLayoutProps) => {
             Events
           </p>
           <a
+            href="/2026-fall-classic"
+            onClick={() => setMobileMenuOpen(false)}
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              pathname === "/2026-fall-classic"
+                ? "bg-orange-950/50 text-orange-300"
+                : "text-orange-500/80 hover:bg-white/[0.03] hover:text-orange-400"
+            }`}
+          >
+            <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+            <span className="flex-1">Fall Classic</span>
+            <span className="rounded bg-orange-950 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-300 border border-orange-800/60">
+              Live
+            </span>
+          </a>
+          <a
             href="/2025-winter-classic"
             onClick={() => setMobileMenuOpen(false)}
             className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
