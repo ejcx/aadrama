@@ -1346,13 +1346,13 @@ export async function lookupRosterElos(
   players: { name: string; aliases: string[] }[]
 ): Promise<Record<string, RosterEloLookup>> {
   const result: Record<string, RosterEloLookup> = {}
-  const aliases = [
-    ...new Set(
+  const aliases = Array.from(
+    new Set(
       players.flatMap((p) =>
         [p.name, ...p.aliases].map((a) => a.toLowerCase().trim()).filter(Boolean)
       )
-    ),
-  ]
+    )
+  )
   if (aliases.length === 0) return result
 
   const supabase = await createClient()
