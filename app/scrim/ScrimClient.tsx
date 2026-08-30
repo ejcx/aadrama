@@ -32,6 +32,9 @@ import {
 } from "./actions";
 import type { ScrimWithCounts, ScrimPlayer, MapChoice } from "@/lib/supabase/types";
 import { isCaptainsPickBlocked } from "@/lib/scrim/captains-pick";
+import { formatLabelFromPlayerCount } from "@/lib/scrim/format";
+import type { ScrimFormat } from "@/lib/scrim/format";
+import ScrimFormatFilter from "../components/ScrimFormatFilter";
 
 /** Poll interval for live scrim/lobby/draft updates (3–5s range). */
 const SCRIM_POLL_MS = 4000;
@@ -863,6 +866,7 @@ export default function ScrimClient() {
   });
   const [recentLimit, setRecentLimit] = useState<number>(25);
   const [filterMap, setFilterMap] = useState<string>("");
+  const [filterFormat, setFilterFormat] = useState<ScrimFormat | null>(null);
   const [scrimMaps, setScrimMaps] = useState<string[]>([]);
 
   // Update time range based on preset selection
@@ -902,7 +906,7 @@ export default function ScrimClient() {
   // Load recent scrims when time range or map filter changes
   useEffect(() => {
     loadRecentScrims();
-  }, [timeRange, startTime, endTime, recentLimit, filterMap]);
+  }, [timeRange, startTime, endTime, recentLimit, filterMap, filterFormat]);
 
   async function loadActiveScrims() {
     try {
@@ -941,6 +945,7 @@ export default function ScrimClient() {
         startTime: timeRange !== "all" && startTime ? new Date(startTime).toISOString() : undefined,
         endTime: timeRange !== "all" && endTime ? new Date(endTime).toISOString() : undefined,
         map: filterMap || undefined,
+        playersPerTeam: filterFormat || undefined,
       });
       setRecentScrims(scrims);
     } catch (err) {
@@ -1217,7 +1222,7 @@ export default function ScrimClient() {
                 </div>
               )}
 
-              {/* Map Filter and Limit */}
+              {/* Map Filter, Format, and Limit */}
               <div className="flex flex-wrap gap-4">
                 <div className="flex-1 min-w-[200px] max-w-xs">
                   <label className="block text-gray-300 text-xs sm:text-sm mb-1">Map</label>
@@ -1233,6 +1238,9 @@ export default function ScrimClient() {
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="flex-1 min-w-[240px]">
+                  <ScrimFormatFilter value={filterFormat} onChange={setFilterFormat} />
                 </div>
                 <div className="max-w-[150px]">
                   <label className="block text-gray-300 text-xs sm:text-sm mb-1">Limit</label>
@@ -1269,7 +1277,7 @@ export default function ScrimClient() {
                         </span>
                       )}
                       <span className="text-gray-500 text-sm">
-                        {scrim.player_count} players
+                        {formatLabelFromPlayerCount(scrim.player_count)}
                       </span>
                       <span className="text-gray-600 text-xs">
                         {new Date(scrim.created_at).toLocaleDateString()}

@@ -7,6 +7,8 @@ import { SessionHoverPopover } from "../../../components/SessionHoverPopover";
 import PlayerBadgesRow from "@/app/components/PlayerBadgesRow";
 import type { PlayerBadge } from "@/lib/supabase/types";
 import { SEASON_1_LABEL, SEASON_2_LABEL } from "@/lib/scrim/seasons";
+import { formatLabel, formatLabelFromPlayerCount, type ScrimFormat } from "@/lib/scrim/format";
+import ScrimFormatFilter from "@/app/components/ScrimFormatFilter";
 import { getPlayerElo, getPlayerEloHistory, getPlayerMapEloHistory, getPlayerRank, getPlayerSeason1Elo, getPlayerSeason2Elo, getPlayerPeakElo, getPlayerScrimsAtEloFirstPlace, getPlayerDailyKills, getRankedScrimMaps, getPlayerBadges } from "../../actions";
 import { getPlayerScrims, getScrimMaps, type PlayerScrimResult } from "../../../scrim/actions";
 import {
@@ -335,6 +337,7 @@ const PlayerDetailClient = ({
   const [scrimStartTime, setScrimStartTime] = useState<string>(defaultDates.start);
   const [scrimEndTime, setScrimEndTime] = useState<string>(defaultDates.end);
   const [scrimMapFilter, setScrimMapFilter] = useState<string>("");
+  const [scrimFormatFilter, setScrimFormatFilter] = useState<ScrimFormat | null>(null);
   const [scrimLimit, setScrimLimit] = useState<number>(25);
   
   // All-time scrim stats (for totals in top bar)
@@ -342,6 +345,11 @@ const PlayerDetailClient = ({
     totalKills: number;
     totalDeaths: number;
     kdRatio: number | null;
+    wins: number;
+    losses: number;
+    draws: number;
+    games: number;
+    eloChangeSum: number;
   } | null>(null);
 
   // Daily kills chart state
@@ -452,6 +460,7 @@ const PlayerDetailClient = ({
         const allScrims = await getPlayerScrims({
           gameName: playerName,
           limit: 1000, // Get all scrims for totals
+          playersPerTeam: scrimFormatFilter || undefined,
         });
 
         if (cancelled) return;
@@ -462,11 +471,20 @@ const PlayerDetailClient = ({
         const totalDeaths = allScrims.reduce((sum, s) => sum + (s.deaths || 0), 0);
         const kdRatio =
           totalDeaths > 0 ? totalKills / totalDeaths : totalKills > 0 ? Infinity : 0;
+        const wins = allScrims.filter((s) => s.result === "win").length;
+        const losses = allScrims.filter((s) => s.result === "loss").length;
+        const draws = allScrims.filter((s) => s.result === "draw").length;
+        const eloChangeSum = allScrims.reduce((sum, s) => sum + (s.elo_change || 0), 0);
 
         setAllTimeScrimStats({
           totalKills,
           totalDeaths,
           kdRatio: kdRatio === Infinity ? Infinity : kdRatio,
+          wins,
+          losses,
+          draws,
+          games: allScrims.length,
+          eloChangeSum,
         });
       } catch (err) {
         console.error('Failed to fetch all-time scrim stats:', err);
@@ -485,7 +503,7 @@ const PlayerDetailClient = ({
     return () => {
       cancelled = true;
     };
-  }, [playerName]);
+  }, [playerName, scrimFormatFilter]);
 
   // Fetch player scrims
   useEffect(() => {
@@ -499,6 +517,7 @@ const PlayerDetailClient = ({
           startTime: scrimStartTime ? new Date(scrimStartTime).toISOString() : undefined,
           endTime: scrimEndTime ? new Date(scrimEndTime).toISOString() : undefined,
           map: scrimMapFilter || undefined,
+          playersPerTeam: scrimFormatFilter || undefined,
         });
         setScrimResults(scrims);
       } catch (err) {
@@ -509,7 +528,7 @@ const PlayerDetailClient = ({
       }
     };
     fetchPlayerScrims();
-  }, [playerName, scrimStartTime, scrimEndTime, scrimMapFilter, scrimLimit]);
+  }, [playerName, scrimStartTime, scrimEndTime, scrimMapFilter, scrimFormatFilter, scrimLimit]);
 
   // Reset competitive stats when switching profiles
   useEffect(() => {
@@ -540,7 +559,9 @@ const PlayerDetailClient = ({
 
         // Fetch ELO history, rank, and frozen Season 1 rating in parallel
         const [historyRecords, rankData, season1Elo, season2Elo, peakElo] = await Promise.all([
-          getPlayerEloHistory(playerName, 7),
+          getPlayerEloHistory(playerName, 7, {
+            playersPerTeam: scrimFormatFilter,
+          }),
           getPlayerRank(playerName),
           getPlayerSeason1Elo(playerName),
           getPlayerSeason2Elo(playerName),
@@ -586,7 +607,7 @@ const PlayerDetailClient = ({
     return () => {
       cancelled = true;
     };
-  }, [playerName]);
+  }, [playerName, scrimFormatFilter]);
 
   const competitiveStatsLoading = eloLoading || allTimeScrimStatsLoading;
   const hasCompetitiveStats =
@@ -905,7 +926,20 @@ const PlayerDetailClient = ({
 
           {/* Ranked / competitive stats */}
           <div className="mb-6">
-            <h2 className="text-white text-lg sm:text-xl font-bold mb-4">Ranked Scrims</h2>
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
+              <h2 className="text-white text-lg sm:text-xl font-bold">Ranked Scrims</h2>
+              <ScrimFormatFilter
+                value={scrimFormatFilter}
+                onChange={setScrimFormatFilter}
+                label="Team size"
+              />
+            </div>
+            {scrimFormatFilter && (
+              <p className="text-gray-400 text-xs mb-3">
+                Showing {formatLabel(scrimFormatFilter)} only. Format ELO is 1200 + ELO
+                changes from those scrims — not the official lifetime rating.
+              </p>
+            )}
             {competitiveStatsLoading ? (
               <CompetitiveStatsSkeleton />
             ) : !hasCompetitiveStats ? (
@@ -913,7 +947,7 @@ const PlayerDetailClient = ({
             ) : eloData ? (
             <div className={`
               rounded-lg p-4 sm:p-6 border
-              ${eloData.rank !== null && eloData.rank <= 10
+              ${!scrimFormatFilter && eloData.rank !== null && eloData.rank <= 10
                 ? eloData.rank === 1
                   ? 'bg-gradient-to-r from-yellow-900/40 via-amber-900/30 to-orange-900/40 border-yellow-600/70'
                   : eloData.rank <= 3
@@ -925,21 +959,27 @@ const PlayerDetailClient = ({
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   {/* Grandmaster Badge for top 10 */}
-                  {eloData.rank !== null && eloData.rank <= 10 && (
+                  {eloData.rank !== null && eloData.rank <= 10 && !scrimFormatFilter && (
                     <GrandmasterBadge rank={eloData.rank} />
                   )}
                   
                   <div>
                     <div className="text-yellow-400/80 text-xs sm:text-sm mb-1">
-                      Cumulative ELO
-                      {eloData.rank !== null && (
+                      {scrimFormatFilter
+                        ? `${formatLabel(scrimFormatFilter)} ELO`
+                        : "Cumulative ELO"}
+                      {!scrimFormatFilter && eloData.rank !== null && (
                         <span className="text-gray-400 ml-2">
                           #{eloData.rank}
                         </span>
                       )}
                     </div>
                     <div className="flex items-baseline gap-3">
-                      <span className="text-3xl sm:text-4xl font-bold text-yellow-400">{eloData.elo}</span>
+                      <span className="text-3xl sm:text-4xl font-bold text-yellow-400">
+                        {scrimFormatFilter && allTimeScrimStats
+                          ? 1200 + allTimeScrimStats.eloChangeSum
+                          : eloData.elo}
+                      </span>
                       {eloData.eloChange7Days !== 0 && (
                         <span className={`text-lg sm:text-xl font-semibold ${eloData.eloChange7Days > 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {eloData.eloChange7Days > 0 ? '▲' : '▼'} {eloData.eloChange7Days > 0 ? '+' : ''}{eloData.eloChange7Days}
@@ -952,7 +992,8 @@ const PlayerDetailClient = ({
                         </span>
                       )}
                     </div>
-                    {(eloData.season1Elo != null ||
+                    {!scrimFormatFilter &&
+                      (eloData.season1Elo != null ||
                       eloData.season2Elo != null ||
                       eloData.peakElo != null) && (
                       <div className="mt-2 flex flex-col gap-1 text-sm">
@@ -987,28 +1028,46 @@ const PlayerDetailClient = ({
                 </div>
 
                 <div className="flex gap-4 sm:gap-6 text-center">
+                  {(() => {
+                    const games = scrimFormatFilter && allTimeScrimStats
+                      ? allTimeScrimStats.games
+                      : eloData.games_played;
+                    const wins = scrimFormatFilter && allTimeScrimStats
+                      ? allTimeScrimStats.wins
+                      : eloData.wins;
+                    const losses = scrimFormatFilter && allTimeScrimStats
+                      ? allTimeScrimStats.losses
+                      : eloData.losses;
+                    const draws = scrimFormatFilter && allTimeScrimStats
+                      ? allTimeScrimStats.draws
+                      : eloData.draws;
+                    return (
+                  <>
                   <div>
                     <div className="text-gray-400 text-xs mb-1">Ranked Games</div>
-                    <div className="text-white text-lg sm:text-xl font-semibold">{eloData.games_played}</div>
+                    <div className="text-white text-lg sm:text-xl font-semibold">{games}</div>
                   </div>
                   <div>
                     <div className="text-gray-400 text-xs mb-1">W-L-D</div>
                     <div className="text-sm sm:text-base">
-                      <span className="text-green-400 font-semibold">{eloData.wins}</span>
+                      <span className="text-green-400 font-semibold">{wins}</span>
                       <span className="text-gray-500">-</span>
-                      <span className="text-red-400 font-semibold">{eloData.losses}</span>
+                      <span className="text-red-400 font-semibold">{losses}</span>
                       <span className="text-gray-500">-</span>
-                      <span className="text-gray-400 font-semibold">{eloData.draws}</span>
+                      <span className="text-gray-400 font-semibold">{draws}</span>
                     </div>
                   </div>
-                  {eloData.games_played > 0 && (
+                  {games > 0 && (
                     <div>
                       <div className="text-gray-400 text-xs mb-1">Win Rate</div>
-                      <div className={`text-lg sm:text-xl font-semibold ${(eloData.wins / eloData.games_played) >= 0.5 ? 'text-green-400' : 'text-red-400'}`}>
-                        {((eloData.wins / eloData.games_played) * 100).toFixed(0)}%
+                      <div className={`text-lg sm:text-xl font-semibold ${(wins / games) >= 0.5 ? 'text-green-400' : 'text-red-400'}`}>
+                        {((wins / games) * 100).toFixed(0)}%
                       </div>
                     </div>
                   )}
+                  </>
+                    );
+                  })()}
                   {(() => {
                     // Use all-time scrim stats if available, otherwise calculate from visible scrims
                     const stats = allTimeScrimStats || (() => {
@@ -1472,6 +1531,7 @@ const PlayerDetailClient = ({
                       <tr className="border-b border-gray-700 bg-gray-800">
                         <th className="text-left py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Date</th>
                         <th className="text-left py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Map</th>
+                        <th className="text-center py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Format</th>
                         <th className="text-center py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Result</th>
                         <th className="text-center py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">Score</th>
                         <th className="text-center py-2 sm:py-3 px-2 sm:px-4 whitespace-nowrap">K/D</th>
@@ -1490,6 +1550,11 @@ const PlayerDetailClient = ({
                           </td>
                           <td className="py-2 sm:py-3 px-2 sm:px-4">
                             <span className="text-cyan-400">{scrim.map || 'Unknown'}</span>
+                          </td>
+                          <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-gray-400">
+                            {scrim.player_count != null
+                              ? formatLabelFromPlayerCount(scrim.player_count)
+                              : "—"}
                           </td>
                           <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
                             <span className={`px-2 py-1 rounded text-xs font-semibold ${

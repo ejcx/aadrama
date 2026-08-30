@@ -9,6 +9,11 @@ import {
 import type { PlayerBadge } from '@/lib/supabase/types'
 import { createClient } from '@/lib/supabase/server'
 import { SEASON_2_START_ISO, season1EloFromChanges } from '@/lib/scrim/seasons'
+import { playerCountForFormat, type ScrimFormat } from '@/lib/scrim/format'
+import {
+  getFinalizedRankedScrimIdsByPlayerCount,
+  getPlayerCountsForScrimIds,
+} from '@/app/scrim/actions'
 import {
   comparisonNeedsFullScrimRoster,
   computeTeammateStats,
@@ -568,7 +573,7 @@ export type PlayerEloHistoryRow = {
 export async function getPlayerEloHistory(
   playerName: string,
   days = 7,
-  options?: { map?: string | null }
+  options?: { map?: string | null; playersPerTeam?: ScrimFormat | null }
 ): Promise<PlayerEloHistoryRow[]> {
   const supabase = await createClient()
   const playerNameLower = playerName.toLowerCase()
@@ -577,6 +582,9 @@ export async function getPlayerEloHistory(
   daysAgo.setDate(daysAgo.getDate() - days)
 
   const mapFilter = options?.map?.trim() || null
+  const formatCount = options?.playersPerTeam
+    ? playerCountForFormat(options.playersPerTeam)
+    : null
 
   let scrimIds: string[] | null = null
   if (mapFilter) {
@@ -605,7 +613,11 @@ export async function getPlayerEloHistory(
   const { data, error } = await query
 
   if (error) throw new Error(`Failed to fetch player ELO history: ${error.message}`)
-  return (data || []) as PlayerEloHistoryRow[]
+  const rows = (data || []) as PlayerEloHistoryRow[]
+  if (!formatCount) return rows
+
+  const counts = await getPlayerCountsForScrimIds(rows.map((r) => r.scrim_id))
+  return rows.filter((r) => counts[r.scrim_id] === formatCount)
 }
 
 // Get player rank (count of players with higher ELO)
@@ -830,62 +842,120 @@ export async function getPlayerMapEloHistory(
   }))
 }
 
-export async function getPlayerStatsByMap(
-  map: string,
-  options?: { season1?: boolean; season2?: boolean }
-): Promise<MapPlayerStats[]> {
+export type RankedStatsFilter = {
+  map?: string
+  playersPerTeam?: ScrimFormat
+  season1?: boolean
+  season2?: boolean
+}
+
+type FilteredHistoryRow = {
+  game_name_lower: string
+  scrim_id: string
+  result: string
+  elo_change: number | null
+  kills: number | null
+  created_at: string
+}
+
+async function fetchEloHistoryForRankedFilters(
+  options: RankedStatsFilter
+): Promise<FilteredHistoryRow[]> {
   const supabase = await createClient()
+  const map = options.map?.trim() || undefined
+  const playerCount = options.playersPerTeam
+    ? playerCountForFormat(options.playersPerTeam)
+    : undefined
 
-  type MapHistoryRow = {
-    game_name_lower: string
-    scrim_id: string
-    result: string
-    elo_change: number | null
-    kills: number | null
-    created_at: string
-  }
+  const data: FilteredHistoryRow[] = []
 
-  const data: MapHistoryRow[] = []
-  for (let from = 0; ; from += ELO_HISTORY_PAGE_SIZE) {
-    let query = supabase
-      .from('elo_history')
-      .select(`
-        game_name_lower,
-        scrim_id,
-        result,
-        elo_change,
-        kills,
-        created_at,
-        scrims!inner(map, finalized_at)
-      `)
-      .eq('scrims.map', map)
-      .order('created_at', { ascending: true })
-      .order('id', { ascending: true })
-      .range(from, from + ELO_HISTORY_PAGE_SIZE - 1)
+  if (map) {
+    for (let from = 0; ; from += ELO_HISTORY_PAGE_SIZE) {
+      let query = supabase
+        .from('elo_history')
+        .select(`
+          game_name_lower,
+          scrim_id,
+          result,
+          elo_change,
+          kills,
+          created_at,
+          scrims!inner(map, finalized_at)
+        `)
+        .eq('scrims.map', map)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + ELO_HISTORY_PAGE_SIZE - 1)
 
-    if (options?.season1) {
-      query = query.lt('created_at', SEASON_2_START_ISO)
-    } else if (options?.season2) {
-      query = query.gte('created_at', SEASON_2_START_ISO)
+      if (options.season1) {
+        query = query.lt('created_at', SEASON_2_START_ISO)
+      } else if (options.season2) {
+        query = query.gte('created_at', SEASON_2_START_ISO)
+      }
+
+      const { data: page, error } = await query
+      if (error) throw new Error(`Failed to fetch map stats: ${error.message}`)
+
+      const rows = (page ?? []) as FilteredHistoryRow[]
+      data.push(...rows)
+      if (rows.length < ELO_HISTORY_PAGE_SIZE) break
     }
 
-    const { data: page, error } = await query
+    if (!playerCount) return data
 
-    if (error) throw new Error(`Failed to fetch map stats: ${error.message}`)
-
-    const rows = (page ?? []) as MapHistoryRow[]
-    data.push(...rows)
-    if (rows.length < ELO_HISTORY_PAGE_SIZE) break
+    const counts = await getPlayerCountsForScrimIds(data.map((row) => row.scrim_id))
+    return data.filter((row) => counts[row.scrim_id] === playerCount)
   }
+
+  if (!playerCount) {
+    throw new Error('map or playersPerTeam is required')
+  }
+
+  const scrimIds = await getFinalizedRankedScrimIdsByPlayerCount(playerCount)
+  if (scrimIds.length === 0) return []
+
+  for (let i = 0; i < scrimIds.length; i += SCRIM_ID_CHUNK) {
+    const chunk = scrimIds.slice(i, i + SCRIM_ID_CHUNK)
+    for (let from = 0; ; from += ELO_HISTORY_PAGE_SIZE) {
+      let query = supabase
+        .from('elo_history')
+        .select('game_name_lower, scrim_id, result, elo_change, kills, created_at')
+        .in('scrim_id', chunk)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + ELO_HISTORY_PAGE_SIZE - 1)
+
+      if (options.season1) {
+        query = query.lt('created_at', SEASON_2_START_ISO)
+      } else if (options.season2) {
+        query = query.gte('created_at', SEASON_2_START_ISO)
+      }
+
+      const { data: page, error } = await query
+      if (error) throw new Error(`Failed to fetch format stats: ${error.message}`)
+
+      const rows = (page ?? []) as FilteredHistoryRow[]
+      data.push(...rows)
+      if (rows.length < ELO_HISTORY_PAGE_SIZE) break
+    }
+  }
+
+  return data
+}
+
+export async function getFilteredRankedStats(
+  options: RankedStatsFilter
+): Promise<MapPlayerStats[]> {
+  const supabase = await createClient()
+  const data = await fetchEloHistoryForRankedFilters(options)
 
   const sevenDaysAgo = new Date()
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   let since7d = sevenDaysAgo.toISOString()
-  if (options?.season2 && sevenDaysAgo < new Date(SEASON_2_START_ISO)) {
+  if (options.season2 && sevenDaysAgo < new Date(SEASON_2_START_ISO)) {
     since7d = SEASON_2_START_ISO
   }
 
-  // Aggregate stats per player
   const playerMap = new Map<
     string,
     { wins: number; losses: number; draws: number; eloSum: number; kills: number; eloChange7d: number }
@@ -907,13 +977,12 @@ export async function getPlayerStatsByMap(
     else existing.draws++
     existing.eloSum += record.elo_change || 0
     existing.kills += record.kills ?? 0
-    if (!options?.season1 && record.created_at >= since7d) {
+    if (!options.season1 && record.created_at >= since7d) {
       existing.eloChange7d += record.elo_change || 0
     }
     playerMap.set(record.game_name_lower, existing)
   }
 
-  // Get display names from player_elo
   const gameNames = Array.from(playerMap.keys())
   if (gameNames.length === 0) return []
 
@@ -936,7 +1005,6 @@ export async function getPlayerStatsByMap(
 
   const kdMap = await getRankedScrimKdStats(Array.from(scrimIds), gameNames)
 
-  // Build result array
   const results: MapPlayerStats[] = Array.from(playerMap.entries()).map(([gameNameLower, stats]) => {
     const kd = kdMap.get(gameNameLower)
     const gamesPlayed = stats.wins + stats.losses + stats.draws
@@ -956,10 +1024,20 @@ export async function getPlayerStatsByMap(
     }
   })
 
-  // Sort by map_elo descending
   results.sort((a, b) => b.map_elo - a.map_elo)
-
   return results
+}
+
+export async function getPlayerStatsByMap(
+  map: string,
+  options?: { season1?: boolean; season2?: boolean; playersPerTeam?: ScrimFormat }
+): Promise<MapPlayerStats[]> {
+  return getFilteredRankedStats({
+    map,
+    season1: options?.season1,
+    season2: options?.season2,
+    playersPerTeam: options?.playersPerTeam,
+  })
 }
 
 // Get all badges earned by a player (most recent first).
@@ -1286,7 +1364,7 @@ async function fetchRankedGamesForScrims(
 
 export async function getTeammateStats(
   comparisons: TeammateComparisonInput[],
-  options?: { season2?: boolean }
+  options?: { season2?: boolean; playersPerTeam?: ScrimFormat }
 ): Promise<TeammateStatsResult[]> {
   const normalized = comparisons
     .map((c) => ({
@@ -1324,6 +1402,12 @@ export async function getTeammateStats(
     )
     const scrimGames = await fetchRankedGamesForScrims(season2, scrimIds)
     games = mergeRankedGames(games, scrimGames)
+  }
+
+  if (options?.playersPerTeam) {
+    const want = playerCountForFormat(options.playersPerTeam)
+    const counts = await getPlayerCountsForScrimIds(games.map((g) => g.scrimId))
+    games = games.filter((g) => counts[g.scrimId] === want)
   }
 
   const rankedPlayers = await getRankedPlayerOptions(500)

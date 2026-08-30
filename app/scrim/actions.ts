@@ -19,6 +19,7 @@ import {
   season1EloFromChanges,
 } from '@/lib/scrim/seasons'
 import { isCaptainsPickBlocked } from '@/lib/scrim/captains-pick'
+import { playerCountForFormat, type ScrimFormat } from '@/lib/scrim/format'
 
 // Get current user info from Clerk
 async function getCurrentUser() {
@@ -668,11 +669,70 @@ export async function getTrackerMaps(): Promise<string[]> {
 }
 
 // Get recent finished scrims with optional date and map filtering
+const SCRIM_ID_CHUNK = 80
+const SCRIM_LIST_PAGE_SIZE = 1000
+
+export async function getPlayerCountsForScrimIds(
+  scrimIds: string[]
+): Promise<Record<string, number>> {
+  const result: Record<string, number> = {}
+  const uniqueIds = Array.from(new Set(scrimIds.filter(Boolean)))
+  if (uniqueIds.length === 0) return result
+
+  const supabase = await createClient()
+  for (let i = 0; i < uniqueIds.length; i += SCRIM_ID_CHUNK) {
+    const chunk = uniqueIds.slice(i, i + SCRIM_ID_CHUNK)
+    const { data, error } = await supabase
+      .from('scrims_with_counts')
+      .select('id, player_count')
+      .in('id', chunk)
+
+    if (error) {
+      console.error('Failed to fetch scrim player counts:', error.message)
+      continue
+    }
+    for (const row of data || []) {
+      result[row.id] = row.player_count
+    }
+  }
+
+  return result
+}
+
+export async function getFinalizedRankedScrimIdsByPlayerCount(
+  playerCount: number
+): Promise<string[]> {
+  const supabase = await createClient()
+  const ids: string[] = []
+
+  for (let from = 0; ; from += SCRIM_LIST_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('scrims_with_counts')
+      .select('id')
+      .eq('status', 'finalized')
+      .eq('is_ranked', true)
+      .eq('player_count', playerCount)
+      .order('created_at', { ascending: true })
+      .range(from, from + SCRIM_LIST_PAGE_SIZE - 1)
+
+    if (error) {
+      throw new Error(`Failed to fetch scrims by player count: ${error.message}`)
+    }
+
+    const page = data ?? []
+    ids.push(...page.map((row) => row.id))
+    if (page.length < SCRIM_LIST_PAGE_SIZE) break
+  }
+
+  return ids
+}
+
 export async function getRecentScrims(options?: {
   limit?: number
   startTime?: string
   endTime?: string
   map?: string
+  playersPerTeam?: ScrimFormat
 }): Promise<ScrimWithCounts[]> {
   const supabase = await createClient()
   const limit = options?.limit || 10
@@ -694,6 +754,10 @@ export async function getRecentScrims(options?: {
   // Apply map filter if provided
   if (options?.map) {
     query = query.eq('map', options.map)
+  }
+
+  if (options?.playersPerTeam) {
+    query = query.eq('player_count', playerCountForFormat(options.playersPerTeam))
   }
   
   const { data, error } = await query
@@ -739,6 +803,7 @@ export interface PlayerScrimResult {
   kills: number | null
   deaths: number | null
   kd_ratio: number | null
+  player_count: number | null
 }
 
 export async function getPlayerScrims(options: {
@@ -747,6 +812,7 @@ export async function getPlayerScrims(options: {
   startTime?: string
   endTime?: string
   map?: string
+  playersPerTeam?: ScrimFormat
 }): Promise<PlayerScrimResult[]> {
   const supabase = await createClient()
   const gameNameLower = options.gameName.toLowerCase()
@@ -786,8 +852,9 @@ export async function getPlayerScrims(options: {
     query = query.eq('scrims.map', options.map)
   }
   
-  // Apply limit
-  query = query.limit(options.limit || 25)
+  // Fetch extra rows when filtering by format so the limit still applies after
+  const requestedLimit = options.limit || 25
+  query = query.limit(options.playersPerTeam ? 1000 : requestedLimit)
   
   const { data, error } = await query
   
@@ -795,6 +862,16 @@ export async function getPlayerScrims(options: {
     console.error('Failed to fetch player scrims:', error)
     return []
   }
+
+  const wantedPlayerCount = options.playersPerTeam
+    ? playerCountForFormat(options.playersPerTeam)
+    : null
+  const playerCounts = await getPlayerCountsForScrimIds(
+    (data || []).map((record) => {
+      const scrim = record.scrims as unknown as { id: string }
+      return scrim.id
+    })
+  )
   
   // Collect all unique session IDs from all scrims first (eliminates N+1 query pattern)
   const allSessionIds = new Set<string>()
@@ -878,6 +955,11 @@ export async function getPlayerScrims(options: {
       kd_ratio = deaths > 0 ? kills / deaths : kills > 0 ? Infinity : 0
     }
 
+    const player_count = playerCounts[scrim.id] ?? null
+    if (wantedPlayerCount !== null && player_count !== wantedPlayerCount) {
+      continue
+    }
+
     results.push({
       id: scrim.id,
       map: scrim.map,
@@ -892,7 +974,10 @@ export async function getPlayerScrims(options: {
       kills,
       deaths,
       kd_ratio,
+      player_count,
     })
+
+    if (results.length >= requestedLimit) break
   }
 
   return results

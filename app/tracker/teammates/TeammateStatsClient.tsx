@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import RankedPlayerPicker from "@/app/components/RankedPlayerPicker";
 import { SEASON_2_LABEL } from "@/lib/scrim/seasons";
+import ScrimFormatFilter from "@/app/components/ScrimFormatFilter";
+import type { ScrimFormat } from "@/lib/scrim/format";
 import {
   getRankedScrimMaps,
   getTeammateStats,
@@ -49,6 +51,7 @@ export default function TeammateStatsClient({
   initialMaps: string[];
 }) {
   const [seasonView, setSeasonView] = useState<SeasonView>("all");
+  const [formatFilter, setFormatFilter] = useState<ScrimFormat | null>(null);
   const [maps, setMaps] = useState<string[]>(initialMaps);
   const [rows, setRows] = useState<ComparisonRow[]>(() => [newRow()]);
   const [stats, setStats] = useState<TeammateStatsResult[]>([]);
@@ -82,7 +85,10 @@ export default function TeammateStatsClient({
             mode: r.mode,
             map: r.map || undefined,
           })),
-          { season2: seasonView === "season2" }
+          {
+            season2: seasonView === "season2",
+            playersPerTeam: formatFilter || undefined,
+          }
         );
         setStats(results);
       } catch (err) {
@@ -91,7 +97,7 @@ export default function TeammateStatsClient({
         setStats([]);
       }
     });
-  }, [rows, seasonView]);
+  }, [rows, seasonView, formatFilter]);
 
   useEffect(() => {
     loadStats();
@@ -149,6 +155,11 @@ export default function TeammateStatsClient({
             <span className="text-gray-500 text-sm ml-2">Updating…</span>
           )}
         </div>
+        <ScrimFormatFilter
+          value={formatFilter}
+          onChange={setFormatFilter}
+          label="Team size"
+        />
 
       </div>
 

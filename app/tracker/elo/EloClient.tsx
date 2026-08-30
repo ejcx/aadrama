@@ -14,9 +14,11 @@ import {
   getSeason2EloLeaderboard,
   getSeason2EloChanges7Days,
   getRankedScrimMaps,
-  getPlayerStatsByMap,
+  getFilteredRankedStats,
   type MapPlayerStats,
 } from "../actions";
+import ScrimFormatFilter from "@/app/components/ScrimFormatFilter";
+import { formatLabel, type ScrimFormat } from "@/lib/scrim/format";
 
 type SeasonView = "cumulative" | "season1" | "season2";
 
@@ -90,6 +92,7 @@ async function fetchLeaderboard(view: SeasonView, limit: number) {
 export default function EloClient({ initialData }: { initialData: InitialData }) {
   const [seasonView, setSeasonView] = useState<SeasonView>("cumulative");
   const [selectedMap, setSelectedMap] = useState<string>("");
+  const [selectedFormat, setSelectedFormat] = useState<ScrimFormat | null>(null);
   const [maps, setMaps] = useState<string[]>(initialData.maps);
   const [eloPlayers, setEloPlayers] = useState<EloPlayer[]>(initialData.eloPlayers);
   const [mapStats, setMapStats] = useState<MapPlayerStats[] | null>(null);
@@ -129,28 +132,44 @@ export default function EloClient({ initialData }: { initialData: InitialData })
   };
 
   useEffect(() => {
-    if (!selectedMap) {
+    if (!selectedMap && !selectedFormat) {
       setMapStats(null);
       return;
     }
 
     setLoading(true);
-    getPlayerStatsByMap(selectedMap, seasonMapOptions(seasonView))
+    getFilteredRankedStats({
+      map: selectedMap || undefined,
+      playersPerTeam: selectedFormat || undefined,
+      ...seasonMapOptions(seasonView),
+    })
       .then((stats) => {
         setMapStats(stats);
       })
       .catch((err) => {
-        console.error("Failed to load map stats:", err);
+        console.error("Failed to load filtered stats:", err);
         setMapStats([]);
       })
       .finally(() => {
         setLoading(false);
       });
-  }, [selectedMap, seasonView]);
+  }, [selectedMap, selectedFormat, seasonView]);
 
   const tableLoading = loading || seasonLoading || isPending;
   const show7DayChange = seasonView !== "season1";
   const isFrozenSeason1 = seasonView === "season1";
+  const showingDerived = Boolean(selectedMap || selectedFormat);
+  const derivedEloLabel = [
+    selectedFormat ? `${formatLabel(selectedFormat)} ELO` : null,
+    selectedMap && !selectedFormat ? "Map ELO" : null,
+    selectedMap && selectedFormat ? "ELO" : null,
+  ].find(Boolean) || "ELO";
+  const derivedScopeLabel = [
+    selectedFormat ? formatLabel(selectedFormat) : null,
+    selectedMap || null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="space-y-4">
@@ -214,7 +233,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
         </div>
       </div>
 
-      <div className="aa-panel p-4">
+      <div className="aa-panel p-4 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <label className="text-gray-300 text-sm font-medium">Filter by Map:</label>
           <select
@@ -236,26 +255,33 @@ export default function EloClient({ initialData }: { initialData: InitialData })
             </span>
           )}
         </div>
-        {selectedMap && (
-          <p className="text-gray-400 text-xs mt-2">
-            Note: Map ELO is calculated as 1200 + sum of all ELO changes from scrims on
-            this map
+        <ScrimFormatFilter
+          value={selectedFormat}
+          onChange={setSelectedFormat}
+          label="Filter by team size"
+        />
+        {showingDerived && (
+          <p className="text-gray-400 text-xs">
+            {derivedEloLabel} is 1200 + sum of ELO changes from
+            {selectedFormat ? ` ${formatLabel(selectedFormat)}` : ""}
+            {selectedMap ? ` scrims on ${selectedMap}` : " ranked scrims"}
             {isFrozenSeason1 ? ` before ${SEASON_1_END_DISPLAY}` : ""}.
+            {" "}Official lifetime ELO is shown when both filters are set to All.
           </p>
         )}
       </div>
 
       {tableLoading && (
         <div className="aa-panel p-8 text-center text-gray-400">
-          {seasonLoading || isPending ? "Loading leaderboard..." : "Loading map statistics..."}
+          {seasonLoading || isPending ? "Loading leaderboard..." : "Loading filtered statistics..."}
         </div>
       )}
 
-      {!tableLoading && selectedMap && mapStats && (
+      {!tableLoading && showingDerived && mapStats && (
         <div className="aa-table-wrap">
           {mapStats.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
-              No ranked games found on {selectedMap}
+              No ranked games found{derivedScopeLabel ? ` for ${derivedScopeLabel}` : ""}
               {isFrozenSeason1 ? ` in ${SEASON_1_LABEL}` : ""}
             </div>
           ) : (
@@ -269,7 +295,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
                   <tr className="border-b border-gray-800 bg-gray-900/80 text-gray-500">
                     <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Rank</th>
                     <th className="text-left py-2 sm:py-3 px-2 sm:px-4">Player</th>
-                    <th className="text-center py-2 sm:py-3 px-2 sm:px-4">Map ELO</th>
+                    <th className="text-center py-2 sm:py-3 px-2 sm:px-4">{derivedEloLabel}</th>
                     {show7DayChange && (
                       <th className="text-center py-2 sm:py-3 px-2 sm:px-4">7d Change</th>
                     )}
@@ -399,7 +425,7 @@ export default function EloClient({ initialData }: { initialData: InitialData })
         </div>
       )}
 
-      {!tableLoading && !selectedMap && (
+      {!tableLoading && !showingDerived && (
         <div className="aa-table-wrap">
           {eloPlayers.length === 0 ? (
             <div className="p-8 text-center text-gray-400">
