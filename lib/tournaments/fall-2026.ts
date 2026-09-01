@@ -34,6 +34,7 @@ export type ScheduleWeek = {
   euDate: string
   maps: WeekMap[]
   matches: ScheduledMatch[]
+  bye: string
 }
 
 export const TEAMS: TournamentTeam[] = [
@@ -109,12 +110,24 @@ export const TEAMS: TournamentTeam[] = [
       { name: "unknown", aliases: [] },
     ],
   },
+  {
+    id: "eu3",
+    name: "EU3",
+    region: "EU",
+    color: "from-rose-600 to-fuchsia-900",
+    players: [
+      { name: "EU3", aliases: ["eu3"], captain: true },
+      { name: "TBD 2", aliases: [] },
+      { name: "TBD 3", aliases: [] },
+      { name: "TBD 4", aliases: [] },
+    ],
+  },
 ]
 
 export const NA_CAPTAINS = ["drob", "joe", "farmer", "intro"] as const
-export const EU_CAPTAINS = ["bart", "junk"] as const
+export const EU_CAPTAINS = ["bart", "junk", "eu3"] as const
 
-/** Group-stage map weeks. With 6 teams, weeks 1–5 are used; 6–7 are the 8-team calendar. */
+/** Group-stage map weeks. 7-team round robin uses all 7 weeks. */
 export const MAP_WEEKS: { week: number; maps: WeekMap[] }[] = [
   {
     week: 1,
@@ -173,10 +186,11 @@ export const SCHEDULE: ScheduleWeek[] = [
     naDate: "Thu Sep 10",
     euDate: "Sat Sep 12",
     maps: MAP_WEEKS[0].maps,
+    bye: "junk",
     matches: [
-      { home: "intro", away: "junk", involvesEu: true },
+      { home: "farmer", away: "eu3", involvesEu: true },
       { home: "joe", away: "bart", involvesEu: true },
-      { home: "farmer", away: "drob", involvesEu: false },
+      { home: "intro", away: "drob", involvesEu: false },
     ],
   },
   {
@@ -184,10 +198,11 @@ export const SCHEDULE: ScheduleWeek[] = [
     naDate: "Thu Sep 17",
     euDate: "Sat Sep 19",
     maps: MAP_WEEKS[1].maps,
+    bye: "bart",
     matches: [
-      { home: "intro", away: "bart", involvesEu: true },
+      { home: "farmer", away: "joe", involvesEu: false },
       { home: "drob", away: "junk", involvesEu: true },
-      { home: "joe", away: "farmer", involvesEu: false },
+      { home: "eu3", away: "intro", involvesEu: true },
     ],
   },
   {
@@ -195,10 +210,11 @@ export const SCHEDULE: ScheduleWeek[] = [
     naDate: "Thu Sep 24",
     euDate: "Sat Sep 26",
     maps: MAP_WEEKS[2].maps,
+    bye: "joe",
     matches: [
-      { home: "intro", away: "drob", involvesEu: false },
-      { home: "farmer", away: "bart", involvesEu: true },
-      { home: "joe", away: "junk", involvesEu: true },
+      { home: "farmer", away: "junk", involvesEu: true },
+      { home: "eu3", away: "intro", involvesEu: true },
+      { home: "drob", away: "bart", involvesEu: true },
     ],
   },
   {
@@ -206,10 +222,11 @@ export const SCHEDULE: ScheduleWeek[] = [
     naDate: "Thu Oct 1",
     euDate: "Sat Oct 3",
     maps: MAP_WEEKS[3].maps,
+    bye: "eu3",
     matches: [
-      { home: "intro", away: "farmer", involvesEu: false },
-      { home: "joe", away: "drob", involvesEu: false },
-      { home: "bart", away: "junk", involvesEu: true },
+      { home: "farmer", away: "intro", involvesEu: false },
+      { home: "junk", away: "bart", involvesEu: true },
+      { home: "drob", away: "joe", involvesEu: false },
     ],
   },
   {
@@ -217,10 +234,35 @@ export const SCHEDULE: ScheduleWeek[] = [
     naDate: "Thu Oct 8",
     euDate: "Sat Oct 10",
     maps: MAP_WEEKS[4].maps,
+    bye: "drob",
     matches: [
-      { home: "intro", away: "joe", involvesEu: false },
-      { home: "farmer", away: "junk", involvesEu: true },
-      { home: "drob", away: "bart", involvesEu: true },
+      { home: "farmer", away: "bart", involvesEu: true },
+      { home: "intro", away: "junk", involvesEu: true },
+      { home: "joe", away: "eu3", involvesEu: true },
+    ],
+  },
+  {
+    week: 6,
+    naDate: "Thu Oct 15",
+    euDate: "Sat Oct 17",
+    maps: MAP_WEEKS[5].maps,
+    bye: "intro",
+    matches: [
+      { home: "farmer", away: "drob", involvesEu: false },
+      { home: "bart", away: "eu3", involvesEu: true },
+      { home: "joe", away: "junk", involvesEu: true },
+    ],
+  },
+  {
+    week: 7,
+    naDate: "Thu Oct 22",
+    euDate: "Sat Oct 24",
+    maps: MAP_WEEKS[6].maps,
+    bye: "farmer",
+    matches: [
+      { home: "eu3", away: "joe", involvesEu: true },
+      { home: "drob", away: "intro", involvesEu: false },
+      { home: "bart", away: "junk", involvesEu: true },
     ],
   },
 ]

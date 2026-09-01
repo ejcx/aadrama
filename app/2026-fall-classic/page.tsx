@@ -16,7 +16,7 @@ import {
 export const metadata: Metadata = {
   title: "Fall Classic 2026 — AA Drama",
   description:
-    "Americas Army 2.5 Fall Classic: 6-team round robin, best of 14, finals in late October.",
+    "Americas Army 2.5 Fall Classic: 7-team round robin, best of 14, finals in late October.",
 };
 
 function formatElo(n: number) {
@@ -276,12 +276,8 @@ export default async function FallClassic2026Page() {
             <h3 className="mb-3 text-xl font-bold text-white sm:text-2xl">
               Schedule
             </h3>
-            <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-              Pairings below are a placeholder round-robin, not the official
-              schedule. Who plays whom each week has not been set yet.
-            </div>
             <p className="mb-6 text-sm text-gray-500">
-              Default times, once matchups are real: Thursday for all-NA matches,
+              Seven teams, one bye each week. Thursday for all-NA matches,
               Saturday when an EU team is involved. Teams can play any agreed
               time; one match per week unless both sides want two.
             </p>
@@ -296,6 +292,9 @@ export default async function FallClassic2026Page() {
                       Round {week.week}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="rounded-full bg-gray-700/80 px-2 py-1 text-gray-300">
+                        Bye {getTeam(week.bye)?.name}
+                      </span>
                       <span className="rounded-full bg-cyan-500/15 px-2 py-1 text-cyan-300">
                         NA {week.naDate}
                       </span>
@@ -337,7 +336,7 @@ export default async function FallClassic2026Page() {
                             </span>
                             {!played && (
                               <span className="text-[10px] text-gray-500">
-                                Placeholder
+                                Upcoming
                               </span>
                             )}
                           </div>
@@ -401,29 +400,19 @@ export default async function FallClassic2026Page() {
               Map pool
             </h3>
             <p className="mb-4 text-sm text-gray-500">
-              Six confirmed teams: group play is 5 weeks (weeks 1–5). Weeks 6–7
-              were drawn for an 8-team season and are unused unless the field
-              expands.
+              Seven teams: group play uses all 7 map weeks. Each team has one bye.
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {MAP_WEEKS.map((week) => {
-                const used = week.week <= 5;
                 return (
                   <div
                     key={week.week}
-                    className={`overflow-hidden rounded-lg border ${
-                      used ? "border-gray-700 bg-gray-900" : "border-gray-800 bg-gray-950 opacity-70"
-                    }`}
+                    className="overflow-hidden rounded-lg border border-gray-700 bg-gray-900"
                   >
                     <div className="flex items-center justify-between border-b border-gray-800 bg-gray-800/50 px-4 py-2">
                       <span className="text-sm font-semibold text-white">
                         Week {week.week}
                       </span>
-                      {!used && (
-                        <span className="text-[10px] uppercase text-gray-500">
-                          Unused
-                        </span>
-                      )}
                     </div>
                     <div className="space-y-2 p-4">
                       {week.maps.map((map) => (
@@ -453,7 +442,7 @@ export default async function FallClassic2026Page() {
               {[
                 {
                   title: "Format",
-                  body: "Round robin: every team plays each other once. Matches are best of 14 (first to 8). Rounds and matches may tie. Top 2 go to the final.",
+                  body: "Round robin: every team plays each other once, with one bye week. Matches are best of 14 (first to 8). Rounds and matches may tie. Top 2 go to the final.",
                 },
                 {
                   title: "How rounds are won",
