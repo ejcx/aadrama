@@ -16,7 +16,7 @@ import {
 export const metadata: Metadata = {
   title: "Fall Classic 2026 — AA Drama",
   description:
-    "Americas Army 2.5 Fall Classic: 7-team round robin, best of 14, finals in late October.",
+    "Americas Army 2.5 Fall Classic: 7-team round robin on AAO25 Assist, best of 14, finals last week of October.",
 };
 
 function formatElo(n: number) {
@@ -77,17 +77,20 @@ export default async function FallClassic2026Page() {
     const sum = teamEloSum(team, elos);
     const rankedCount = team.players.filter((p) => elos[p.name]?.ranked).length;
     return { team, sum, avg: sum / team.players.length, rankedCount };
-  }).sort((a, b) => b.sum - a.sum);
+  }).sort((a, b) => b.avg - a.avg);
 
   const eloByTeamId = Object.fromEntries(
     teamsWithElo.map(({ team, sum }) => [team.id, sum])
+  );
+  const eloAvgByTeamId = Object.fromEntries(
+    teamsWithElo.map(({ team, avg }) => [team.id, avg])
   );
   const standings = calculateStandings();
   const anyResults = standings.some((s) => s.wins + s.losses + s.ties > 0);
   const orderedStandings = anyResults
     ? standings
     : [...standings].sort(
-        (a, b) => (eloByTeamId[b.teamId] ?? 0) - (eloByTeamId[a.teamId] ?? 0)
+        (a, b) => (eloAvgByTeamId[b.teamId] ?? 0) - (eloAvgByTeamId[a.teamId] ?? 0)
       );
 
   return (
@@ -107,8 +110,9 @@ export default async function FallClassic2026Page() {
               Fall Classic
             </h2>
             <p className="mx-auto mb-6 max-w-2xl text-sm text-gray-400 sm:text-base">
-              Round-robin group stage on AAO25 Assist. Top 2 advance to a two-map
-              final. Organized in the AA: Competitive Community Discord.
+              All games on America&apos;s Army v2.5 via AAO25 Assist. Round-robin
+              group stage; top 2 advance to a final. Organized in the AA:
+              Competitive Community Discord.
             </p>
             <div className="mb-2 flex flex-wrap items-center justify-center gap-4 text-sm text-gray-300">
               <span>Sep 10 – Oct 24, 2026</span>
@@ -116,6 +120,8 @@ export default async function FallClassic2026Page() {
               <span>Best of 14 (first to 8)</span>
               <span className="text-gray-600">·</span>
               <span>US servers</span>
+              <span className="text-gray-600">·</span>
+              <span>Finals last week of October</span>
             </div>
           </div>
 
@@ -124,8 +130,9 @@ export default async function FallClassic2026Page() {
               Teams
             </h3>
             <p className="mb-6 text-sm text-gray-500">
-              ★ captain. Collective ELO is the sum of each roster (unranked
-              players count as {UNRANKED_ELO}). Sorted by team ELO.
+              ★ captain. NA sides list 4; EU sides list 5. Collective ELO is the
+              sum of the roster (unranked players count as {UNRANKED_ELO}).
+              Sorted by average ELO.
             </p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {teamsWithElo.map(({ team, sum, avg, rankedCount }, idx) => (
@@ -136,12 +143,12 @@ export default async function FallClassic2026Page() {
                   <div className="h-full rounded-xl bg-gray-900 p-5">
                     <div className="mb-4 flex items-start justify-between gap-3">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs font-bold text-gray-500">
                             #{idx + 1}
                           </span>
                           <h4 className="text-lg font-bold text-white">
-                            Team {team.name}
+                            {team.name}
                           </h4>
                           <span
                             className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
@@ -153,6 +160,11 @@ export default async function FallClassic2026Page() {
                             {team.region}
                           </span>
                         </div>
+                        {team.subtitle && (
+                          <div className="mt-0.5 text-xs text-gray-400">
+                            {team.subtitle}
+                          </div>
+                        )}
                         <div className="mt-1 text-xs text-gray-500">
                           {rankedCount}/{team.players.length} ranked
                         </div>
@@ -227,13 +239,20 @@ export default async function FallClassic2026Page() {
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-2">
                               <span
-                                className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${team?.color}`}
+                                className={`h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-r ${team?.color}`}
                               />
-                              <span
-                                className={`font-medium ${qualified ? "text-white" : "text-gray-300"}`}
-                              >
-                                {team?.name}
-                              </span>
+                              <div>
+                                <span
+                                  className={`font-medium ${qualified ? "text-white" : "text-gray-300"}`}
+                                >
+                                  {team?.name}
+                                </span>
+                                {team?.subtitle && (
+                                  <div className="text-[10px] text-gray-500">
+                                    {team.subtitle}
+                                  </div>
+                                )}
+                              </div>
                               {qualified && (
                                 <span className="rounded bg-cyan-400/20 px-1.5 py-0.5 text-[10px] text-cyan-400">
                                   Finals
@@ -266,8 +285,8 @@ export default async function FallClassic2026Page() {
                 </table>
               </div>
               <p className="border-t border-gray-800 px-4 py-3 text-xs text-gray-500">
-                Match win = 3 pts, tie = 1 pt. Round win percentage is the final
-                group-stage tiebreaker. Top 2 advance.
+                Match win = 3 pts, tie = 1 pt. Top 2 advance on W/L, with round
+                win percentage as the group-stage tiebreaker.
               </p>
             </div>
           </div>
@@ -277,9 +296,10 @@ export default async function FallClassic2026Page() {
               Schedule
             </h3>
             <p className="mb-6 text-sm text-gray-500">
-              Seven teams, one bye each week. Thursday for all-NA matches,
-              Saturday when an EU team is involved. Teams can play any agreed
-              time; one match per week unless both sides want two.
+              Starts the second week of September. One match a week by default;
+              two if both sides agree. Any agreed time works. EU games will
+              presumably need weekend daytime. Suggested defaults: Thursday for
+              all-NA, Saturday when an EU team is involved.
             </p>
             <div className="space-y-4">
               {SCHEDULE.map((week) => (
@@ -293,7 +313,7 @@ export default async function FallClassic2026Page() {
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span className="rounded-full bg-gray-700/80 px-2 py-1 text-gray-300">
-                        Bye {getTeam(week.bye)?.name}
+                        Bye {getTeam(week.bye)?.shortName ?? getTeam(week.bye)?.name}
                       </span>
                       <span className="rounded-full bg-cyan-500/15 px-2 py-1 text-cyan-300">
                         NA {week.naDate}
@@ -345,11 +365,11 @@ export default async function FallClassic2026Page() {
                               <span
                                 className={`h-2 w-2 rounded-full bg-gradient-to-r ${home?.color}`}
                               />
-                              {home?.name}
+                              {home?.shortName ?? home?.name}
                             </span>
                             <span className="text-xs text-gray-500">vs</span>
                             <span className="flex items-center gap-2 text-sm font-medium text-gray-200">
-                              {away?.name}
+                              {away?.shortName ?? away?.name}
                               <span
                                 className={`h-2 w-2 rounded-full bg-gradient-to-r ${away?.color}`}
                               />
@@ -370,10 +390,12 @@ export default async function FallClassic2026Page() {
             </h3>
             <div className="rounded-xl border border-amber-500/30 bg-gray-900 p-5 sm:p-6">
               <p className="mb-4 text-sm text-gray-300">
-                Top 2 from group play meet in a two-map final. If round totals are
-                tied, a third map is the tiebreaker. Maps TBD. Target window is the
-                last week of October, or the first week of November if makeups are
-                needed.
+                Top 2 from group play by W/L, with round win percentage as
+                tiebreaker. Each team picks one regular-season map and submits it
+                one week before the final. Right after that, the top seed submits
+                three remaining pool maps; the second seed picks the tiebreaker
+                from those three within a day. The third map is only played if
+                rounds won are equal after the first two. Last week of October.
               </p>
               <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-3">
                 <div className="rounded-lg border border-amber-500/20 bg-gray-800/60 p-4 text-center">
@@ -400,7 +422,8 @@ export default async function FallClassic2026Page() {
               Map pool
             </h3>
             <p className="mb-4 text-sm text-gray-500">
-              Seven teams: group play uses all 7 map weeks. Each team has one bye.
+              Seven teams, seven weeks. Each team has one bye. Maps are
+              tentative.
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {MAP_WEEKS.map((week) => {
@@ -458,11 +481,11 @@ export default async function FallClassic2026Page() {
                 },
                 {
                   title: "Scheduling",
-                  body: "One match a week by default; two if both teams agree. If no time can be found, both teams take 0–14 unless one side is clearly unreasonable.",
+                  body: "Any agreed time. One match a week by default; two if both teams agree. If two teams cannot agree on a time, both take 0–14 unless one side is clearly unreasonable.",
                 },
                 {
                   title: "Forfeits & tiebreakers",
-                  body: "Teams may forfeit remaining rounds, but round win percentage is the final group-stage tiebreaker.",
+                  body: "Teams may forfeit remaining rounds. Group-stage ranking is W/L, with round win percentage as the final tiebreaker.",
                 },
                 {
                   title: "Substitutes",
@@ -470,7 +493,7 @@ export default async function FallClassic2026Page() {
                 },
                 {
                   title: "Admin",
-                  body: "Tournament is organized in the AA: Competitive Community Discord.",
+                  body: "Organized and administered in the AA: Competitive Community Discord.",
                 },
               ].map((rule) => (
                 <div
@@ -481,6 +504,30 @@ export default async function FallClassic2026Page() {
                   <p className="text-sm text-gray-400">{rule.body}</p>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="w-full">
+            <h3 className="mb-6 text-xl font-bold text-white sm:text-2xl">
+              Miscellaneous
+            </h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
+                <h4 className="mb-2 font-semibold text-white">
+                  Strategic advice
+                </h4>
+                <p className="text-sm text-gray-400">
+                  All teams are barred from receiving strategic advice from Ryan
+                  aka @rylegit7 as it constitutes an unfair advantage. Penalty:
+                  automatic loss for the week and 10 minutes in Leavenworth.
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
+                <h4 className="mb-2 font-semibold text-white">ARs</h4>
+                <p className="text-sm text-gray-400">
+                  ARs must go “bum bum bum bum” and not “bum ba da da”.
+                </p>
+              </div>
             </div>
           </div>
         </div>

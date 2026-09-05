@@ -9,6 +9,8 @@ export type TournamentPlayer = {
 export type TournamentTeam = {
   id: string
   name: string
+  subtitle?: string
+  shortName?: string
   region: "NA" | "EU"
   color: string
   players: TournamentPlayer[]
@@ -40,7 +42,8 @@ export type ScheduleWeek = {
 export const TEAMS: TournamentTeam[] = [
   {
     id: "intro",
-    name: "Intro",
+    name: "Dirty Mike and the Boys",
+    shortName: "Dirty Mike",
     region: "NA",
     color: "from-cyan-600 to-sky-800",
     players: [
@@ -52,7 +55,8 @@ export const TEAMS: TournamentTeam[] = [
   },
   {
     id: "joe",
-    name: "Joe",
+    name: "WWJD",
+    subtitle: "What would jibs do",
     region: "NA",
     color: "from-red-600 to-rose-800",
     players: [
@@ -64,7 +68,7 @@ export const TEAMS: TournamentTeam[] = [
   },
   {
     id: "farmer",
-    name: "Farmer",
+    name: "Hotdog",
     region: "NA",
     color: "from-emerald-600 to-green-800",
     players: [
@@ -76,7 +80,7 @@ export const TEAMS: TournamentTeam[] = [
   },
   {
     id: "drob",
-    name: "Drob",
+    name: "High T",
     region: "NA",
     color: "from-amber-500 to-orange-800",
     players: [
@@ -93,9 +97,10 @@ export const TEAMS: TournamentTeam[] = [
     color: "from-violet-600 to-purple-900",
     players: [
       { name: "Bart", aliases: ["bart"], captain: true },
-      { name: "Yoshi", aliases: [".yoshii^", "yoshi"] },
-      { name: "Tuhmater", aliases: ["tuhmat3r", "tuhmater"] },
-      { name: "Nukubu", aliases: ["nukubu"] },
+      { name: "Hype", aliases: ["hype"] },
+      { name: "imamenace", aliases: ["imamenace"] },
+      { name: "Aquaxe", aliases: ["aquaxe"] },
+      { name: "Mat3r", aliases: ["tuhmat3r", "mat3r", "tuhmater"] },
     ],
   },
   {
@@ -105,27 +110,29 @@ export const TEAMS: TournamentTeam[] = [
     color: "from-blue-600 to-indigo-900",
     players: [
       { name: "Junk", aliases: ["junk"], captain: true },
-      { name: "Hype", aliases: ["hype"] },
-      { name: "imamenace", aliases: ["imamenace"] },
-      { name: "unknown", aliases: [] },
+      { name: "Vasili", aliases: ["vasili"] },
+      { name: "Erniaa", aliases: ["erniaa"] },
+      { name: "Potejto", aliases: ["potejto"] },
+      { name: "Scott", aliases: ["scott"] },
     ],
   },
   {
-    id: "eu3",
-    name: "EU3",
+    id: "yoshi",
+    name: "Yoshi",
     region: "EU",
     color: "from-rose-600 to-fuchsia-900",
     players: [
-      { name: "EU3", aliases: ["eu3"], captain: true },
-      { name: "TBD 2", aliases: [] },
-      { name: "TBD 3", aliases: [] },
-      { name: "TBD 4", aliases: [] },
+      { name: "Yoshi", aliases: [".yoshii^", "yoshi"], captain: true },
+      { name: "cRm", aliases: ["crm"] },
+      { name: "Bananen", aliases: ["bananen"] },
+      { name: "Unknown", aliases: [] },
+      { name: "Nukubu", aliases: ["nukubu"] },
     ],
   },
 ]
 
 export const NA_CAPTAINS = ["drob", "joe", "farmer", "intro"] as const
-export const EU_CAPTAINS = ["bart", "junk", "eu3"] as const
+export const EU_CAPTAINS = ["bart", "junk", "yoshi"] as const
 
 /** Group-stage map weeks. 7-team round robin uses all 7 weeks. */
 export const MAP_WEEKS: { week: number; maps: WeekMap[] }[] = [
@@ -147,14 +154,14 @@ export const MAP_WEEKS: { week: number; maps: WeekMap[] }[] = [
     week: 3,
     maps: [
       { name: "Pipeline", time: "4 minutes" },
-      { name: "SF Hospital", time: "4 minutes" },
+      { name: "ESL Dusk", time: "3 minutes" },
     ],
   },
   {
     week: 4,
     maps: [
       { name: "Collapsed Tunnel", time: "3 minutes" },
-      { name: "River Basin", time: "6 minutes", note: "5 rounds" },
+      { name: "River Basin", time: "7 minutes", note: "5 rounds" },
     ],
   },
   {
@@ -188,7 +195,7 @@ export const SCHEDULE: ScheduleWeek[] = [
     maps: MAP_WEEKS[0].maps,
     bye: "junk",
     matches: [
-      { home: "farmer", away: "eu3", involvesEu: true },
+      { home: "farmer", away: "yoshi", involvesEu: true },
       { home: "joe", away: "bart", involvesEu: true },
       { home: "intro", away: "drob", involvesEu: false },
     ],
@@ -198,11 +205,11 @@ export const SCHEDULE: ScheduleWeek[] = [
     naDate: "Thu Sep 17",
     euDate: "Sat Sep 19",
     maps: MAP_WEEKS[1].maps,
-    bye: "bart",
+    bye: "yoshi",
     matches: [
       { home: "farmer", away: "joe", involvesEu: false },
       { home: "drob", away: "junk", involvesEu: true },
-      { home: "eu3", away: "intro", involvesEu: true },
+      { home: "bart", away: "intro", involvesEu: true },
     ],
   },
   {
@@ -213,7 +220,7 @@ export const SCHEDULE: ScheduleWeek[] = [
     bye: "joe",
     matches: [
       { home: "farmer", away: "junk", involvesEu: true },
-      { home: "eu3", away: "intro", involvesEu: true },
+      { home: "yoshi", away: "intro", involvesEu: true },
       { home: "drob", away: "bart", involvesEu: true },
     ],
   },
@@ -222,10 +229,10 @@ export const SCHEDULE: ScheduleWeek[] = [
     naDate: "Thu Oct 1",
     euDate: "Sat Oct 3",
     maps: MAP_WEEKS[3].maps,
-    bye: "eu3",
+    bye: "bart",
     matches: [
       { home: "farmer", away: "intro", involvesEu: false },
-      { home: "junk", away: "bart", involvesEu: true },
+      { home: "junk", away: "yoshi", involvesEu: true },
       { home: "drob", away: "joe", involvesEu: false },
     ],
   },
@@ -238,7 +245,7 @@ export const SCHEDULE: ScheduleWeek[] = [
     matches: [
       { home: "farmer", away: "bart", involvesEu: true },
       { home: "intro", away: "junk", involvesEu: true },
-      { home: "joe", away: "eu3", involvesEu: true },
+      { home: "joe", away: "yoshi", involvesEu: true },
     ],
   },
   {
@@ -249,7 +256,7 @@ export const SCHEDULE: ScheduleWeek[] = [
     bye: "intro",
     matches: [
       { home: "farmer", away: "drob", involvesEu: false },
-      { home: "bart", away: "eu3", involvesEu: true },
+      { home: "bart", away: "yoshi", involvesEu: true },
       { home: "joe", away: "junk", involvesEu: true },
     ],
   },
@@ -260,8 +267,8 @@ export const SCHEDULE: ScheduleWeek[] = [
     maps: MAP_WEEKS[6].maps,
     bye: "farmer",
     matches: [
-      { home: "eu3", away: "joe", involvesEu: true },
-      { home: "drob", away: "intro", involvesEu: false },
+      { home: "intro", away: "joe", involvesEu: false },
+      { home: "drob", away: "yoshi", involvesEu: true },
       { home: "bart", away: "junk", involvesEu: true },
     ],
   },
