@@ -92,7 +92,7 @@ export const TEAMS: TournamentTeam[] = [
   },
   {
     id: "bart",
-    name: "Bart",
+    name: "bum ba da da",
     region: "EU",
     color: "from-violet-600 to-purple-900",
     players: [
