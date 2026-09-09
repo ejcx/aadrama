@@ -4,14 +4,18 @@ import SidebarLayout from "../components/SidebarLayout";
 import { lookupRosterElos } from "../tracker/actions";
 import {
   calculateStandings,
+  getMatchResult,
   getTeam,
   MAP_WEEKS,
   SCHEDULE,
   TEAMS,
   UNRANKED_ELO,
+  seriesScore,
   teamEloSum,
   type TournamentTeam,
 } from "@/lib/tournaments/fall-2026";
+import { fetchTournamentPlayerLines } from "@/lib/tournaments/session-players";
+import PlayerStatsTable from "./PlayerStatsTable";
 
 export const metadata: Metadata = {
   title: "Fall Classic 2026 — AA Drama",
@@ -26,6 +30,10 @@ function formatElo(n: number) {
 function formatPct(n: number | null) {
   if (n == null) return "—";
   return `${(n * 100).toFixed(1)}%`;
+}
+
+function sessionHref(sessionId: string) {
+  return `/tracker/session/${encodeURIComponent(sessionId)}`;
 }
 
 function PlayerRow({
@@ -71,7 +79,20 @@ function PlayerRow({
 
 export default async function FallClassic2026Page() {
   const roster = TEAMS.flatMap((team) => team.players);
-  const elos = await lookupRosterElos(roster);
+  const [elos, playerLines] = await Promise.all([
+    lookupRosterElos(roster),
+    fetchTournamentPlayerLines(),
+  ]);
+  const namedPlayerLines = playerLines.map((line) => {
+    const tracker = line.rosterName
+      ? elos[line.rosterName]?.tracker
+      : undefined;
+    return {
+      ...line,
+      displayName: tracker || line.displayName,
+      trackerName: tracker || line.trackerName,
+    };
+  });
 
   const teamsWithElo = TEAMS.map((team) => {
     const sum = teamEloSum(team, elos);
@@ -207,7 +228,7 @@ export default async function FallClassic2026Page() {
                       <th className="px-3 py-3 text-center">W</th>
                       <th className="px-3 py-3 text-center">L</th>
                       <th className="px-3 py-3 text-center">T</th>
-                      <th className="px-3 py-3 text-center">Pts</th>
+                      <th className="px-3 py-3 text-center">Rnd</th>
                       <th className="px-3 py-3 text-center">Rnd %</th>
                       <th className="px-3 py-3 text-right">ELO</th>
                     </tr>
@@ -269,8 +290,10 @@ export default async function FallClassic2026Page() {
                           <td className="px-3 py-3 text-center font-medium text-yellow-400">
                             {row.ties}
                           </td>
-                          <td className="px-3 py-3 text-center font-bold text-white">
-                            {row.points}
+                          <td className="px-3 py-3 text-center tabular-nums text-gray-400">
+                            {row.roundsFor + row.roundsAgainst > 0
+                              ? `${row.roundsFor}–${row.roundsAgainst}`
+                              : "—"}
                           </td>
                           <td className="px-3 py-3 text-center tabular-nums text-gray-400">
                             {formatPct(row.roundWinPct)}
@@ -285,11 +308,15 @@ export default async function FallClassic2026Page() {
                 </table>
               </div>
               <p className="border-t border-gray-800 px-4 py-3 text-xs text-gray-500">
-                Match win = 3 pts, tie = 1 pt. Top 2 advance on W/L, with round
-                win percentage as the group-stage tiebreaker.
+                Each map is a match. Ranked by W/L, then rounds won. Top 2
+                advance.
               </p>
             </div>
           </div>
+
+          {namedPlayerLines.some((line) => line.kills + line.deaths > 0) && (
+            <PlayerStatsTable lines={namedPlayerLines} />
+          )}
 
           <div className="w-full">
             <h3 className="mb-3 text-xl font-bold text-white sm:text-2xl">
@@ -337,8 +364,19 @@ export default async function FallClassic2026Page() {
                     {week.matches.map((match) => {
                       const home = getTeam(match.home);
                       const away = getTeam(match.away);
-                      const played =
-                        match.homeScore != null && match.awayScore != null;
+                      const result = getMatchResult(
+                        week.week,
+                        match.home,
+                        match.away
+                      );
+                      const played = Boolean(result && result.maps.length > 0);
+                      const series = result ? seriesScore(result) : null;
+                      const homeWon =
+                        series != null && series.homeScore > series.awayScore;
+                      const awayWon =
+                        series != null && series.awayScore > series.homeScore;
+                      const tied =
+                        series != null && series.homeScore === series.awayScore;
                       return (
                         <div
                           key={`${match.home}-${match.away}`}
@@ -359,22 +397,59 @@ export default async function FallClassic2026Page() {
                                 Upcoming
                               </span>
                             )}
+                            {played && series && (
+                              <span
+                                className={`text-sm font-bold tabular-nums ${
+                                  tied ? "text-yellow-400" : "text-white"
+                                }`}
+                              >
+                                {series.homeScore}–{series.awayScore}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center justify-between gap-2">
-                            <span className="flex items-center gap-2 text-sm font-medium text-gray-200">
+                            <span
+                              className={`flex min-w-0 items-center gap-2 text-sm font-medium ${
+                                homeWon ? "text-white" : "text-gray-200"
+                              }`}
+                            >
                               <span
-                                className={`h-2 w-2 rounded-full bg-gradient-to-r ${home?.color}`}
+                                className={`h-2 w-2 shrink-0 rounded-full bg-gradient-to-r ${home?.color}`}
                               />
-                              {home?.shortName ?? home?.name}
+                              <span className="truncate">
+                                {home?.shortName ?? home?.name}
+                              </span>
                             </span>
                             <span className="text-xs text-gray-500">vs</span>
-                            <span className="flex items-center gap-2 text-sm font-medium text-gray-200">
-                              {away?.shortName ?? away?.name}
+                            <span
+                              className={`flex min-w-0 items-center justify-end gap-2 text-sm font-medium ${
+                                awayWon ? "text-white" : "text-gray-200"
+                              }`}
+                            >
+                              <span className="truncate">
+                                {away?.shortName ?? away?.name}
+                              </span>
                               <span
-                                className={`h-2 w-2 rounded-full bg-gradient-to-r ${away?.color}`}
+                                className={`h-2 w-2 shrink-0 rounded-full bg-gradient-to-r ${away?.color}`}
                               />
                             </span>
                           </div>
+                          {played && result && (
+                            <div className="mt-2 space-y-1 border-t border-gray-700/80 pt-2">
+                              {result.maps.map((map) => (
+                                <Link
+                                  key={map.sessionId}
+                                  href={sessionHref(map.sessionId)}
+                                  className="flex items-center justify-between gap-2 text-xs text-gray-400 hover:text-cyan-300"
+                                >
+                                  <span className="truncate">{map.name}</span>
+                                  <span className="shrink-0 tabular-nums">
+                                    {map.homeScore}–{map.awayScore}
+                                  </span>
+                                </Link>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })}

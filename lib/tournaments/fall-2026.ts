@@ -26,9 +26,49 @@ export type ScheduledMatch = {
   home: string
   away: string
   involvesEu: boolean
-  homeScore?: number
-  awayScore?: number
 }
+
+/** One map inside a pairing. Scores are home-first. */
+export type MapResult = {
+  name: string
+  homeScore: number
+  awayScore: number
+  sessionId: string
+}
+
+/**
+ * Recorded results. Schedule is fixtures only — this is the only place
+ * scores live. One object per pairing; add a map when it is played.
+ * `home` / `away` are team ids from TEAMS.
+ */
+export type MatchResult = {
+  week: number
+  home: string
+  away: string
+  maps: MapResult[]
+}
+
+export const MATCH_RESULTS: MatchResult[] = [
+  {
+    week: 1,
+    home: "intro",
+    away: "drob",
+    maps: [
+      {
+        name: "Headquarters Raid",
+        homeScore: 5,
+        awayScore: 7,
+        sessionId: "185.150.189.120:1797_1788920154",
+      },
+      {
+        name: "Insurgent Camp",
+        homeScore: 9,
+        awayScore: 3,
+        sessionId: "185.150.189.120:1797_1788923494",
+      },
+    ],
+  },
+]
 
 export type ScheduleWeek = {
   week: number
@@ -48,8 +88,8 @@ export const TEAMS: TournamentTeam[] = [
     color: "from-cyan-600 to-sky-800",
     players: [
       { name: "Intro", aliases: ["intro-", "intro"], captain: true },
-      { name: "Inverse", aliases: ["judas.inverse", "inverse"] },
-      { name: "Killerpep", aliases: ["killerpep"] },
+      { name: "Inverse", aliases: ["judas.inverse", "inverse", "iverse"] },
+      { name: "Killerpep", aliases: ["killerpep", "-killerpep"] },
       { name: "Method", aliases: ["nx.method;", "method"] },
     ],
   },
@@ -84,9 +124,9 @@ export const TEAMS: TournamentTeam[] = [
     region: "NA",
     color: "from-amber-500 to-orange-800",
     players: [
-      { name: "Drob", aliases: ["drob"], captain: true },
+      { name: "Drob", aliases: ["drob", "drob127"], captain: true },
       { name: "Re1ativity2", aliases: ["re1ativity2"] },
-      { name: "Xeno", aliases: ["xeno"] },
+      { name: "Xeno", aliases: ["xeno", "xenotype"] },
       { name: "Chaos", aliases: ["chaos88", "chaos"] },
     ],
   },
@@ -278,6 +318,194 @@ export function getTeam(id: string) {
   return TEAMS.find((t) => t.id === id)
 }
 
+export function getMatchResult(week: number, home: string, away: string) {
+  return MATCH_RESULTS.find(
+    (m) => m.week === week && m.home === home && m.away === away
+  )
+}
+
+export function seriesScore(result: MatchResult) {
+  return result.maps.reduce(
+    (acc, map) => ({
+      homeScore: acc.homeScore + map.homeScore,
+      awayScore: acc.awayScore + map.awayScore,
+    }),
+    { homeScore: 0, awayScore: 0 }
+  )
+}
+
+/** Each map is its own match for W/L. */
+export function mapRecord(result: MatchResult) {
+  let homeWins = 0
+  let awayWins = 0
+  let ties = 0
+  for (const map of result.maps) {
+    if (map.homeScore > map.awayScore) homeWins++
+    else if (map.awayScore > map.homeScore) awayWins++
+    else ties++
+  }
+  return { homeWins, awayWins, ties }
+}
+
+export function allMatchSessionIds() {
+  return MATCH_RESULTS.flatMap((m) => m.maps.map((map) => map.sessionId))
+}
+
+export function mapNameForSession(sessionId: string) {
+  for (const match of MATCH_RESULTS) {
+    const map = match.maps.find((m) => m.sessionId === sessionId)
+    if (map) return map.name
+  }
+}
+
+export function recordedMapNames() {
+  return Array.from(
+    new Set(MATCH_RESULTS.flatMap((m) => m.maps.map((map) => map.name)))
+  )
+}
+
+function nameVariants(name: string) {
+  const lower = name.toLowerCase().trim()
+  return new Set([lower, lower.replace(/^-+/, "")])
+}
+
+export function resolveRosterPlayer(trackerName: string) {
+  const incoming = nameVariants(trackerName)
+  for (const team of TEAMS) {
+    for (const player of team.players) {
+      const aliases = [player.name, ...player.aliases]
+      if (aliases.some((alias) => {
+        const known = nameVariants(alias)
+        for (const v of incoming) {
+          if (known.has(v)) return true
+        }
+        return false
+      })) {
+        return { team, player }
+      }
+    }
+  }
+}
+
+export type PlayerStatLine = {
+  trackerName: string
+  displayName: string
+  rosterName: string | null
+  teamId: string | null
+  teamName: string | null
+  mapName: string
+  sessionId: string
+  kills: number
+  deaths: number
+}
+
+export type TournamentPlayerStat = {
+  trackerName: string
+  displayName: string
+  teamId: string | null
+  teamName: string | null
+  kills: number
+  deaths: number
+  fragRate: number
+}
+
+export function annotateStatLines(
+  rows: {
+    name: string
+    kills: number
+    deaths: number
+    sessionId: string
+    mapName: string
+  }[],
+  displayByRoster: Record<string, string> = {}
+): PlayerStatLine[] {
+  return rows.map((row) => {
+    const resolved = resolveRosterPlayer(row.name)
+    const rosterName = resolved?.player.name ?? null
+    const displayName =
+      (rosterName && displayByRoster[rosterName]) ||
+      rosterName ||
+      row.name
+    const trackerName =
+      (rosterName && displayByRoster[rosterName]) || row.name
+    return {
+      trackerName,
+      displayName,
+      rosterName,
+      teamId: resolved?.team.id ?? null,
+      teamName: resolved?.team.name ?? null,
+      mapName: row.mapName,
+      sessionId: row.sessionId,
+      kills: row.kills,
+      deaths: row.deaths,
+    }
+  })
+}
+
+export function buildPlayerStats(
+  rows: { name: string; kills: number; deaths: number }[],
+  displayByRoster: Record<string, string> = {}
+): TournamentPlayerStat[] {
+  const lines = annotateStatLines(
+    rows.map((row) => ({
+      ...row,
+      sessionId: "",
+      mapName: "",
+    })),
+    displayByRoster
+  )
+  return aggregatePlayerStats(lines)
+}
+
+export function aggregatePlayerStats(lines: PlayerStatLine[]): TournamentPlayerStat[] {
+  const byKey = new Map<
+    string,
+    {
+      trackerName: string
+      displayName: string
+      teamId: string | null
+      teamName: string | null
+      kills: number
+      deaths: number
+    }
+  >()
+
+  for (const line of lines) {
+    if (line.kills + line.deaths === 0) continue
+    const key = line.rosterName ?? line.trackerName.toLowerCase()
+    const existing = byKey.get(key)
+    if (existing) {
+      existing.kills += line.kills
+      existing.deaths += line.deaths
+    } else {
+      byKey.set(key, {
+        trackerName: line.trackerName,
+        displayName: line.displayName,
+        teamId: line.teamId,
+        teamName: line.teamName,
+        kills: line.kills,
+        deaths: line.deaths,
+      })
+    }
+  }
+
+  return Array.from(byKey.values())
+    .map((row) => ({
+      ...row,
+      fragRate:
+        row.deaths === 0
+          ? row.kills > 0
+            ? row.kills
+            : 0
+          : Number((row.kills / row.deaths).toFixed(2)),
+    }))
+    .sort((a, b) => {
+      if (b.kills !== a.kills) return b.kills - a.kills
+      if (b.fragRate !== a.fragRate) return b.fragRate - a.fragRate
+      return a.displayName.localeCompare(b.displayName)
+    })
+}
+
 export function teamEloSum(
   team: TournamentTeam,
   elos: Record<string, { elo: number } | undefined>
@@ -294,7 +522,6 @@ export type StandingRow = {
   ties: number
   roundsFor: number
   roundsAgainst: number
-  points: number
   roundWinPct: number | null
 }
 
@@ -309,26 +536,26 @@ export function calculateStandings(): StandingRow[] {
         ties: 0,
         roundsFor: 0,
         roundsAgainst: 0,
-        points: 0,
         roundWinPct: null,
       },
     ])
   )
 
-  for (const week of SCHEDULE) {
-    for (const match of week.matches) {
-      if (match.homeScore == null || match.awayScore == null) continue
-      const home = standings[match.home]
-      const away = standings[match.away]
-      home.roundsFor += match.homeScore
-      home.roundsAgainst += match.awayScore
-      away.roundsFor += match.awayScore
-      away.roundsAgainst += match.homeScore
+  for (const match of MATCH_RESULTS) {
+    const home = standings[match.home]
+    const away = standings[match.away]
+    if (!home || !away) continue
 
-      if (match.homeScore > match.awayScore) {
+    for (const map of match.maps) {
+      home.roundsFor += map.homeScore
+      home.roundsAgainst += map.awayScore
+      away.roundsFor += map.awayScore
+      away.roundsAgainst += map.homeScore
+
+      if (map.homeScore > map.awayScore) {
         home.wins++
         away.losses++
-      } else if (match.awayScore > match.homeScore) {
+      } else if (map.awayScore > map.homeScore) {
         away.wins++
         home.losses++
       } else {
@@ -343,16 +570,16 @@ export function calculateStandings(): StandingRow[] {
       const played = row.roundsFor + row.roundsAgainst
       return {
         ...row,
-        points: row.wins * 3 + row.ties,
         roundWinPct: played > 0 ? row.roundsFor / played : null,
       }
     })
     .sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points
       if (b.wins !== a.wins) return b.wins - a.wins
+      if (a.losses !== b.losses) return a.losses - b.losses
       const aPct = a.roundWinPct ?? 0
       const bPct = b.roundWinPct ?? 0
       if (bPct !== aPct) return bPct - aPct
+      if (b.roundsFor !== a.roundsFor) return b.roundsFor - a.roundsFor
       return a.teamId.localeCompare(b.teamId)
     })
 }
