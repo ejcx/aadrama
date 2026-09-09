@@ -366,7 +366,8 @@ export function recordedMapNames() {
 
 function nameVariants(name: string) {
   const lower = name.toLowerCase().trim()
-  return new Set([lower, lower.replace(/^-+/, "")])
+  const stripped = lower.replace(/^-+/, "")
+  return stripped === lower ? [lower] : [lower, stripped]
 }
 
 export function resolveRosterPlayer(trackerName: string) {
@@ -374,13 +375,11 @@ export function resolveRosterPlayer(trackerName: string) {
   for (const team of TEAMS) {
     for (const player of team.players) {
       const aliases = [player.name, ...player.aliases]
-      if (aliases.some((alias) => {
+      const matches = aliases.some((alias) => {
         const known = nameVariants(alias)
-        for (const v of incoming) {
-          if (known.has(v)) return true
-        }
-        return false
-      })) {
+        return incoming.some((v) => known.indexOf(v) !== -1)
+      })
+      if (matches) {
         return { team, player }
       }
     }
