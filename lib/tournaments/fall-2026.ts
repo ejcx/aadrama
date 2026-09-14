@@ -76,7 +76,6 @@ export type ScheduleWeek = {
   euDate: string
   maps: WeekMap[]
   matches: ScheduledMatch[]
-  bye: string
 }
 
 export const TEAMS: TournamentTeam[] = [
@@ -138,9 +137,11 @@ export const TEAMS: TournamentTeam[] = [
     players: [
       { name: "Bart", aliases: ["bart"], captain: true },
       { name: "Hype", aliases: ["hype"] },
-      { name: "imamenace", aliases: ["imamenace"] },
+      { name: "Banana", aliases: ["banana", "bananen"] },
+      { name: "Nukubu", aliases: ["nukubu"] },
+      { name: "Imamenace", aliases: ["imamenace"] },
       { name: "Aquaxe", aliases: ["aquaxe"] },
-      { name: "Mat3r", aliases: ["tuhmat3r", "mat3r", "tuhmater"] },
+      { name: "Unknown", aliases: ["unknown"] },
     ],
   },
   {
@@ -153,28 +154,15 @@ export const TEAMS: TournamentTeam[] = [
       { name: "Vasili", aliases: ["vasili"] },
       { name: "Erniaa", aliases: ["erniaa"] },
       { name: "Potejto", aliases: ["potejto"] },
-      { name: "Scott", aliases: ["scott"] },
-    ],
-  },
-  {
-    id: "yoshi",
-    name: "Yoshi",
-    region: "EU",
-    color: "from-rose-600 to-fuchsia-900",
-    players: [
-      { name: "Yoshi", aliases: [".yoshii^", "yoshi"], captain: true },
-      { name: "cRm", aliases: ["crm"] },
-      { name: "Bananen", aliases: ["bananen"] },
-      { name: "Unknown", aliases: [] },
-      { name: "Nukubu", aliases: ["nukubu"] },
+      { name: "Krishu", aliases: ["krishu"] },
     ],
   },
 ]
 
 export const NA_CAPTAINS = ["drob", "joe", "farmer", "intro"] as const
-export const EU_CAPTAINS = ["bart", "junk", "yoshi"] as const
+export const EU_CAPTAINS = ["bart", "junk"] as const
 
-/** Group-stage map weeks. 7-team round robin uses all 7 weeks. */
+/** Group-stage map weeks. 6-team round robin is 5 weeks, no byes. */
 export const MAP_WEEKS: { week: number; maps: WeekMap[] }[] = [
   {
     week: 1,
@@ -194,14 +182,14 @@ export const MAP_WEEKS: { week: number; maps: WeekMap[] }[] = [
     week: 3,
     maps: [
       { name: "Pipeline", time: "4 minutes" },
-      { name: "ESL Dusk", time: "3 minutes" },
+      { name: "SF Sandstorm", time: "3 minutes" },
     ],
   },
   {
     week: 4,
     maps: [
       { name: "Collapsed Tunnel", time: "3 minutes" },
-      { name: "River Basin", time: "7 minutes", note: "5 rounds" },
+      { name: "Mountain Ambush", time: "6 minutes", note: "5 rounds" },
     ],
   },
   {
@@ -209,20 +197,6 @@ export const MAP_WEEKS: { week: number; maps: WeekMap[] }[] = [
     maps: [
       { name: "Woodland Outpost", time: "4 minutes" },
       { name: "Urban Assault", time: "3 minutes" },
-    ],
-  },
-  {
-    week: 6,
-    maps: [
-      { name: "SF Sandstorm", time: "3 minutes" },
-      { name: "Mountain Ambush", time: "6 minutes", note: "5 rounds" },
-    ],
-  },
-  {
-    week: 7,
-    maps: [
-      { name: "Canyon", time: "3 minutes" },
-      { name: "Weapons Cache", time: "4 minutes" },
     ],
   },
 ]
@@ -233,11 +207,10 @@ export const SCHEDULE: ScheduleWeek[] = [
     naDate: "Thu Sep 10",
     euDate: "Sat Sep 12",
     maps: MAP_WEEKS[0].maps,
-    bye: "junk",
     matches: [
-      { home: "farmer", away: "yoshi", involvesEu: true },
-      { home: "joe", away: "bart", involvesEu: true },
+      { home: "farmer", away: "joe", involvesEu: false },
       { home: "intro", away: "drob", involvesEu: false },
+      { home: "junk", away: "bart", involvesEu: true },
     ],
   },
   {
@@ -245,11 +218,10 @@ export const SCHEDULE: ScheduleWeek[] = [
     naDate: "Thu Sep 17",
     euDate: "Sat Sep 19",
     maps: MAP_WEEKS[1].maps,
-    bye: "yoshi",
     matches: [
-      { home: "farmer", away: "joe", involvesEu: false },
-      { home: "drob", away: "junk", involvesEu: true },
-      { home: "bart", away: "intro", involvesEu: true },
+      { home: "farmer", away: "intro", involvesEu: false },
+      { home: "junk", away: "joe", involvesEu: true },
+      { home: "bart", away: "drob", involvesEu: true },
     ],
   },
   {
@@ -257,11 +229,10 @@ export const SCHEDULE: ScheduleWeek[] = [
     naDate: "Thu Sep 24",
     euDate: "Sat Sep 26",
     maps: MAP_WEEKS[2].maps,
-    bye: "joe",
     matches: [
-      { home: "farmer", away: "junk", involvesEu: true },
-      { home: "yoshi", away: "intro", involvesEu: true },
-      { home: "drob", away: "bart", involvesEu: true },
+      { home: "farmer", away: "bart", involvesEu: true },
+      { home: "drob", away: "junk", involvesEu: true },
+      { home: "joe", away: "intro", involvesEu: false },
     ],
   },
   {
@@ -269,10 +240,9 @@ export const SCHEDULE: ScheduleWeek[] = [
     naDate: "Thu Oct 1",
     euDate: "Sat Oct 3",
     maps: MAP_WEEKS[3].maps,
-    bye: "bart",
     matches: [
-      { home: "farmer", away: "intro", involvesEu: false },
-      { home: "junk", away: "yoshi", involvesEu: true },
+      { home: "farmer", away: "junk", involvesEu: true },
+      { home: "bart", away: "intro", involvesEu: true },
       { home: "drob", away: "joe", involvesEu: false },
     ],
   },
@@ -281,35 +251,10 @@ export const SCHEDULE: ScheduleWeek[] = [
     naDate: "Thu Oct 8",
     euDate: "Sat Oct 10",
     maps: MAP_WEEKS[4].maps,
-    bye: "drob",
-    matches: [
-      { home: "farmer", away: "bart", involvesEu: true },
-      { home: "intro", away: "junk", involvesEu: true },
-      { home: "joe", away: "yoshi", involvesEu: true },
-    ],
-  },
-  {
-    week: 6,
-    naDate: "Thu Oct 15",
-    euDate: "Sat Oct 17",
-    maps: MAP_WEEKS[5].maps,
-    bye: "intro",
     matches: [
       { home: "farmer", away: "drob", involvesEu: false },
-      { home: "bart", away: "yoshi", involvesEu: true },
-      { home: "joe", away: "junk", involvesEu: true },
-    ],
-  },
-  {
-    week: 7,
-    naDate: "Thu Oct 22",
-    euDate: "Sat Oct 24",
-    maps: MAP_WEEKS[6].maps,
-    bye: "farmer",
-    matches: [
-      { home: "intro", away: "joe", involvesEu: false },
-      { home: "drob", away: "yoshi", involvesEu: true },
-      { home: "bart", away: "junk", involvesEu: true },
+      { home: "joe", away: "bart", involvesEu: true },
+      { home: "intro", away: "junk", involvesEu: true },
     ],
   },
 ]

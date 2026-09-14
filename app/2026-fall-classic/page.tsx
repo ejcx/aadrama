@@ -20,7 +20,7 @@ import PlayerStatsTable from "./PlayerStatsTable";
 export const metadata: Metadata = {
   title: "Fall Classic 2026 — AA Drama",
   description:
-    "Americas Army 2.5 Fall Classic: 7-team round robin on AAO25 Assist, best of 14, finals last week of October.",
+    "Americas Army 2.5 Fall Classic: 6-team round robin on AAO25 Assist, best of 14, finals last week of October.",
 };
 
 function formatElo(n: number) {
@@ -136,7 +136,7 @@ export default async function FallClassic2026Page() {
               Competitive Community Discord.
             </p>
             <div className="mb-2 flex flex-wrap items-center justify-center gap-4 text-sm text-gray-300">
-              <span>Sep 10 – Oct 24, 2026</span>
+              <span>Sep 10 – Oct 10, 2026</span>
               <span className="text-gray-600">·</span>
               <span>Best of 14 (first to 8)</span>
               <span className="text-gray-600">·</span>
@@ -151,9 +151,8 @@ export default async function FallClassic2026Page() {
               Teams
             </h3>
             <p className="mb-6 text-sm text-gray-500">
-              ★ captain. NA sides list 4; EU sides list 5. Collective ELO is the
-              sum of the roster (unranked players count as {UNRANKED_ELO}).
-              Sorted by average ELO.
+              ★ captain. Collective ELO is the sum of the roster (unranked
+              players count as {UNRANKED_ELO}). Sorted by average ELO.
             </p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {teamsWithElo.map(({ team, sum, avg, rankedCount }, idx) => (
@@ -339,14 +338,11 @@ export default async function FallClassic2026Page() {
                       Round {week.week}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="rounded-full bg-gray-700/80 px-2 py-1 text-gray-300">
-                        Bye {getTeam(week.bye)?.shortName ?? getTeam(week.bye)?.name}
-                      </span>
                       <span className="rounded-full bg-cyan-500/15 px-2 py-1 text-cyan-300">
                         NA {week.naDate}
                       </span>
                       <span className="rounded-full bg-violet-500/15 px-2 py-1 text-violet-300">
-                        EU {week.euDate}
+                        EU {week.euDate} 4 PM EST
                       </span>
                     </div>
                   </div>
@@ -497,8 +493,7 @@ export default async function FallClassic2026Page() {
               Map pool
             </h3>
             <p className="mb-4 text-sm text-gray-500">
-              Seven teams, seven weeks. Each team has one bye. Maps are
-              tentative.
+              Six teams, five weeks. Each pairing plays two maps.
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {MAP_WEEKS.map((week) => {
@@ -540,7 +535,7 @@ export default async function FallClassic2026Page() {
               {[
                 {
                   title: "Format",
-                  body: "Round robin: every team plays each other once, with one bye week. Matches are best of 14 (first to 8). Rounds and matches may tie. Top 2 go to the final.",
+                  body: "Round robin: every team plays each other once. Matches are best of 14 (first to 8). Rounds and matches may tie. Top 2 go to the final.",
                 },
                 {
                   title: "How rounds are won",
@@ -564,7 +559,11 @@ export default async function FallClassic2026Page() {
                 },
                 {
                   title: "Substitutes",
-                  body: "A designated sub covers no-shows. If that sub is unavailable, others may fill in at the same or lower skill. Skill is declared by the dictator in charge.",
+                  body: "Designated subs are Mat3r and Scott. If they are unavailable, others may fill in at the same or lower skill. Skill is declared by the dictator in charge.",
+                },
+                {
+                  title: "Starting sides",
+                  body: "Add the two team numbers (1 Intro, 2 Joe, 3 Farmer, 4 Drob, 5 Junk, 6 Bart). If the sum is even, the lower number picks starting side on one map and the higher number picks on the other. If odd, that order is reversed.",
                 },
                 {
                   title: "Admin",

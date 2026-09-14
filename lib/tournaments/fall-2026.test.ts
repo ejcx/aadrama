@@ -1,11 +1,39 @@
 import { describe, expect, it } from "vitest"
 import {
   MATCH_RESULTS,
+  SCHEDULE,
+  TEAMS,
   buildPlayerStats,
   calculateStandings,
   resolveRosterPlayer,
   seriesScore,
 } from "./fall-2026"
+
+describe("Fall Classic schedule", () => {
+  it("is a 6-team 5-week round robin with intro vs drob in week 1", () => {
+    expect(TEAMS.map((t) => t.id)).toEqual([
+      "intro",
+      "joe",
+      "farmer",
+      "drob",
+      "bart",
+      "junk",
+    ])
+    expect(SCHEDULE).toHaveLength(5)
+    const pairs = SCHEDULE.flatMap((week) =>
+      week.matches.map((m) => [m.home, m.away].sort().join("-"))
+    )
+    expect(pairs).toHaveLength(15)
+    expect(new Set(pairs).size).toBe(15)
+    expect(SCHEDULE[0].matches).toEqual(
+      expect.arrayContaining([
+        { home: "intro", away: "drob", involvesEu: false },
+        { home: "farmer", away: "joe", involvesEu: false },
+        { home: "junk", away: "bart", involvesEu: true },
+      ])
+    )
+  })
+})
 
 describe("Fall Classic match results", () => {
   it("stores week 1 intro vs drob as two maps with session ids", () => {
