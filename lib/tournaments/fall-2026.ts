@@ -68,6 +68,25 @@ export const MATCH_RESULTS: MatchResult[] = [
       },
     ],
   },
+  {
+    week: 1,
+    home: "farmer",
+    away: "joe",
+    maps: [
+      {
+        name: "Headquarters Raid",
+        homeScore: 5,
+        awayScore: 7,
+        sessionId: "185.150.189.120:1797_1789522774",
+      },
+      {
+        name: "Insurgent Camp",
+        homeScore: 4,
+        awayScore: 8,
+        sessionId: "185.150.189.120:1797_1789526074",
+      },
+    ],
+  },
 ]
 
 export type ScheduleWeek = {
@@ -113,7 +132,7 @@ export const TEAMS: TournamentTeam[] = [
     players: [
       { name: "Farmer", aliases: ["-farmer.[vda]", "farmer"], captain: true },
       { name: "Rainmaker", aliases: ["rainmaker"] },
-      { name: "Mediocre", aliases: ["mediocre"] },
+      { name: "Mediocre", aliases: ["di.mediocre", "mediocre"] },
       { name: "Bryguy", aliases: ["bryguy"] },
     ],
   },

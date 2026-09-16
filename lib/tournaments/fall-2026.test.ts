@@ -36,6 +36,27 @@ describe("Fall Classic schedule", () => {
 })
 
 describe("Fall Classic match results", () => {
+  it("stores week 1 farmer vs joe as two WWJD map wins", () => {
+    const match = MATCH_RESULTS.find(
+      (m) => m.week === 1 && m.home === "farmer" && m.away === "joe"
+    )
+    expect(match?.maps).toEqual([
+      {
+        name: "Headquarters Raid",
+        homeScore: 5,
+        awayScore: 7,
+        sessionId: "185.150.189.120:1797_1789522774",
+      },
+      {
+        name: "Insurgent Camp",
+        homeScore: 4,
+        awayScore: 8,
+        sessionId: "185.150.189.120:1797_1789526074",
+      },
+    ])
+    expect(seriesScore(match!)).toEqual({ homeScore: 9, awayScore: 15 })
+  })
+
   it("stores week 1 intro vs drob as two maps with session ids", () => {
     const match = MATCH_RESULTS.find(
       (m) => m.week === 1 && m.home === "intro" && m.away === "drob"
@@ -75,9 +96,22 @@ describe("Fall Classic match results", () => {
       roundsFor: 10,
       roundsAgainst: 14,
     })
-    expect(standings.joe.wins + standings.joe.losses + standings.joe.ties).toBe(0)
-    expect(calculateStandings()[0].teamId).toBe("intro")
-    expect(calculateStandings()[1].teamId).toBe("drob")
+    expect(standings.joe).toMatchObject({
+      wins: 2,
+      losses: 0,
+      ties: 0,
+      roundsFor: 15,
+      roundsAgainst: 9,
+    })
+    expect(standings.farmer).toMatchObject({
+      wins: 0,
+      losses: 2,
+      ties: 0,
+      roundsFor: 9,
+      roundsAgainst: 15,
+    })
+    expect(calculateStandings()[0].teamId).toBe("joe")
+    expect(calculateStandings()[1].teamId).toBe("intro")
   })
 
   it("maps tracker names onto roster players", () => {
@@ -85,6 +119,7 @@ describe("Fall Classic match results", () => {
     expect(resolveRosterPlayer("drob127")?.player.name).toBe("Drob")
     expect(resolveRosterPlayer("-KillerPep")?.player.name).toBe("Killerpep")
     expect(resolveRosterPlayer("xenotype")?.team.id).toBe("drob")
+    expect(resolveRosterPlayer("di.mediocre")?.player.name).toBe("Mediocre")
   })
 
   it("aggregates kills and deaths and skips spectators", () => {
