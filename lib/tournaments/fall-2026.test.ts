@@ -90,11 +90,11 @@ describe("Fall Classic match results", () => {
       roundsAgainst: 10,
     })
     expect(standings.drob).toMatchObject({
-      wins: 1,
+      wins: 3,
       losses: 1,
       ties: 0,
-      roundsFor: 10,
-      roundsAgainst: 14,
+      roundsFor: 24,
+      roundsAgainst: 22,
     })
     expect(standings.joe).toMatchObject({
       wins: 2,
@@ -112,10 +112,10 @@ describe("Fall Classic match results", () => {
     })
     expect(standings.bart).toMatchObject({
       wins: 2,
-      losses: 0,
+      losses: 2,
       ties: 0,
-      roundsFor: 19,
-      roundsAgainst: 5,
+      roundsFor: 27,
+      roundsAgainst: 19,
     })
     expect(standings.junk).toMatchObject({
       wins: 0,
@@ -124,8 +124,29 @@ describe("Fall Classic match results", () => {
       roundsFor: 5,
       roundsAgainst: 19,
     })
-    expect(calculateStandings()[0].teamId).toBe("bart")
+    expect(calculateStandings()[0].teamId).toBe("drob")
     expect(calculateStandings()[1].teamId).toBe("joe")
+  })
+
+  it("stores week 2 bart vs drob as two High T map wins", () => {
+    const match = MATCH_RESULTS.find(
+      (m) => m.week === 2 && m.home === "bart" && m.away === "drob"
+    )
+    expect(match?.maps).toEqual([
+      {
+        name: "MOUT McKenna",
+        homeScore: 5,
+        awayScore: 7,
+        sessionId: "185.150.189.120:1797_1789934676",
+      },
+      {
+        name: "Bridge SE",
+        homeScore: 3,
+        awayScore: 7,
+        sessionId: "185.150.189.120:1797_1789936750",
+      },
+    ])
+    expect(seriesScore(match!)).toEqual({ homeScore: 8, awayScore: 14 })
   })
 
   it("stores week 1 Team Poland vs bum ba da da as two bart map wins", () => {

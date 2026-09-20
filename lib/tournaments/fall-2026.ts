@@ -106,6 +106,25 @@ export const MATCH_RESULTS: MatchResult[] = [
       },
     ],
   },
+  {
+    week: 2,
+    home: "bart",
+    away: "drob",
+    maps: [
+      {
+        name: "MOUT McKenna",
+        homeScore: 5,
+        awayScore: 7,
+        sessionId: "185.150.189.120:1797_1789934676",
+      },
+      {
+        name: "Bridge SE",
+        homeScore: 3,
+        awayScore: 7,
+        sessionId: "185.150.189.120:1797_1789936750",
+      },
+    ],
+  },
 ]
 
 export type ScheduleWeek = {
