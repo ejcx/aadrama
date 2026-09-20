@@ -87,6 +87,25 @@ export const MATCH_RESULTS: MatchResult[] = [
       },
     ],
   },
+  {
+    week: 1,
+    home: "junk",
+    away: "bart",
+    maps: [
+      {
+        name: "Headquarters Raid",
+        homeScore: 2,
+        awayScore: 10,
+        sessionId: "45.77.52.236:1807_1789844114",
+      },
+      {
+        name: "Insurgent Camp",
+        homeScore: 3,
+        awayScore: 9,
+        sessionId: "45.77.52.236:1807_1789847203",
+      },
+    ],
+  },
 ]
 
 export type ScheduleWeek = {
@@ -154,26 +173,28 @@ export const TEAMS: TournamentTeam[] = [
     region: "EU",
     color: "from-violet-600 to-purple-900",
     players: [
-      { name: "Bart", aliases: ["bart"], captain: true },
+      { name: "Bart", aliases: ["bart", ".Bart^"], captain: true },
       { name: "Hype", aliases: ["hype"] },
-      { name: "Banana", aliases: ["banana", "bananen"] },
-      { name: "Nukubu", aliases: ["nukubu"] },
-      { name: "Imamenace", aliases: ["imamenace"] },
-      { name: "Aquaxe", aliases: ["aquaxe"] },
+      { name: "Banana", aliases: ["banana", "bananen", "bananainpyjama"] },
+      { name: "Nukubu", aliases: ["nukubu", "-nukubu."] },
+      { name: "Imamenace", aliases: ["imamenace", "^ImaMenace"] },
+      { name: "Aquaxe", aliases: ["aquaxe", "aQuaXe"] },
       { name: "Unknown", aliases: ["unknown"] },
     ],
   },
   {
     id: "junk",
-    name: "Junk",
+    name: "Team Poland",
+    shortName: "Poland",
     region: "EU",
     color: "from-blue-600 to-indigo-900",
     players: [
-      { name: "Junk", aliases: ["junk"], captain: true },
-      { name: "Vasili", aliases: ["vasili"] },
+      { name: "Junk", aliases: ["junk", "+JunK+"], captain: true },
+      { name: "Vasili", aliases: ["vasili", "-Vasili-"] },
       { name: "Erniaa", aliases: ["erniaa"] },
       { name: "Potejto", aliases: ["potejto"] },
       { name: "Krishu", aliases: ["krishu"] },
+      { name: "Yoshii", aliases: ["yoshii", ".YOshii^"] },
     ],
   },
 ]

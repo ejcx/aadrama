@@ -563,7 +563,7 @@ export default async function FallClassic2026Page() {
                 },
                 {
                   title: "Starting sides",
-                  body: "Add the two team numbers (1 Intro, 2 Joe, 3 Farmer, 4 Drob, 5 Junk, 6 Bart). If the sum is even, the lower number picks starting side on one map and the higher number picks on the other. If odd, that order is reversed.",
+                  body: "Add the two team numbers (1 Intro, 2 Joe, 3 Farmer, 4 Drob, 5 Team Poland, 6 Bart). If the sum is even, the lower number picks starting side on one map and the higher number picks on the other. If odd, that order is reversed.",
                 },
                 {
                   title: "Admin",

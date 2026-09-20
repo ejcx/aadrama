@@ -110,8 +110,44 @@ describe("Fall Classic match results", () => {
       roundsFor: 9,
       roundsAgainst: 15,
     })
-    expect(calculateStandings()[0].teamId).toBe("joe")
-    expect(calculateStandings()[1].teamId).toBe("intro")
+    expect(standings.bart).toMatchObject({
+      wins: 2,
+      losses: 0,
+      ties: 0,
+      roundsFor: 19,
+      roundsAgainst: 5,
+    })
+    expect(standings.junk).toMatchObject({
+      wins: 0,
+      losses: 2,
+      ties: 0,
+      roundsFor: 5,
+      roundsAgainst: 19,
+    })
+    expect(calculateStandings()[0].teamId).toBe("bart")
+    expect(calculateStandings()[1].teamId).toBe("joe")
+  })
+
+  it("stores week 1 Team Poland vs bum ba da da as two bart map wins", () => {
+    const match = MATCH_RESULTS.find(
+      (m) => m.week === 1 && m.home === "junk" && m.away === "bart"
+    )
+    expect(TEAMS.find((t) => t.id === "junk")?.name).toBe("Team Poland")
+    expect(match?.maps).toEqual([
+      {
+        name: "Headquarters Raid",
+        homeScore: 2,
+        awayScore: 10,
+        sessionId: "45.77.52.236:1807_1789844114",
+      },
+      {
+        name: "Insurgent Camp",
+        homeScore: 3,
+        awayScore: 9,
+        sessionId: "45.77.52.236:1807_1789847203",
+      },
+    ])
+    expect(seriesScore(match!)).toEqual({ homeScore: 5, awayScore: 19 })
   })
 
   it("maps tracker names onto roster players", () => {
@@ -120,6 +156,10 @@ describe("Fall Classic match results", () => {
     expect(resolveRosterPlayer("-KillerPep")?.player.name).toBe("Killerpep")
     expect(resolveRosterPlayer("xenotype")?.team.id).toBe("drob")
     expect(resolveRosterPlayer("di.mediocre")?.player.name).toBe("Mediocre")
+    expect(resolveRosterPlayer(".Bart^")?.team.id).toBe("bart")
+    expect(resolveRosterPlayer("+JunK+")?.team.name).toBe("Team Poland")
+    expect(resolveRosterPlayer(".YOshii^")?.player.name).toBe("Yoshii")
+    expect(resolveRosterPlayer("bananainpyjama")?.player.name).toBe("Banana")
   })
 
   it("aggregates kills and deaths and skips spectators", () => {
