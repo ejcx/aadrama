@@ -20,6 +20,7 @@ import {
 } from '@/lib/scrim/seasons'
 import { isCaptainsPickBlocked } from '@/lib/scrim/captains-pick'
 import { playerCountForFormat, type ScrimFormat } from '@/lib/scrim/format'
+import { ADMIN_USER_ID } from '@/lib/admin'
 
 // Get current user info from Clerk
 async function getCurrentUser() {
@@ -2113,9 +2114,6 @@ export async function getScrimRankedStatus(scrimId: string): Promise<{
         eloChanges: null,
     }
 }
-
-// Admin user ID that can recalculate ELO
-const ADMIN_USER_ID = 'user_37oDN0YOSoKb4uypcjhU0Rgodzi'
 
 /** Rebuild cumulative history rows, player_elo, and milestone badges after ELO edits. */
 async function syncPlayersAfterEloHistoryChange(

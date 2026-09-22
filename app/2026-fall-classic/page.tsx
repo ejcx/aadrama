@@ -4,18 +4,17 @@ import SidebarLayout from "../components/SidebarLayout";
 import { lookupRosterElos } from "../tracker/actions";
 import {
   calculateStandings,
-  getMatchResult,
   getTeam,
   MAP_WEEKS,
-  SCHEDULE,
   TEAMS,
   UNRANKED_ELO,
-  seriesScore,
   teamEloSum,
   type TournamentTeam,
 } from "@/lib/tournaments/fall-2026";
 import { fetchTournamentPlayerLines } from "@/lib/tournaments/session-players";
+import { getTournamentMatchMedia } from "./actions";
 import PlayerStatsTable from "./PlayerStatsTable";
+import ScheduleMatches from "./ScheduleMatches";
 
 export const metadata: Metadata = {
   title: "Fall Classic 2026 — AA Drama",
@@ -30,10 +29,6 @@ function formatElo(n: number) {
 function formatPct(n: number | null) {
   if (n == null) return "—";
   return `${(n * 100).toFixed(1)}%`;
-}
-
-function sessionHref(sessionId: string) {
-  return `/tracker/session/${encodeURIComponent(sessionId)}`;
 }
 
 function PlayerRow({
@@ -79,9 +74,10 @@ function PlayerRow({
 
 export default async function FallClassic2026Page() {
   const roster = TEAMS.flatMap((team) => team.players);
-  const [elos, playerLines] = await Promise.all([
+  const [elos, playerLines, matchMedia] = await Promise.all([
     lookupRosterElos(roster),
     fetchTournamentPlayerLines(),
+    getTournamentMatchMedia(),
   ]);
   const namedPlayerLines = playerLines.map((line) => {
     const tracker = line.rosterName
@@ -325,134 +321,10 @@ export default async function FallClassic2026Page() {
               Starts the second week of September. One match a week by default;
               two if both sides agree. Any agreed time works. EU games will
               presumably need weekend daytime. Suggested defaults: Thursday for
-              all-NA, Saturday when an EU team is involved.
+              all-NA, Saturday when an EU team is involved. Click a match to
+              open the session, streams, and clips.
             </p>
-            <div className="space-y-4">
-              {SCHEDULE.map((week) => (
-                <div
-                  key={week.week}
-                  className="overflow-hidden rounded-xl border border-gray-700 bg-gray-900"
-                >
-                  <div className="flex flex-col gap-2 border-b border-gray-800 bg-gray-800/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="font-semibold text-white">
-                      Round {week.week}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="rounded-full bg-cyan-500/15 px-2 py-1 text-cyan-300">
-                        NA {week.naDate}
-                      </span>
-                      <span className="rounded-full bg-violet-500/15 px-2 py-1 text-violet-300">
-                        EU {week.euDate} 4 PM EST
-                      </span>
-                    </div>
-                  </div>
-                  <div className="border-b border-gray-800 px-4 py-2 text-xs text-gray-400">
-                    {week.maps.map((m, i) => (
-                      <span key={m.name}>
-                        {i > 0 && <span className="text-gray-600"> · </span>}
-                        <span className="text-gray-300">{m.name}</span>{" "}
-                        {m.time}
-                        {m.note ? ` (${m.note})` : ""}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
-                    {week.matches.map((match) => {
-                      const home = getTeam(match.home);
-                      const away = getTeam(match.away);
-                      const result = getMatchResult(
-                        week.week,
-                        match.home,
-                        match.away
-                      );
-                      const played = Boolean(result && result.maps.length > 0);
-                      const series = result ? seriesScore(result) : null;
-                      const homeWon =
-                        series != null && series.homeScore > series.awayScore;
-                      const awayWon =
-                        series != null && series.awayScore > series.homeScore;
-                      const tied =
-                        series != null && series.homeScore === series.awayScore;
-                      return (
-                        <div
-                          key={`${match.home}-${match.away}`}
-                          className="rounded-lg border border-gray-700 bg-gray-800/50 p-3"
-                        >
-                          <div className="mb-2 flex items-center justify-between">
-                            <span
-                              className={`text-[10px] font-semibold uppercase ${
-                                match.involvesEu
-                                  ? "text-violet-400"
-                                  : "text-cyan-400"
-                              }`}
-                            >
-                              {match.involvesEu ? week.euDate : week.naDate}
-                            </span>
-                            {!played && (
-                              <span className="text-[10px] text-gray-500">
-                                Upcoming
-                              </span>
-                            )}
-                            {played && series && (
-                              <span
-                                className={`text-sm font-bold tabular-nums ${
-                                  tied ? "text-yellow-400" : "text-white"
-                                }`}
-                              >
-                                {series.homeScore}–{series.awayScore}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <span
-                              className={`flex min-w-0 items-center gap-2 text-sm font-medium ${
-                                homeWon ? "text-white" : "text-gray-200"
-                              }`}
-                            >
-                              <span
-                                className={`h-2 w-2 shrink-0 rounded-full bg-gradient-to-r ${home?.color}`}
-                              />
-                              <span className="truncate">
-                                {home?.shortName ?? home?.name}
-                              </span>
-                            </span>
-                            <span className="text-xs text-gray-500">vs</span>
-                            <span
-                              className={`flex min-w-0 items-center justify-end gap-2 text-sm font-medium ${
-                                awayWon ? "text-white" : "text-gray-200"
-                              }`}
-                            >
-                              <span className="truncate">
-                                {away?.shortName ?? away?.name}
-                              </span>
-                              <span
-                                className={`h-2 w-2 shrink-0 rounded-full bg-gradient-to-r ${away?.color}`}
-                              />
-                            </span>
-                          </div>
-                          {played && result && (
-                            <div className="mt-2 space-y-1 border-t border-gray-700/80 pt-2">
-                              {result.maps.map((map) => (
-                                <Link
-                                  key={map.sessionId}
-                                  href={sessionHref(map.sessionId)}
-                                  className="flex items-center justify-between gap-2 text-xs text-gray-400 hover:text-cyan-300"
-                                >
-                                  <span className="truncate">{map.name}</span>
-                                  <span className="shrink-0 tabular-nums">
-                                    {map.homeScore}–{map.awayScore}
-                                  </span>
-                                </Link>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ScheduleMatches initialMedia={matchMedia} />
           </div>
 
           <div className="w-full">
