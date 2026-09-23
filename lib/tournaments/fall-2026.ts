@@ -125,6 +125,19 @@ export const MATCH_RESULTS: MatchResult[] = [
       },
     ],
   },
+  {
+    week: 2,
+    home: "farmer",
+    away: "intro",
+    maps: [
+      {
+        name: "MOUT McKenna",
+        homeScore: 6,
+        awayScore: 6,
+        sessionId: "185.150.189.120:1797_1790127814",
+      },
+    ],
+  },
 ]
 
 export type ScheduleWeek = {
@@ -172,6 +185,7 @@ export const TEAMS: TournamentTeam[] = [
       { name: "Rainmaker", aliases: ["rainmaker"] },
       { name: "Mediocre", aliases: ["di.mediocre", "mediocre"] },
       { name: "Bryguy", aliases: ["bryguy"] },
+      { name: "Army", aliases: ["army", "Army-=Of-God=-"] },
     ],
   },
   {

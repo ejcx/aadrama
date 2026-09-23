@@ -85,9 +85,9 @@ describe("Fall Classic match results", () => {
     expect(standings.intro).toMatchObject({
       wins: 1,
       losses: 1,
-      ties: 0,
-      roundsFor: 14,
-      roundsAgainst: 10,
+      ties: 1,
+      roundsFor: 20,
+      roundsAgainst: 16,
     })
     expect(standings.drob).toMatchObject({
       wins: 3,
@@ -106,9 +106,9 @@ describe("Fall Classic match results", () => {
     expect(standings.farmer).toMatchObject({
       wins: 0,
       losses: 2,
-      ties: 0,
-      roundsFor: 9,
-      roundsAgainst: 15,
+      ties: 1,
+      roundsFor: 15,
+      roundsAgainst: 21,
     })
     expect(standings.bart).toMatchObject({
       wins: 2,
@@ -149,6 +149,21 @@ describe("Fall Classic match results", () => {
     expect(seriesScore(match!)).toEqual({ homeScore: 8, awayScore: 14 })
   })
 
+  it("stores week 2 farmer vs intro MOUT McKenna as a 6-6 tie", () => {
+    const match = MATCH_RESULTS.find(
+      (m) => m.week === 2 && m.home === "farmer" && m.away === "intro"
+    )
+    expect(match?.maps).toEqual([
+      {
+        name: "MOUT McKenna",
+        homeScore: 6,
+        awayScore: 6,
+        sessionId: "185.150.189.120:1797_1790127814",
+      },
+    ])
+    expect(seriesScore(match!)).toEqual({ homeScore: 6, awayScore: 6 })
+  })
+
   it("stores week 1 Team Poland vs bum ba da da as two bart map wins", () => {
     const match = MATCH_RESULTS.find(
       (m) => m.week === 1 && m.home === "junk" && m.away === "bart"
@@ -181,6 +196,8 @@ describe("Fall Classic match results", () => {
     expect(resolveRosterPlayer("+JunK+")?.team.name).toBe("Team Poland")
     expect(resolveRosterPlayer(".YOshii^")?.player.name).toBe("Yoshii")
     expect(resolveRosterPlayer("bananainpyjama")?.player.name).toBe("Banana")
+    expect(resolveRosterPlayer("Army-=Of-God=-")?.player.name).toBe("Army")
+    expect(resolveRosterPlayer("Army-=Of-God=-")?.team.id).toBe("farmer")
   })
 
   it("aggregates kills and deaths and skips spectators", () => {

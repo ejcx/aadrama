@@ -354,10 +354,21 @@ export default function ScheduleMatches({
   const media = openKey
     ? (mediaByKey[openKey] ?? emptyMatchMedia())
     : emptyMatchMedia();
+  const playable = [...media.streams, ...media.clips].filter((item) =>
+    payloadOf(item).trim()
+  );
+  const selected =
+    playable.find((item) => item.id === selectedId) ?? playable[0] ?? null;
 
   useEffect(() => {
-    setSelectedId(null);
     setSaveError(null);
+    setSelectedId(
+      playable.find((item) => item.id === selectedId)?.id ??
+        playable[0]?.id ??
+        null
+    );
+    // Reset selection when opening a different match.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openKey]);
 
   useEffect(() => {
@@ -373,10 +384,6 @@ export default function ScheduleMatches({
       document.body.style.overflow = prev;
     };
   }, [openKey]);
-
-  const selected =
-    [...media.streams, ...media.clips].find((item) => item.id === selectedId) ??
-    null;
 
   const homeTeam = openMatch ? getTeam(openMatch.match.home) : null;
   const awayTeam = openMatch ? getTeam(openMatch.match.away) : null;
@@ -396,13 +403,14 @@ export default function ScheduleMatches({
   const openMatchPanel = (key: string, sessionId?: string) => {
     setOpenKey(key);
     setSelectedSessionId(sessionId ?? null);
-    setSelectedId(null);
   };
 
   const updateOpenMedia = (next: MatchMedia) => {
     if (!openKey) return;
     setMediaByKey((prev) => ({ ...prev, [openKey]: next }));
-    const items = [...next.streams, ...next.clips];
+    const items = [...next.streams, ...next.clips].filter((item) =>
+      payloadOf(item).trim()
+    );
     if (!items.some((item) => item.id === selectedId)) {
       setSelectedId(items[0]?.id ?? null);
     }
@@ -624,7 +632,6 @@ export default function ScheduleMatches({
                       type="button"
                       onClick={() => {
                         setSelectedSessionId(map.sessionId);
-                        setSelectedId(null);
                       }}
                       className={`rounded-full px-2.5 py-1 text-xs ${
                         map.sessionId === activeSessionId
@@ -635,6 +642,22 @@ export default function ScheduleMatches({
                       {map.name} {map.homeScore}–{map.awayScore}
                     </button>
                   ))}
+                </div>
+              )}
+              {selected && (selected.embedHtml || selected.url) && (
+                <div className="mb-6">
+                  <MediaEmbed item={selected} />
+                  {selected.url && (
+                    <a
+                      href={selected.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300"
+                    >
+                      Open stream in new tab
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
                 </div>
               )}
               {activeSessionId ? (
@@ -658,33 +681,17 @@ export default function ScheduleMatches({
                   No tracker session recorded for this match yet.
                 </p>
               )}
-              {selected && (selected.embedHtml || selected.url) && (
-                <div className="mb-4">
-                  <MediaEmbed item={selected} />
-                  {selected.url && (
-                    <a
-                      href={selected.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300"
-                    >
-                      Open stream in new tab
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
-                </div>
-              )}
               <div className="space-y-5">
                 <MediaList
                   title="Streams"
                   items={media.streams}
-                  selectedId={selectedId}
+                  selectedId={selected?.id ?? null}
                   onSelect={(item) => setSelectedId(item.id)}
                 />
                 <MediaList
                   title="Clips"
                   items={media.clips}
-                  selectedId={selectedId}
+                  selectedId={selected?.id ?? null}
                   onSelect={(item) => setSelectedId(item.id)}
                 />
               </div>
