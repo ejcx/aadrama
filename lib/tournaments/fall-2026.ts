@@ -136,6 +136,12 @@ export const MATCH_RESULTS: MatchResult[] = [
         awayScore: 6,
         sessionId: "185.150.189.120:1797_1790127814",
       },
+      {
+        name: "Bridge SE",
+        homeScore: 3,
+        awayScore: 7,
+        sessionId: "185.150.189.120:1797_1790131434",
+      },
     ],
   },
 ]
