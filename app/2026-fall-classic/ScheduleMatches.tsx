@@ -70,27 +70,41 @@ function MediaEmbed({ item }: { item: MatchMediaLink }) {
   );
 }
 
+function payloadOf(item: MatchMediaLink) {
+  return item.embedHtml || item.url || "";
+}
+
 function itemFromPayload(
   raw: string,
-  title: string
-): MatchMediaLink | null {
+  title: string,
+  id = crypto.randomUUID()
+): MatchMediaLink {
   const value = raw.trim();
-  if (!value) return null;
+  const label = title.trim();
+  if (!value) {
+    return { id, ...(label ? { title: label } : {}) };
+  }
   if (looksLikeEmbedHtml(value)) {
     const src = extractIframeSrc(value);
     return {
-      id: crypto.randomUUID(),
+      id,
       embedHtml: value,
       ...(src ? { url: src } : {}),
-      ...(title.trim() ? { title: title.trim() } : {}),
+      ...(label ? { title: label } : {}),
     };
   }
   const parsed = parseMediaUrl(value);
   return {
-    id: crypto.randomUUID(),
+    id,
     url: parsed?.watchUrl ?? value,
-    ...(title.trim() ? { title: title.trim() } : {}),
+    ...(label ? { title: label } : {}),
   };
+}
+
+function filledMedia(media: MatchMedia): MatchMedia {
+  const keep = (items: MatchMediaLink[]) =>
+    items.filter((item) => payloadOf(item).trim());
+  return { streams: keep(media.streams), clips: keep(media.clips) };
 }
 
 function MediaList({
@@ -178,133 +192,130 @@ function AdminEditor({
   pending: boolean;
   error: string | null;
 }) {
-  const [slot, setSlot] = useState<"stream" | "clip">("clip");
-  const [payload, setPayload] = useState("");
-  const [title, setTitle] = useState("");
-
-  const withDraft = (): MatchMedia => {
-    const item = itemFromPayload(payload, title);
-    if (!item) return { streams, clips };
-    return slot === "stream"
-      ? { streams: [...streams, item], clips }
-      : { streams, clips: [...clips, item] };
-  };
-
-  const add = () => {
-    const next = withDraft();
-    if (next.streams === streams && next.clips === clips) return;
-    onChange(next);
-    setPayload("");
-    setTitle("");
-  };
-
-  const remove = (kind: "stream" | "clip", id: string) => {
+  const setList = (kind: "stream" | "clip", list: MatchMediaLink[]) => {
     onChange(
-      kind === "stream"
-        ? { streams: streams.filter((s) => s.id !== id), clips }
-        : { streams, clips: clips.filter((c) => c.id !== id) }
+      kind === "stream" ? { streams: list, clips } : { streams, clips: list }
     );
   };
 
-  return (
-    <div className="mt-6 border-t border-gray-800 pt-4">
-      <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-amber-400">
-        Admin
-      </h4>
-      <p className="mb-3 text-xs text-gray-500">
-        Paste a URL or the full iframe embed HTML, then Save. You do not need
-        to press Add first.
-      </p>
-      <div className="mb-2 flex gap-2">
+  const addRow = (kind: "stream" | "clip") => {
+    const list = kind === "stream" ? streams : clips;
+    setList(kind, [...list, { id: crypto.randomUUID() }]);
+  };
+
+  const updateRow = (
+    kind: "stream" | "clip",
+    id: string,
+    patch: { payload?: string; title?: string }
+  ) => {
+    const list = kind === "stream" ? streams : clips;
+    setList(
+      kind,
+      list.map((item) => {
+        if (item.id !== id) return item;
+        return itemFromPayload(
+          patch.payload ?? payloadOf(item),
+          patch.title ?? item.title ?? "",
+          item.id
+        );
+      })
+    );
+  };
+
+  const removeRow = (kind: "stream" | "clip", id: string) => {
+    const list = kind === "stream" ? streams : clips;
+    setList(
+      kind,
+      list.filter((item) => item.id !== id)
+    );
+  };
+
+  const editor = (kind: "stream" | "clip", list: MatchMediaLink[]) => (
+    <div className="mb-5">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+          {kind === "stream" ? "Streams" : "Clips"}
+        </h4>
         <button
           type="button"
-          onClick={() => setSlot("stream")}
-          className={`rounded-full px-2.5 py-1 text-xs ${
-            slot === "stream"
-              ? "bg-cyan-500/20 text-cyan-200"
-              : "bg-gray-800 text-gray-400"
-          }`}
-        >
-          Stream / VOD
-        </button>
-        <button
-          type="button"
-          onClick={() => setSlot("clip")}
-          className={`rounded-full px-2.5 py-1 text-xs ${
-            slot === "clip"
-              ? "bg-cyan-500/20 text-cyan-200"
-              : "bg-gray-800 text-gray-400"
-          }`}
-        >
-          Clip
-        </button>
-      </div>
-      <textarea
-        value={payload}
-        onChange={(e) => setPayload(e.target.value)}
-        rows={4}
-        placeholder='<iframe src="https://www.youtube.com/embed/…?clip=…"></iframe>'
-        className="mb-2 w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 font-mono text-xs text-gray-200 outline-none focus:border-cyan-500/50"
-      />
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Optional title"
-        className="mb-2 w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-200 outline-none focus:border-cyan-500/50"
-      />
-      <div className="mb-4 flex gap-2">
-        <button
-          type="button"
-          onClick={add}
-          disabled={!payload.trim()}
-          className="inline-flex items-center gap-1 rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-200 hover:bg-gray-700 disabled:opacity-40"
+          onClick={() => addRow(kind)}
+          className="inline-flex items-center gap-1 rounded-lg bg-gray-800 px-2.5 py-1 text-xs font-medium text-gray-200 hover:bg-gray-700"
         >
           <Plus className="h-3.5 w-3.5" />
-          Add
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const next = withDraft();
-            onChange(next);
-            setPayload("");
-            setTitle("");
-            onSave(next);
-          }}
-          disabled={pending}
-          className="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-500 disabled:opacity-40"
-        >
-          {pending ? "Saving…" : "Save"}
+          Add {kind === "stream" ? "stream" : "clip"}
         </button>
       </div>
-      {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
-      {(["stream", "clip"] as const).map((kind) => {
-        const list = kind === "stream" ? streams : clips;
-        if (list.length === 0) return null;
-        return (
-          <ul key={kind} className="mb-2 space-y-1">
-            {list.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center justify-between gap-2 text-xs text-gray-400"
-              >
-                <span className="truncate">
-                  {kind === "stream" ? "Stream" : "Clip"} ·{" "}
-                  {item.title || item.url || "embed"}
-                </span>
+      {list.length === 0 ? (
+        <p className="text-xs text-gray-600">None yet.</p>
+      ) : (
+        <ul className="space-y-3">
+          {list.map((item, index) => (
+            <li
+              key={item.id}
+              className="rounded-lg border border-gray-800 bg-gray-900/80 p-2.5"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <input
+                  value={item.title ?? ""}
+                  onChange={(e) =>
+                    updateRow(kind, item.id, { title: e.target.value })
+                  }
+                  placeholder={
+                    kind === "stream"
+                      ? `Stream ${index + 1} title`
+                      : `Clip ${index + 1} title`
+                  }
+                  className="w-full rounded-lg border border-gray-700 bg-gray-950 px-2.5 py-1.5 text-sm text-gray-200 outline-none focus:border-cyan-500/50"
+                />
                 <button
                   type="button"
-                  onClick={() => remove(kind, item.id)}
-                  className="rounded p-1 hover:bg-white/5 hover:text-red-400"
-                  aria-label="Remove"
+                  onClick={() => removeRow(kind, item.id)}
+                  className="shrink-0 rounded p-1.5 text-gray-500 hover:bg-white/5 hover:text-red-400"
+                  aria-label={`Remove ${kind}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
-              </li>
-            ))}
-          </ul>
-        );
-      })}
+              </div>
+              <textarea
+                value={payloadOf(item)}
+                onChange={(e) =>
+                  updateRow(kind, item.id, { payload: e.target.value })
+                }
+                rows={4}
+                placeholder={
+                  kind === "stream"
+                    ? "Twitch/YouTube URL or iframe embed HTML"
+                    : "Clip iframe embed HTML or URL"
+                }
+                className="w-full rounded-lg border border-gray-700 bg-gray-950 px-2.5 py-2 font-mono text-xs text-gray-200 outline-none focus:border-cyan-500/50"
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="mt-6 border-t border-gray-800 pt-4">
+      <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-400">
+        Admin
+      </h4>
+      <p className="mb-4 text-xs text-gray-500">
+        Edit streams and clips separately. Paste a URL or iframe embed, then
+        Save.
+      </p>
+      {editor("stream", streams)}
+      {editor("clip", clips)}
+      <button
+        type="button"
+        onClick={() => onSave(filledMedia({ streams, clips }))}
+        disabled={pending}
+        className="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-500 disabled:opacity-40"
+      >
+        {pending ? "Saving…" : "Save"}
+      </button>
+      {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
     </div>
   );
 }
