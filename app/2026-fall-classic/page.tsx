@@ -22,7 +22,7 @@ const RULES_DOC =
 export const metadata: Metadata = {
   title: "Fall Classic 2026 — AA Drama",
   description:
-    "Americas Army 2.5 Fall Classic: 6-team round robin on AAO25 Assist, best of 14, finals last week of October.",
+    "Americas Army 2.5 Fall Classic: 6-team round robin on AAO25 Assist, best of 12, finals last week of October.",
 };
 
 function formatElo(n: number) {
@@ -137,7 +137,7 @@ export default async function FallClassic2026Page() {
             <div className="mb-2 flex flex-wrap items-center justify-center gap-4 text-sm text-gray-300">
               <span>Sep 10 – Oct 10, 2026</span>
               <span className="text-gray-600">·</span>
-              <span>Best of 14 (first to 8)</span>
+              <span>Best of 12 (first to 7)</span>
               <span className="text-gray-600">·</span>
               <span>US servers</span>
               <span className="text-gray-600">·</span>
@@ -428,7 +428,7 @@ export default async function FallClassic2026Page() {
               {[
                 {
                   title: "Format",
-                  body: "Round robin: every team plays each other once. Matches are best of 14 (first to 8). Rounds and matches may tie. Top 2 go to the final.",
+                  body: "Round robin: every team plays each other once. Matches are best of 12 (first to 7). Rounds and matches may tie. Top 2 go to the final.",
                 },
                 {
                   title: "How rounds are won",
@@ -444,7 +444,7 @@ export default async function FallClassic2026Page() {
                 },
                 {
                   title: "Scheduling",
-                  body: "Any agreed time. One match a week by default; two if both teams agree. If two teams cannot agree on a time, both take 0–14 unless one side is clearly unreasonable.",
+                  body: "Any agreed time. One match a week by default; two if both teams agree. If two teams cannot agree on a time, both take 0–12 unless one side is clearly unreasonable.",
                 },
                 {
                   title: "Forfeits & tiebreakers",
