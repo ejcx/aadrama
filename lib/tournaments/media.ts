@@ -4,7 +4,8 @@ export type MediaSlot = "stream" | "clip"
 
 export type MatchMediaLink = {
   id: string
-  url: string
+  url?: string
+  embedHtml?: string
   title?: string
 }
 
@@ -188,12 +189,67 @@ export function embedSrc(parsed: ParsedMedia, parents: string[]): string {
   return `https://player.twitch.tv/?video=${encodeURIComponent(parsed.id)}&${parent}`
 }
 
+export function looksLikeEmbedHtml(raw: string) {
+  return /^\s*</.test(raw)
+}
+
+export function extractIframeSrc(html: string): string | null {
+  const match = html.match(/<iframe\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/i)
+  return match?.[1] ?? null
+}
+
+export function withTwitchParents(html: string, hosts: string[]) {
+  return html.replace(
+    /src=(["'])(https?:\/\/(?:clips|player)\.twitch\.tv[^"']*)\1/gi,
+    (_full, quote: string, src: string) => {
+      try {
+        const url = new URL(src)
+        url.searchParams.delete("parent")
+        for (const parent of twitchParentParams(hosts)) {
+          url.searchParams.append("parent", parent)
+        }
+        return `src=${quote}${url.toString()}${quote}`
+      } catch {
+        return _full
+      }
+    }
+  )
+}
+
 export function normalizeMediaLink(
-  item: Partial<MatchMediaLink> & { url: string }
+  item: Partial<MatchMediaLink> & { url?: string; embedHtml?: string }
 ): MatchMediaLink | null {
-  const parsed = parseMediaUrl(item.url)
-  if (!parsed) return null
   const title = item.title?.trim()
+  const embedHtml = item.embedHtml?.trim()
+  if (embedHtml && looksLikeEmbedHtml(embedHtml)) {
+    const src = extractIframeSrc(embedHtml)
+    return {
+      id: item.id || crypto.randomUUID(),
+      embedHtml,
+      ...(src ? { url: src } : {}),
+      ...(title ? { title } : {}),
+    }
+  }
+
+  const url = item.url?.trim()
+  if (!url) return null
+  if (looksLikeEmbedHtml(url)) {
+    const src = extractIframeSrc(url)
+    return {
+      id: item.id || crypto.randomUUID(),
+      embedHtml: url,
+      ...(src ? { url: src } : {}),
+      ...(title ? { title } : {}),
+    }
+  }
+  const parsed = parseMediaUrl(url)
+  if (!parsed) {
+    return {
+      id: item.id || crypto.randomUUID(),
+      url,
+      ...(title ? { title } : {}),
+    }
+  }
   return {
     id: item.id || crypto.randomUUID(),
     url: parsed.watchUrl,
@@ -209,13 +265,23 @@ export function normalizeMatchMedia(input: {
     if (!Array.isArray(value)) return []
     return value
       .map((entry) => {
-        if (typeof entry === "string") return normalizeMediaLink({ url: entry })
-        if (entry && typeof entry === "object" && "url" in entry) {
-          const rec = entry as { id?: string; url?: string; title?: string }
-          if (typeof rec.url !== "string") return null
+        if (typeof entry === "string") {
+          return looksLikeEmbedHtml(entry)
+            ? normalizeMediaLink({ embedHtml: entry })
+            : normalizeMediaLink({ url: entry })
+        }
+        if (entry && typeof entry === "object") {
+          const rec = entry as {
+            id?: string
+            url?: string
+            embedHtml?: string
+            title?: string
+          }
           return normalizeMediaLink({
             id: typeof rec.id === "string" ? rec.id : undefined,
-            url: rec.url,
+            url: typeof rec.url === "string" ? rec.url : undefined,
+            embedHtml:
+              typeof rec.embedHtml === "string" ? rec.embedHtml : undefined,
             title: typeof rec.title === "string" ? rec.title : undefined,
           })
         }

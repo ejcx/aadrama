@@ -86,12 +86,16 @@ describe("normalizeMatchMedia", () => {
     expect(matchMediaKey(2, "bart", "drob")).toBe("2:bart:drob")
   })
 
-  it("drops unparseable entries", () => {
+  it("keeps iframe embed payloads", () => {
+    const iframe =
+      '<iframe src="https://www.youtube.com/embed/abc?clip=Ugkx1" allowfullscreen></iframe>'
     const media = normalizeMatchMedia({
-      streams: ["https://example.com/nope"],
-      clips: [],
+      streams: [],
+      clips: [{ embedHtml: iframe, title: "Clip" }],
     })
-    expect(media.streams).toEqual([])
+    expect(media.clips).toHaveLength(1)
+    expect(media.clips[0].embedHtml).toContain("clip=Ugkx1")
+    expect(media.clips[0].title).toBe("Clip")
   })
 })
 

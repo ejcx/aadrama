@@ -11,8 +11,11 @@ import {
 import {
   embedSrc,
   emptyMatchMedia,
+  extractIframeSrc,
+  looksLikeEmbedHtml,
   matchMediaKey,
   parseMediaUrl,
+  withTwitchParents,
   type MatchMedia,
   type MatchMediaLink,
   type ParsedMedia,
@@ -34,13 +37,25 @@ function twitchParents() {
 
 function mediaLabel(item: MatchMediaLink, parsed: ParsedMedia | null) {
   if (item.title) return item.title;
-  if (!parsed) return item.url;
-  if (parsed.kind === "channel") return parsed.id;
-  if (parsed.kind === "clip") return `${parsed.provider} clip`;
-  return `${parsed.provider} VOD`;
+  if (parsed?.kind === "channel") return parsed.id;
+  if (parsed?.kind === "clip") return `${parsed.provider} clip`;
+  if (parsed) return `${parsed.provider} VOD`;
+  if (item.embedHtml) return "Embed";
+  return item.url ?? "Media";
 }
 
-function MediaEmbed({ parsed }: { parsed: ParsedMedia }) {
+function MediaEmbed({ item }: { item: MatchMediaLink }) {
+  if (item.embedHtml) {
+    const html = withTwitchParents(item.embedHtml, twitchParents());
+    return (
+      <div
+        className="aspect-video w-full overflow-hidden rounded-lg bg-black [&_iframe]:h-full [&_iframe]:w-full"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+  }
+  const parsed = item.url ? parseMediaUrl(item.url) : null;
+  if (!parsed) return null;
   const src = embedSrc(parsed, twitchParents());
   return (
     <div className="aspect-video w-full overflow-hidden rounded-lg bg-black">
@@ -53,6 +68,29 @@ function MediaEmbed({ parsed }: { parsed: ParsedMedia }) {
       />
     </div>
   );
+}
+
+function itemFromPayload(
+  raw: string,
+  title: string
+): MatchMediaLink | null {
+  const value = raw.trim();
+  if (!value) return null;
+  if (looksLikeEmbedHtml(value)) {
+    const src = extractIframeSrc(value);
+    return {
+      id: crypto.randomUUID(),
+      embedHtml: value,
+      ...(src ? { url: src } : {}),
+      ...(title.trim() ? { title: title.trim() } : {}),
+    };
+  }
+  const parsed = parseMediaUrl(value);
+  return {
+    id: crypto.randomUUID(),
+    url: parsed?.watchUrl ?? value,
+    ...(title.trim() ? { title: title.trim() } : {}),
+  };
 }
 
 function MediaList({
@@ -76,8 +114,9 @@ function MediaList({
       ) : (
         <ul className="space-y-1.5">
           {items.map((item) => {
-            const parsed = parseMediaUrl(item.url);
+            const parsed = item.url ? parseMediaUrl(item.url) : null;
             const active = item.id === selectedId;
+            const openHref = parsed?.watchUrl ?? item.url;
             return (
               <li key={item.id}>
                 <div
@@ -96,20 +135,24 @@ function MediaList({
                       {mediaLabel(item, parsed)}
                     </span>
                     <span className="block truncate text-[10px] uppercase text-gray-500">
-                      {parsed?.provider ?? "unknown"} ·{" "}
-                      {parsed ? "watch here" : "unrecognized url"}
+                      {item.embedHtml
+                        ? "embed"
+                        : parsed?.provider ?? "unknown"}{" "}
+                      · watch here
                     </span>
                   </button>
-                  <a
-                    href={parsed?.watchUrl ?? item.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="shrink-0 rounded p-1.5 text-gray-500 hover:bg-white/5 hover:text-cyan-300"
-                    aria-label="Open in new tab"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
+                  {openHref && (
+                    <a
+                      href={openHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="shrink-0 rounded p-1.5 text-gray-500 hover:bg-white/5 hover:text-cyan-300"
+                      aria-label="Open in new tab"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  )}
                 </div>
               </li>
             );
@@ -131,28 +174,27 @@ function AdminEditor({
   streams: MatchMediaLink[];
   clips: MatchMediaLink[];
   onChange: (next: MatchMedia) => void;
-  onSave: () => void;
+  onSave: (next: MatchMedia) => void;
   pending: boolean;
   error: string | null;
 }) {
-  const [slot, setSlot] = useState<"stream" | "clip">("stream");
-  const [url, setUrl] = useState("");
+  const [slot, setSlot] = useState<"stream" | "clip">("clip");
+  const [payload, setPayload] = useState("");
   const [title, setTitle] = useState("");
 
+  const withDraft = (): MatchMedia => {
+    const item = itemFromPayload(payload, title);
+    if (!item) return { streams, clips };
+    return slot === "stream"
+      ? { streams: [...streams, item], clips }
+      : { streams, clips: [...clips, item] };
+  };
+
   const add = () => {
-    const parsed = parseMediaUrl(url);
-    if (!parsed) return;
-    const item: MatchMediaLink = {
-      id: crypto.randomUUID(),
-      url: parsed.watchUrl,
-      ...(title.trim() ? { title: title.trim() } : {}),
-    };
-    onChange(
-      slot === "stream"
-        ? { streams: [...streams, item], clips }
-        : { streams, clips: [...clips, item] }
-    );
-    setUrl("");
+    const next = withDraft();
+    if (next.streams === streams && next.clips === clips) return;
+    onChange(next);
+    setPayload("");
     setTitle("");
   };
 
@@ -170,8 +212,8 @@ function AdminEditor({
         Admin
       </h4>
       <p className="mb-3 text-xs text-gray-500">
-        Paste a Twitch or YouTube URL. Streams and clips both embed in this
-        panel.
+        Paste a URL or the full iframe embed HTML, then Save. You do not need
+        to press Add first.
       </p>
       <div className="mb-2 flex gap-2">
         <button
@@ -197,11 +239,12 @@ function AdminEditor({
           Clip
         </button>
       </div>
-      <input
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        placeholder="https://www.twitch.tv/videos/… or youtube.com/…"
-        className="mb-2 w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-200 outline-none focus:border-cyan-500/50"
+      <textarea
+        value={payload}
+        onChange={(e) => setPayload(e.target.value)}
+        rows={4}
+        placeholder='<iframe src="https://www.youtube.com/embed/…?clip=…"></iframe>'
+        className="mb-2 w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 font-mono text-xs text-gray-200 outline-none focus:border-cyan-500/50"
       />
       <input
         value={title}
@@ -213,7 +256,7 @@ function AdminEditor({
         <button
           type="button"
           onClick={add}
-          disabled={!parseMediaUrl(url)}
+          disabled={!payload.trim()}
           className="inline-flex items-center gap-1 rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-200 hover:bg-gray-700 disabled:opacity-40"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -221,7 +264,13 @@ function AdminEditor({
         </button>
         <button
           type="button"
-          onClick={onSave}
+          onClick={() => {
+            const next = withDraft();
+            onChange(next);
+            setPayload("");
+            setTitle("");
+            onSave(next);
+          }}
           disabled={pending}
           className="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-500 disabled:opacity-40"
         >
@@ -241,7 +290,7 @@ function AdminEditor({
               >
                 <span className="truncate">
                   {kind === "stream" ? "Stream" : "Clip"} ·{" "}
-                  {item.title || item.url}
+                  {item.title || item.url || "embed"}
                 </span>
                 <button
                   type="button"
@@ -317,7 +366,6 @@ export default function ScheduleMatches({
   const selected =
     [...media.streams, ...media.clips].find((item) => item.id === selectedId) ??
     null;
-  const selectedParsed = selected ? parseMediaUrl(selected.url) : null;
 
   const homeTeam = openMatch ? getTeam(openMatch.match.home) : null;
   const awayTeam = openMatch ? getTeam(openMatch.match.away) : null;
@@ -349,7 +397,7 @@ export default function ScheduleMatches({
     }
   };
 
-  const save = () => {
+  const save = (next: MatchMedia) => {
     if (!openMatch) return;
     setSaveError(null);
     startTransition(async () => {
@@ -357,8 +405,8 @@ export default function ScheduleMatches({
         week: openMatch.week.week,
         home: openMatch.match.home,
         away: openMatch.match.away,
-        streams: media.streams,
-        clips: media.clips,
+        streams: next.streams,
+        clips: next.clips,
       });
       if (!result.success) {
         setSaveError(result.error ?? "Save failed");
@@ -599,18 +647,20 @@ export default function ScheduleMatches({
                   No tracker session recorded for this match yet.
                 </p>
               )}
-              {selectedParsed && (
+              {selected && (selected.embedHtml || selected.url) && (
                 <div className="mb-4">
-                  <MediaEmbed parsed={selectedParsed} />
-                  <a
-                    href={selectedParsed.watchUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-2 inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300"
-                  >
-                    Open stream in new tab
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
+                  <MediaEmbed item={selected} />
+                  {selected.url && (
+                    <a
+                      href={selected.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300"
+                    >
+                      Open stream in new tab
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
                 </div>
               )}
               <div className="space-y-5">
