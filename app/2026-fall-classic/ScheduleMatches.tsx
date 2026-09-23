@@ -644,22 +644,6 @@ export default function ScheduleMatches({
                   ))}
                 </div>
               )}
-              {selected && (selected.embedHtml || selected.url) && (
-                <div className="mb-6">
-                  <MediaEmbed item={selected} />
-                  {selected.url && (
-                    <a
-                      href={selected.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300"
-                    >
-                      Open stream in new tab
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
-                </div>
-              )}
               {activeSessionId ? (
                 <div className="mb-6">
                   <SessionContent
@@ -680,6 +664,22 @@ export default function ScheduleMatches({
                 <p className="mb-6 text-sm text-gray-500">
                   No tracker session recorded for this match yet.
                 </p>
+              )}
+              {selected && (selected.embedHtml || selected.url) && (
+                <div className="mb-6">
+                  <MediaEmbed item={selected} />
+                  {selected.url && (
+                    <a
+                      href={selected.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300"
+                    >
+                      Open stream in new tab
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
               )}
               <div className="space-y-5">
                 <MediaList
