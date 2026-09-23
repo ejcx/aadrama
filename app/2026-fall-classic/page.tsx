@@ -16,6 +16,9 @@ import { getTournamentMatchMedia } from "./actions";
 import PlayerStatsTable from "./PlayerStatsTable";
 import ScheduleMatches from "./ScheduleMatches";
 
+const RULES_DOC =
+  "https://docs.google.com/document/d/1NnoHCqMDiylvM-hFhmNIBLrMEk3ZfPuaPOFAaz8MWG4/edit?tab=t.0";
+
 export const metadata: Metadata = {
   title: "Fall Classic 2026 — AA Drama",
   description:
@@ -140,6 +143,14 @@ export default async function FallClassic2026Page() {
               <span className="text-gray-600">·</span>
               <span>Finals last week of October</span>
             </div>
+            <a
+              href={RULES_DOC}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-2 text-sm text-gray-400 transition-colors hover:text-white"
+            >
+              Official rules
+            </a>
           </div>
 
           <div className="w-full">
@@ -400,9 +411,19 @@ export default async function FallClassic2026Page() {
           </div>
 
           <div className="w-full">
-            <h3 className="mb-6 text-xl font-bold text-white sm:text-2xl">
-              Rules
-            </h3>
+            <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
+              <h3 className="text-xl font-bold text-white sm:text-2xl">
+                Rules
+              </h3>
+              <a
+                href={RULES_DOC}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-cyan-400 hover:text-cyan-300"
+              >
+                Official rules doc
+              </a>
+            </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {[
                 {
