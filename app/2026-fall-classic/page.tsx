@@ -51,6 +51,11 @@ function PlayerRow({
           ★
         </span>
       )}
+      {player.ringer && (
+        <span className="ml-1 text-[10px] font-semibold uppercase text-orange-400" title="Ringer">
+          ringer
+        </span>
+      )}
     </span>
   );
 
@@ -94,9 +99,16 @@ export default async function FallClassic2026Page() {
   });
 
   const teamsWithElo = TEAMS.map((team) => {
+    const roster = team.players.filter((p) => !p.ringer);
     const sum = teamEloSum(team, elos);
-    const rankedCount = team.players.filter((p) => elos[p.name]?.ranked).length;
-    return { team, sum, avg: sum / team.players.length, rankedCount };
+    const rankedCount = roster.filter((p) => elos[p.name]?.ranked).length;
+    return {
+      team,
+      sum,
+      avg: sum / Math.max(roster.length, 1),
+      rankedCount,
+      rosterSize: roster.length,
+    };
   }).sort((a, b) => b.avg - a.avg);
 
   const eloByTeamId = Object.fromEntries(
@@ -162,7 +174,7 @@ export default async function FallClassic2026Page() {
               players count as {UNRANKED_ELO}). Sorted by average ELO.
             </p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {teamsWithElo.map(({ team, sum, avg, rankedCount }, idx) => (
+              {teamsWithElo.map(({ team, sum, avg, rankedCount, rosterSize }, idx) => (
                 <div
                   key={team.id}
                   className={`rounded-xl bg-gradient-to-br p-[1px] ${team.color}`}
@@ -193,7 +205,7 @@ export default async function FallClassic2026Page() {
                           </div>
                         )}
                         <div className="mt-1 text-xs text-gray-500">
-                          {rankedCount}/{team.players.length} ranked
+                          {rankedCount}/{rosterSize} ranked
                         </div>
                       </div>
                       <div className="text-right">

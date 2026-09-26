@@ -4,6 +4,7 @@ export type TournamentPlayer = {
   name: string
   aliases: string[]
   captain?: boolean
+  ringer?: boolean
 }
 
 export type TournamentTeam = {
@@ -144,6 +145,25 @@ export const MATCH_RESULTS: MatchResult[] = [
       },
     ],
   },
+  {
+    week: 2,
+    home: "junk",
+    away: "joe",
+    maps: [
+      {
+        name: "MOUT McKenna",
+        homeScore: 2,
+        awayScore: 10,
+        sessionId: "185.150.189.120:1797_1790455965",
+      },
+      {
+        name: "Bridge SE",
+        homeScore: 1,
+        awayScore: 9,
+        sessionId: "185.150.189.120:1797_1790458334",
+      },
+    ],
+  },
 ]
 
 export type ScheduleWeek = {
@@ -179,6 +199,8 @@ export const TEAMS: TournamentTeam[] = [
       { name: "convix", aliases: ["convix"] },
       { name: "desi", aliases: ["desi"] },
       { name: "confusion", aliases: ["confusion"] },
+      { name: "Hill", aliases: ["hill"], ringer: true },
+      { name: "Army", aliases: ["army", "Army-=Of-God=-"], ringer: true },
     ],
   },
   {
@@ -394,20 +416,57 @@ function nameVariants(name: string) {
   return stripped === lower ? [lower] : [lower, stripped]
 }
 
-export function resolveRosterPlayer(trackerName: string) {
+function playerMatchesTracker(player: TournamentPlayer, trackerName: string) {
   const incoming = nameVariants(trackerName)
+  const aliases = [player.name, ...player.aliases]
+  return aliases.some((alias) => {
+    const known = nameVariants(alias)
+    return incoming.some((v) => known.indexOf(v) !== -1)
+  })
+}
+
+export function resolveRosterMatches(trackerName: string) {
+  const matches: { team: TournamentTeam; player: TournamentPlayer }[] = []
   for (const team of TEAMS) {
     for (const player of team.players) {
-      const aliases = [player.name, ...player.aliases]
-      const matches = aliases.some((alias) => {
-        const known = nameVariants(alias)
-        return incoming.some((v) => known.indexOf(v) !== -1)
-      })
-      if (matches) {
-        return { team, player }
+      if (playerMatchesTracker(player, trackerName)) {
+        matches.push({ team, player })
       }
     }
   }
+  return matches
+}
+
+export function resolveRosterPlayer(
+  trackerName: string,
+  sessionNames: string[] = []
+) {
+  const matches = resolveRosterMatches(trackerName)
+  if (matches.length === 0) return
+  if (matches.length === 1) return matches[0]
+
+  if (sessionNames.length > 0) {
+    const others = sessionNames.filter(
+      (name) => name.toLowerCase() !== trackerName.toLowerCase()
+    )
+    const scored = matches.map((match) => {
+      const teammates = others.filter((name) =>
+        match.team.players.some(
+          (player) =>
+            player.name !== match.player.name &&
+            playerMatchesTracker(player, name)
+        )
+      ).length
+      return { match, teammates }
+    })
+    scored.sort((a, b) => {
+      if (b.teammates !== a.teammates) return b.teammates - a.teammates
+      return Number(a.match.player.ringer) - Number(b.match.player.ringer)
+    })
+    return scored[0].match
+  }
+
+  return matches.find((match) => !match.player.ringer) ?? matches[0]
 }
 
 export type PlayerStatLine = {
@@ -442,8 +501,18 @@ export function annotateStatLines(
   }[],
   displayByRoster: Record<string, string> = {}
 ): PlayerStatLine[] {
+  const namesBySession = new Map<string, string[]>()
+  for (const row of rows) {
+    const list = namesBySession.get(row.sessionId)
+    if (list) list.push(row.name)
+    else namesBySession.set(row.sessionId, [row.name])
+  }
+
   return rows.map((row) => {
-    const resolved = resolveRosterPlayer(row.name)
+    const resolved = resolveRosterPlayer(
+      row.name,
+      namesBySession.get(row.sessionId) ?? []
+    )
     const rosterName = resolved?.player.name ?? null
     const displayName =
       (rosterName && displayByRoster[rosterName]) ||
@@ -495,7 +564,7 @@ export function aggregatePlayerStats(lines: PlayerStatLine[]): TournamentPlayerS
 
   for (const line of lines) {
     if (line.kills + line.deaths === 0) continue
-    const key = line.rosterName ?? line.trackerName.toLowerCase()
+    const key = `${line.rosterName ?? line.trackerName.toLowerCase()}::${line.teamId ?? ""}`
     const existing = byKey.get(key)
     if (existing) {
       existing.kills += line.kills
@@ -533,9 +602,11 @@ export function teamEloSum(
   team: TournamentTeam,
   elos: Record<string, { elo: number } | undefined>
 ) {
-  return team.players.reduce((sum, player) => {
-    return sum + (elos[player.name]?.elo ?? UNRANKED_ELO)
-  }, 0)
+  return team.players
+    .filter((player) => !player.ringer)
+    .reduce((sum, player) => {
+      return sum + (elos[player.name]?.elo ?? UNRANKED_ELO)
+    }, 0)
 }
 
 export type StandingRow = {

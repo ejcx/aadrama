@@ -97,11 +97,11 @@ describe("Fall Classic match results", () => {
       roundsAgainst: 22,
     })
     expect(standings.joe).toMatchObject({
-      wins: 2,
+      wins: 4,
       losses: 0,
       ties: 0,
-      roundsFor: 15,
-      roundsAgainst: 9,
+      roundsFor: 34,
+      roundsAgainst: 12,
     })
     expect(standings.farmer).toMatchObject({
       wins: 0,
@@ -119,13 +119,13 @@ describe("Fall Classic match results", () => {
     })
     expect(standings.junk).toMatchObject({
       wins: 0,
-      losses: 2,
+      losses: 4,
       ties: 0,
-      roundsFor: 5,
-      roundsAgainst: 19,
+      roundsFor: 8,
+      roundsAgainst: 38,
     })
-    expect(calculateStandings()[0].teamId).toBe("drob")
-    expect(calculateStandings()[1].teamId).toBe("joe")
+    expect(calculateStandings()[0].teamId).toBe("joe")
+    expect(calculateStandings()[1].teamId).toBe("drob")
   })
 
   it("stores week 2 bart vs drob as two High T map wins", () => {
@@ -170,6 +170,27 @@ describe("Fall Classic match results", () => {
     expect(seriesScore(match!)).toEqual({ homeScore: 9, awayScore: 13 })
   })
 
+  it("stores week 2 Team Poland vs WWJD as two WWJD map wins", () => {
+    const match = MATCH_RESULTS.find(
+      (m) => m.week === 2 && m.home === "junk" && m.away === "joe"
+    )
+    expect(match?.maps).toEqual([
+      {
+        name: "MOUT McKenna",
+        homeScore: 2,
+        awayScore: 10,
+        sessionId: "185.150.189.120:1797_1790455965",
+      },
+      {
+        name: "Bridge SE",
+        homeScore: 1,
+        awayScore: 9,
+        sessionId: "185.150.189.120:1797_1790458334",
+      },
+    ])
+    expect(seriesScore(match!)).toEqual({ homeScore: 3, awayScore: 19 })
+  })
+
   it("stores week 1 Team Poland vs bum ba da da as two bart map wins", () => {
     const match = MATCH_RESULTS.find(
       (m) => m.week === 1 && m.home === "junk" && m.away === "bart"
@@ -204,6 +225,12 @@ describe("Fall Classic match results", () => {
     expect(resolveRosterPlayer("bananainpyjama")?.player.name).toBe("Banana")
     expect(resolveRosterPlayer("Army-=Of-God=-")?.player.name).toBe("Army")
     expect(resolveRosterPlayer("Army-=Of-God=-")?.team.id).toBe("farmer")
+    expect(
+      resolveRosterPlayer("Army-=Of-God=-", ["JoE131", "hill", "confusion"])
+        ?.team.id
+    ).toBe("joe")
+    expect(resolveRosterPlayer("hill")?.player.ringer).toBe(true)
+    expect(resolveRosterPlayer("hill")?.team.id).toBe("joe")
   })
 
   it("aggregates kills and deaths and skips spectators", () => {
