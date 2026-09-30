@@ -83,11 +83,11 @@ describe("Fall Classic match results", () => {
       calculateStandings().map((row) => [row.teamId, row])
     )
     expect(standings.intro).toMatchObject({
-      wins: 2,
-      losses: 1,
+      wins: 3,
+      losses: 2,
       ties: 1,
-      roundsFor: 27,
-      roundsAgainst: 19,
+      roundsFor: 39,
+      roundsAgainst: 31,
     })
     expect(standings.drob).toMatchObject({
       wins: 3,
@@ -97,11 +97,11 @@ describe("Fall Classic match results", () => {
       roundsAgainst: 22,
     })
     expect(standings.joe).toMatchObject({
-      wins: 4,
-      losses: 0,
+      wins: 5,
+      losses: 1,
       ties: 0,
-      roundsFor: 34,
-      roundsAgainst: 12,
+      roundsFor: 46,
+      roundsAgainst: 24,
     })
     expect(standings.farmer).toMatchObject({
       wins: 0,
@@ -189,6 +189,27 @@ describe("Fall Classic match results", () => {
       },
     ])
     expect(seriesScore(match!)).toEqual({ homeScore: 3, awayScore: 19 })
+  })
+
+  it("stores week 3 joe vs intro as a split", () => {
+    const match = MATCH_RESULTS.find(
+      (m) => m.week === 3 && m.home === "joe" && m.away === "intro"
+    )
+    expect(match?.maps).toEqual([
+      {
+        name: "Pipeline",
+        homeScore: 8,
+        awayScore: 4,
+        sessionId: "185.150.189.120:1797_1790731764",
+      },
+      {
+        name: "SF Sandstorm",
+        homeScore: 4,
+        awayScore: 8,
+        sessionId: "185.150.189.120:1797_1790734774",
+      },
+    ])
+    expect(seriesScore(match!)).toEqual({ homeScore: 12, awayScore: 12 })
   })
 
   it("stores week 1 Team Poland vs bum ba da da as two bart map wins", () => {
