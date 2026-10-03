@@ -52,8 +52,11 @@ function PlayerRow({
         </span>
       )}
       {player.ringer && (
-        <span className="ml-1 text-[10px] font-semibold uppercase text-orange-400" title="Ringer">
-          ringer
+        <span
+          className="ml-1 text-[10px] font-semibold uppercase text-orange-400"
+          title={player.ringerFor ? `Ringer for ${player.ringerFor}` : "Ringer"}
+        >
+          ringer{player.ringerFor ? ` · ${player.ringerFor}` : ""}
         </span>
       )}
     </span>
@@ -170,7 +173,8 @@ export default async function FallClassic2026Page() {
               Teams
             </h3>
             <p className="mb-6 text-sm text-gray-500">
-              ★ captain. Collective ELO is the sum of the roster (unranked
+              ★ captain. Ringers are listed on the roster but excluded from
+              team ELO. Collective ELO is the sum of the roster (unranked
               players count as {UNRANKED_ELO}). Sorted by average ELO.
             </p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

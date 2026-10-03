@@ -294,6 +294,16 @@ describe("Fall Classic match results", () => {
     ).toBe("joe")
     expect(resolveRosterPlayer("hill")?.player.ringer).toBe(true)
     expect(resolveRosterPlayer("hill")?.team.id).toBe("joe")
+    expect(resolveRosterPlayer("nx.budd;")?.team.id).toBe("drob")
+    expect(resolveRosterPlayer("nx.budd;")?.player).toMatchObject({
+      ringer: true,
+      ringerFor: "Xeno",
+    })
+    expect(resolveRosterPlayer("Scott")?.team.id).toBe("farmer")
+    expect(resolveRosterPlayer("Scott")?.player).toMatchObject({
+      ringer: true,
+      ringerFor: "Mediocre",
+    })
   })
 
   it("aggregates kills and deaths and skips spectators", () => {

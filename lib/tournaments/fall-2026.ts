@@ -5,6 +5,7 @@ export type TournamentPlayer = {
   aliases: string[]
   captain?: boolean
   ringer?: boolean
+  ringerFor?: string
 }
 
 export type TournamentTeam = {
@@ -271,6 +272,12 @@ export const TEAMS: TournamentTeam[] = [
       { name: "Mediocre", aliases: ["di.mediocre", "mediocre"] },
       { name: "Bryguy", aliases: ["bryguy"] },
       { name: "Army", aliases: ["army", "Army-=Of-God=-"] },
+      {
+        name: "Scott",
+        aliases: ["scott"],
+        ringer: true,
+        ringerFor: "Mediocre",
+      },
     ],
   },
   {
@@ -283,6 +290,12 @@ export const TEAMS: TournamentTeam[] = [
       { name: "Re1ativity2", aliases: ["re1ativity2"] },
       { name: "Xeno", aliases: ["xeno", "xenotype"] },
       { name: "Chaos", aliases: ["chaos88", "chaos"] },
+      {
+        name: "Budd",
+        aliases: ["budd", "nx.budd;"],
+        ringer: true,
+        ringerFor: "Xeno",
+      },
     ],
   },
   {
