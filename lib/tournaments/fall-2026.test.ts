@@ -97,11 +97,11 @@ describe("Fall Classic match results", () => {
       roundsAgainst: 30,
     })
     expect(standings.joe).toMatchObject({
-      wins: 5,
-      losses: 1,
+      wins: 6,
+      losses: 2,
       ties: 0,
-      roundsFor: 46,
-      roundsAgainst: 24,
+      roundsFor: 57,
+      roundsAgainst: 36,
     })
     expect(standings.farmer).toMatchObject({
       wins: 2,
@@ -111,11 +111,11 @@ describe("Fall Classic match results", () => {
       roundsAgainst: 37,
     })
     expect(standings.bart).toMatchObject({
-      wins: 2,
-      losses: 4,
+      wins: 3,
+      losses: 5,
       ties: 0,
-      roundsFor: 36,
-      roundsAgainst: 34,
+      roundsFor: 48,
+      roundsAgainst: 45,
     })
     expect(standings.junk).toMatchObject({
       wins: 0,
@@ -252,6 +252,27 @@ describe("Fall Classic match results", () => {
       },
     ])
     expect(seriesScore(match!)).toEqual({ homeScore: 15, awayScore: 9 })
+  })
+
+  it("stores week 5 joe vs bart as a split", () => {
+    const match = MATCH_RESULTS.find(
+      (m) => m.week === 5 && m.home === "joe" && m.away === "bart"
+    )
+    expect(match?.maps).toEqual([
+      {
+        name: "Woodland Outpost",
+        homeScore: 5,
+        awayScore: 7,
+        sessionId: "185.150.189.120:1777_1791060716",
+      },
+      {
+        name: "Urban Assault",
+        homeScore: 6,
+        awayScore: 5,
+        sessionId: "185.150.189.120:1797_1791063347",
+      },
+    ])
+    expect(seriesScore(match!)).toEqual({ homeScore: 11, awayScore: 12 })
   })
 
   it("stores week 1 Team Poland vs bum ba da da as two bart map wins", () => {
