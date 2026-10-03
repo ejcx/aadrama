@@ -90,11 +90,11 @@ describe("Fall Classic match results", () => {
       roundsAgainst: 31,
     })
     expect(standings.drob).toMatchObject({
-      wins: 3,
+      wins: 5,
       losses: 1,
       ties: 0,
-      roundsFor: 24,
-      roundsAgainst: 22,
+      roundsFor: 40,
+      roundsAgainst: 30,
     })
     expect(standings.joe).toMatchObject({
       wins: 5,
@@ -104,25 +104,25 @@ describe("Fall Classic match results", () => {
       roundsAgainst: 24,
     })
     expect(standings.farmer).toMatchObject({
-      wins: 0,
+      wins: 2,
       losses: 3,
       ties: 1,
-      roundsFor: 18,
-      roundsAgainst: 28,
+      roundsFor: 33,
+      roundsAgainst: 37,
     })
     expect(standings.bart).toMatchObject({
       wins: 2,
-      losses: 2,
+      losses: 4,
       ties: 0,
-      roundsFor: 27,
-      roundsAgainst: 19,
+      roundsFor: 36,
+      roundsAgainst: 34,
     })
     expect(standings.junk).toMatchObject({
       wins: 0,
-      losses: 4,
+      losses: 6,
       ties: 0,
-      roundsFor: 8,
-      roundsAgainst: 38,
+      roundsFor: 16,
+      roundsAgainst: 54,
     })
     expect(calculateStandings()[0].teamId).toBe("joe")
     expect(calculateStandings()[1].teamId).toBe("drob")
@@ -210,6 +210,48 @@ describe("Fall Classic match results", () => {
       },
     ])
     expect(seriesScore(match!)).toEqual({ homeScore: 12, awayScore: 12 })
+  })
+
+  it("stores week 3 drob vs junk as two High T map wins", () => {
+    const match = MATCH_RESULTS.find(
+      (m) => m.week === 3 && m.home === "drob" && m.away === "junk"
+    )
+    expect(match?.maps).toEqual([
+      {
+        name: "Pipeline",
+        homeScore: 7,
+        awayScore: 5,
+        sessionId: "185.150.189.120:1797_1791057869",
+      },
+      {
+        name: "SF Sandstorm",
+        homeScore: 9,
+        awayScore: 3,
+        sessionId: "185.150.189.120:1797_1791060143",
+      },
+    ])
+    expect(seriesScore(match!)).toEqual({ homeScore: 16, awayScore: 8 })
+  })
+
+  it("stores week 3 farmer vs bart as two Hotdog map wins", () => {
+    const match = MATCH_RESULTS.find(
+      (m) => m.week === 3 && m.home === "farmer" && m.away === "bart"
+    )
+    expect(match?.maps).toEqual([
+      {
+        name: "Pipeline",
+        homeScore: 7,
+        awayScore: 5,
+        sessionId: "185.150.189.120:1797_1791052306",
+      },
+      {
+        name: "SF Sandstorm",
+        homeScore: 8,
+        awayScore: 4,
+        sessionId: "185.150.189.120:1797_1791055418",
+      },
+    ])
+    expect(seriesScore(match!)).toEqual({ homeScore: 15, awayScore: 9 })
   })
 
   it("stores week 1 Team Poland vs bum ba da da as two bart map wins", () => {
