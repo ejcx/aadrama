@@ -25,6 +25,8 @@ import {
   getRerollStatus,
   voteMapReroll,
   getMapRerollStatus,
+  voteMapVeto,
+  getMapVetoStatus,
   getPotatoVoteStatus,
   votePotato,
   setCaptains,
@@ -33,8 +35,10 @@ import {
   type DraftStatus,
   type RerollStatus,
   type MapRerollStatus,
+  type MapVetoStatus,
   type PotatoVoteStatus,
 } from "../actions";
+import MapVetoPanel from "../../components/MapVetoPanel";
 import type { ScrimWithCounts, ScrimPlayer, ScrimScoreSubmission } from "@/lib/supabase/types";
 import { SessionContent } from "../../tracker/session/SessionContent";
 
@@ -110,6 +114,7 @@ export default function ScrimDetailClient() {
     const [scoreSubmissions, setScoreSubmissions] = useState<ScrimScoreSubmission[]>([]);
     const [rerollStatus, setRerollStatus] = useState<RerollStatus | null>(null);
     const [mapRerollStatus, setMapRerollStatus] = useState<MapRerollStatus | null>(null);
+    const [mapVetoStatus, setMapVetoStatus] = useState<MapVetoStatus | null>(null);
     const [potatoStatus, setPotatoStatus] = useState<PotatoVoteStatus | null>(null);
     const [eloChanges, setEloChanges] = useState<Map<string, { change: number; eloBefore: number; eloAfter: number }>>(new Map());
     const [playerElos, setPlayerElos] = useState<Map<string, number>>(new Map()); // gameNameLower -> current elo (for non-finalized scrims)
@@ -181,7 +186,10 @@ export default function ScrimDetailClient() {
         data.players.length % 2 === 0 &&
         everyoneReady;
 
-      if (scrimData.status === "waiting" && readyToStart) {
+      // A veto scrim cannot start until its map vote is decided. The vote poll below handles that.
+      const awaitingMapVote = scrimData.map_choice === "veto" && !scrimData.map;
+
+      if (scrimData.status === "waiting" && readyToStart && !awaitingMapVote) {
         try {
           await tryStartGameIfReady(scrimId);
           const refreshed = await getScrimDetails(scrimId);
@@ -243,7 +251,7 @@ export default function ScrimDetailClient() {
           console.error("Failed to load reroll status:", err);
         }
 
-        if (scrimData.map_choice === "tiered" && scrimData.map) {
+        if ((scrimData.map_choice === "tiered" || scrimData.map_choice === "veto") && scrimData.map) {
           try {
             const mapStatus = await getMapRerollStatus(scrimId);
             setMapRerollStatus(mapStatus);
@@ -257,6 +265,25 @@ export default function ScrimDetailClient() {
       } else {
         setRerollStatus(null);
         setMapRerollStatus(null);
+      }
+
+      // Veto: players vote in the lobby, and again after a map reroll
+      if (
+        scrimData.map_choice === "veto" &&
+        (scrimData.status === "waiting" || scrimData.status === "in_progress")
+      ) {
+        try {
+          const vetoStatus = await getMapVetoStatus(scrimId);
+          setMapVetoStatus(vetoStatus);
+          // Vote just finished: show the chosen map in the header.
+          if (vetoStatus?.winner && !scrimData.map) {
+            setScrim((current) => (current ? { ...current, map: vetoStatus.winner } : current));
+          }
+        } catch (err) {
+          console.error("Failed to load map vote status:", err);
+        }
+      } else {
+        setMapVetoStatus(null);
       }
 
       // Load draft status while captains are picking teams
@@ -286,6 +313,15 @@ export default function ScrimDetailClient() {
       setError(err instanceof Error ? err.message : "Failed to load scrim");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleMapVote(map: string) {
+    try {
+      setMapVetoStatus(await voteMapVeto(scrimId, map));
+      await loadScrimData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to vote");
     }
   }
 
@@ -350,11 +386,18 @@ export default function ScrimDetailClient() {
                 ? `🗺️ ${scrim.map}`
                 : scrim.map_choice === "tiered"
                   ? "🗺️ TIERED (pending)"
-                  : scrim.title || `Scrim #${scrim.id.slice(0, 8)}`}
+                  : scrim.map_choice === "veto"
+                    ? "🗺️ VETO (voting)"
+                    : scrim.title || `Scrim #${scrim.id.slice(0, 8)}`}
             </h1>
             {scrim.map_choice === "tiered" && (
               <span className="px-2 py-1 rounded-full text-xs font-medium bg-cyan-900/40 text-cyan-300 border border-cyan-700/40">
                 TIERED
+              </span>
+            )}
+            {scrim.map_choice === "veto" && (
+              <span className="px-2 py-1 rounded-full text-xs font-medium bg-cyan-900/40 text-cyan-300 border border-cyan-700/40">
+                VETO
               </span>
             )}
                       {scrim.is_ranked && (
@@ -370,6 +413,11 @@ export default function ScrimDetailClient() {
           {scrim.map_choice === "tiered" && !scrim.map && (
             <p className="text-cyan-400/80 text-sm mt-2">
               Map will be assigned from the tiered pool once teams are set.
+            </p>
+          )}
+          {scrim.map_choice === "veto" && scrim.status === "waiting" && (
+            <p className="text-cyan-400/80 text-sm mt-2">
+              Ready up to vote for the map. Teams are picked after the map is decided.
             </p>
           )}
           {scrim.status === "waiting" && <ExpiresIn expiresAt={scrim.expires_at} />}
@@ -523,7 +571,18 @@ export default function ScrimDetailClient() {
               {players.length >= 2 && players.every(p => p.is_ready) && players.length % 2 === 0 && (
                 <p className="text-green-400 text-sm mt-4">
                   ✓ All players ready! Game will start automatically
+                  {scrim.map_choice === "veto" && " once the map vote is decided"}
                 </p>
+              )}
+
+              {/* Map vote (veto scrims, before teams are picked) */}
+              {mapVetoStatus && (
+                <MapVetoPanel
+                  status={mapVetoStatus}
+                  disabled={isPending}
+                  className="mt-6"
+                  onVote={handleMapVote}
+                />
               )}
 
               {/* Captain selection (creator, captains mode) */}
@@ -688,6 +747,16 @@ export default function ScrimDetailClient() {
           {/* Teams (in_progress, scoring, finalized) */}
           {(scrim.status === "in_progress" || scrim.status === "scoring" || scrim.status === "finalized") && (
             <>
+              {/* Map vote result, or the new vote after a map reroll (veto scrims) */}
+              {scrim.status === "in_progress" && mapVetoStatus && (
+                <MapVetoPanel
+                  status={mapVetoStatus}
+                  disabled={isPending}
+                  className="mb-6"
+                  onVote={handleMapVote}
+                />
+              )}
+
               <h2 className="text-white text-xl font-semibold mb-4">Teams</h2>
               {(() => {
                 // Get player ELO - use historical elo_before for finalized scrims, current elo otherwise
@@ -832,10 +901,17 @@ export default function ScrimDetailClient() {
                     </div>
                   </div>
                   
-                  <p className="text-gray-400 text-sm mb-3">
-                    If teams seem unfair, players can vote to randomly reroll them.
-                    <span className="text-yellow-500"> Warning: Rerolled teams are completely random and may be even more unbalanced!</span>
-                  </p>
+                  {scrim.map_choice === "veto" && scrim.selection_mode !== "random" ? (
+                    <p className="text-gray-400 text-sm mb-3">
+                      If teams seem unfair, players can vote to reroll them.
+                      <span className="text-yellow-500"> Rerolled teams are balanced by ELO again.</span>
+                    </p>
+                  ) : (
+                    <p className="text-gray-400 text-sm mb-3">
+                      If teams seem unfair, players can vote to randomly reroll them.
+                      <span className="text-yellow-500"> Warning: Rerolled teams are completely random and may be even more unbalanced!</span>
+                    </p>
+                  )}
                   
                   {/* Progress bar */}
                   <div className="h-2 bg-gray-700 rounded-full mb-3 overflow-hidden">
@@ -880,10 +956,11 @@ export default function ScrimDetailClient() {
                 </div>
               )}
 
-              {/* Reroll Map Section (tiered only, after map assigned) */}
+              {/* Reroll Map Section (tiered and veto, after map assigned) */}
               {scrim.status === "in_progress" &&
-                scrim.map_choice === "tiered" &&
-                !!scrim.map && (
+                (scrim.map_choice === "tiered" || scrim.map_choice === "veto") &&
+                !!scrim.map &&
+                !mapVetoStatus?.open && (
                 <div className="mt-6 p-4 bg-cyan-900/20 border border-cyan-700/50 rounded-lg">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-cyan-400 font-semibold">🗺️ Reroll Map</h3>
@@ -895,10 +972,17 @@ export default function ScrimDetailClient() {
                     </div>
                   </div>
 
-                  <p className="text-gray-400 text-sm mb-3">
-                    Don&apos;t like the rolled map? Players can vote to pick another from the tiered pool.
-                    <span className="text-cyan-400"> The current map ({scrim.map}) will be excluded from the reroll.</span>
-                  </p>
+                  {scrim.map_choice === "veto" ? (
+                    <p className="text-gray-400 text-sm mb-3">
+                      Don&apos;t like the voted map? Players can vote for a new set of 4 maps from the tiered pool and vote again.
+                      <span className="text-cyan-400"> None of the current 4 options will be offered again.</span>
+                    </p>
+                  ) : (
+                    <p className="text-gray-400 text-sm mb-3">
+                      Don&apos;t like the rolled map? Players can vote to pick another from the tiered pool.
+                      <span className="text-cyan-400"> The current map ({scrim.map}) will be excluded from the reroll.</span>
+                    </p>
+                  )}
 
                   <div className="h-2 bg-gray-700 rounded-full mb-3 overflow-hidden">
                     <div
@@ -923,7 +1007,9 @@ export default function ScrimDetailClient() {
                             alert(
                               result.newMap
                                 ? `Map rerolled to ${result.newMap}!`
-                                : "Map has been rerolled!"
+                                : scrim.map_choice === "veto"
+                                  ? "Map reroll passed. Vote on the 4 new maps."
+                                  : "Map has been rerolled!"
                             );
                             await loadScrimData();
                           }

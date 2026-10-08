@@ -19,6 +19,7 @@ import {
   season1EloFromChanges,
 } from '@/lib/scrim/seasons'
 import { isCaptainsPickBlocked } from '@/lib/scrim/captains-pick'
+import { tallyVetoVotes, type VetoOptionTally } from '@/lib/scrim/veto'
 import { playerCountForFormat, type ScrimFormat } from '@/lib/scrim/format'
 import { ADMIN_USER_ID } from '@/lib/admin'
 
@@ -42,7 +43,8 @@ export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
   }
   const supabase = await createClient()
 
-  const mapChoice = input?.map_choice === 'tiered' ? 'tiered' : 'manual'
+  const mapChoice: MapChoice =
+    input?.map_choice === 'tiered' || input?.map_choice === 'veto' ? input.map_choice : 'manual'
   if (mapChoice === 'manual' && !input?.map) {
     throw new Error('Map is required')
   }
@@ -53,7 +55,7 @@ export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
       created_by: userId,
       created_by_name: userName,
       title: input?.title || null,
-      map: mapChoice === 'tiered' ? null : (input?.map || null),
+      map: mapChoice === 'manual' ? (input?.map || null) : null,
       map_choice: mapChoice,
       max_players_per_team: input?.max_players_per_team || 8,
       min_players_per_team: input?.min_players_per_team || 4, // 4v4 minimum
@@ -299,6 +301,19 @@ async function checkAndStartGame(scrimId: string): Promise<void> {
     return
   }
 
+  // Veto scrims pick the map before teams, so wait until the vote is decided
+  if (scrim.map_choice === 'veto') {
+    const { data: vetoMap, error: vetoError } = await supabase.rpc('sync_map_veto', { p_scrim_id: scrimId })
+    if (vetoError) {
+      console.error(`[Scrim ${scrimId}] sync_map_veto failed:`, vetoError)
+      throw new Error(`Failed to check map vote: ${vetoError.message}`)
+    }
+    if (!vetoMap) {
+      console.log(`[Scrim ${scrimId}] Map vote still open - not starting yet`)
+      return
+    }
+  }
+
   // All conditions met - check selection mode
   console.log(`[Scrim ${scrimId}] All conditions met! Checking selection mode...`)
 
@@ -357,7 +372,19 @@ export async function endGame(scrimId: string): Promise<void> {
   if (scrim.created_by !== userId && !isParticipant) {
     throw new Error('Not authorized to end this game')
   }
-  
+
+  // A veto scrim must not reach scoring without a map. Close any open vote
+  // before and after the status change, in case a map reroll lands in between.
+  const closeMapVote = async () => {
+    if (scrim.map_choice !== 'veto') return
+    const { error: vetoError } = await supabase.rpc('sync_map_veto', {
+      p_scrim_id: scrimId,
+      p_force: true,
+    })
+    if (vetoError) throw new Error(`Failed to close map vote: ${vetoError.message}`)
+  }
+  await closeMapVote()
+
   const { error } = await supabase
     .from('scrims')
     .update({
@@ -367,7 +394,9 @@ export async function endGame(scrimId: string): Promise<void> {
     .eq('id', scrimId)
   
   if (error) throw new Error(`Failed to end game: ${error.message}`)
-  
+
+  await closeMapVote()
+
   revalidatePath('/scrim')
 }
 
@@ -1102,7 +1131,11 @@ export async function voteReroll(scrimId: string): Promise<{ rerolled: boolean; 
   // Check if reroll threshold is met and execute if so
   let rerolled = false
   if (newVote) {
-    const { data: rerollResult, error: rerollError } = await supabase.rpc('check_and_execute_reroll', { p_scrim_id: scrimId })
+    // Veto scrims balance by ELO again. Everything else rerolls purely at random.
+    const { data: rerollResult, error: rerollError } = await supabase.rpc(
+      scrim.map_choice === 'veto' ? 'check_and_execute_veto_team_reroll' : 'check_and_execute_reroll',
+      { p_scrim_id: scrimId }
+    )
     
     if (rerollError) {
       console.error('Failed to check/execute reroll:', rerollError)
@@ -1194,7 +1227,7 @@ export async function voteMapReroll(
   if (scrim.status !== 'in_progress') {
     throw new Error('Can only vote for map reroll during in_progress phase')
   }
-  if (scrim.map_choice !== 'tiered') {
+  if (scrim.map_choice !== 'tiered' && scrim.map_choice !== 'veto') {
     throw new Error('Map reroll is only available for tiered (random map) scrims')
   }
   if (!scrim.map) {
@@ -1228,7 +1261,18 @@ export async function voteMapReroll(
   let rerolled = false
   let newMap: string | null = null
 
-  if (newVote) {
+  if (newVote && scrim.map_choice === 'veto') {
+    // Veto: 4 new maps and a new vote (newMap stays null until that vote ends)
+    const { data: rerollResult, error: rerollError } = await supabase.rpc(
+      'check_and_execute_veto_map_reroll',
+      { p_scrim_id: scrimId }
+    )
+    if (rerollError) {
+      console.error('Failed to check/execute veto map reroll:', rerollError)
+      throw new Error(`Map reroll vote saved, but could not execute reroll: ${rerollError.message}`)
+    }
+    rerolled = rerollResult === true
+  } else if (newVote) {
     const { data: rerollResult, error: rerollError } = await supabase.rpc(
       'check_and_execute_map_reroll',
       { p_scrim_id: scrimId }
@@ -1251,6 +1295,117 @@ export async function voteMapReroll(
 
   const status = await getMapRerollStatus(scrimId)
   return { rerolled, newMap, status }
+}
+
+// ==================== MAP VETO ====================
+
+export interface MapVetoStatus {
+  /** Voting is still open (no map chosen yet) */
+  open: boolean
+  /** lobby = before teams are picked; reroll = new vote after a map reroll */
+  phase: 'lobby' | 'reroll'
+  options: VetoOptionTally[]
+  totalPlayers: number
+  votesCast: number
+  /** Seconds until the vote closes, once it is on the clock (lobby full and ready, or a map reroll) */
+  secondsLeft: number | null
+  winner: string | null
+  /** The winner was picked at random between tied maps */
+  tiebreak: boolean
+  myVote: string | null
+  canVote: boolean
+  /** In the scrim but not readied up yet, so cannot vote */
+  needsReady: boolean
+}
+
+const VETO_VOTE_STATUSES = ['waiting', 'in_progress', 'scoring']
+
+/** Vote state for a veto scrim, or null for other map choices. */
+export async function getMapVetoStatus(scrimId: string): Promise<MapVetoStatus | null> {
+  const supabase = await createClient()
+
+  const readScrim = () =>
+    supabase
+      .from('scrims')
+      .select('status, map, map_choice, veto_maps, veto_ends_at, veto_tiebreak')
+      .eq('id', scrimId)
+      .single()
+
+  let { data: scrim, error } = await readScrim()
+  if (error || !scrim || scrim.map_choice !== 'veto') return null
+
+  // While the map is undecided, draw the options if needed and close the vote
+  // once it is decided. A decided map is final, so there is nothing to do after.
+  if (!scrim.map && VETO_VOTE_STATUSES.includes(scrim.status)) {
+    const { error: syncError } = await supabase.rpc('sync_map_veto', { p_scrim_id: scrimId })
+    if (syncError) throw new Error(`Failed to update map vote: ${syncError.message}`)
+    ;({ data: scrim, error } = await readScrim())
+    if (error || !scrim) return null
+  }
+
+  if (!scrim.veto_maps?.length) return null
+
+  const { data: players, error: playersError } = await supabase
+    .from('scrim_players')
+    .select('user_id, user_name, is_ready, team, veto_map_vote')
+    .eq('scrim_id', scrimId)
+
+  if (playersError) throw new Error(`Failed to get map votes: ${playersError.message}`)
+
+  // Until teams exist (lobby, captains draft) every player counts and ready
+  // players vote. After that it is the players on a team.
+  const phase = scrim.status === 'waiting' || scrim.status === 'drafting' ? 'lobby' : 'reroll'
+  const everyone = (players || []).filter((p) => phase === 'lobby' || p.team !== null)
+  const voters = everyone.filter((p) => phase === 'reroll' || p.is_ready)
+  const options = tallyVetoVotes(scrim.veto_maps, voters)
+
+  const { userId } = await auth()
+  const me = everyone.find((p) => p.user_id === userId)
+  const iCanVote = voters.some((p) => p.user_id === userId)
+
+  const open = (scrim.status === 'waiting' || scrim.status === 'in_progress') && !scrim.map
+  return {
+    open,
+    phase,
+    options,
+    totalPlayers: everyone.length,
+    votesCast: options.reduce((sum, o) => sum + o.votes, 0),
+    secondsLeft:
+      open && scrim.veto_ends_at
+        ? Math.max(0, Math.ceil((new Date(scrim.veto_ends_at).getTime() - Date.now()) / 1000))
+        : null,
+    winner: scrim.map,
+    tiebreak: Boolean(scrim.veto_tiebreak),
+    myVote: iCanVote ? (me?.veto_map_vote ?? null) : null,
+    canVote: open && iCanVote,
+    needsReady: open && Boolean(me) && !iCanVote,
+  }
+}
+
+export async function voteMapVeto(scrimId: string, map: string): Promise<MapVetoStatus | null> {
+  const { userId } = await getCurrentUser()
+  const supabase = await createClient()
+
+  const { error } = await supabase.rpc('cast_map_veto_vote', {
+    p_scrim_id: scrimId,
+    p_user_id: userId,
+    p_map: map,
+  })
+  if (error) throw new Error(error.message)
+
+  // The last vote can decide the map, which lets the scrim start. The vote is
+  // already saved, so a failed start (captains not chosen yet, for example)
+  // should not look like a failed vote. The lobby poll retries the start.
+  try {
+    await checkAndStartGame(scrimId)
+  } catch (err) {
+    console.error(`[Scrim ${scrimId}] Start after map vote failed:`, err)
+  }
+
+  revalidatePath('/scrim')
+  revalidatePath(`/scrim/${scrimId}`)
+
+  return getMapVetoStatus(scrimId)
 }
 
 // ==================== SCRIM BADGES ====================
