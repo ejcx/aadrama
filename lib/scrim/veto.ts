@@ -35,6 +35,22 @@ export function vetoLeaders(tally: readonly VetoOptionTally[]): string[] {
   return tally.filter((t) => t.votes === top).map((t) => t.map)
 }
 
+/** The tally with a vote that was just cast but not saved yet, so the click shows at once. */
+export function tallyWithPendingVote(
+  tally: readonly VetoOptionTally[],
+  currentVote: string | null,
+  pendingVote: string | null
+): VetoOptionTally[] {
+  if (!pendingVote || pendingVote === currentVote || !tally.some((t) => t.map === pendingVote)) {
+    return [...tally]
+  }
+  return tally.map((t) => {
+    if (t.map === pendingVote) return { ...t, votes: t.votes + 1 }
+    if (t.map === currentVote) return { ...t, votes: Math.max(0, t.votes - 1) }
+    return t
+  })
+}
+
 const TIERED_MAP_NAMES = new Set(TIERED_MAPS.map((m) => m.name))
 
 /** Loading-screen image for a tiered-pool map (public/maps), or null for any other map. */

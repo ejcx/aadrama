@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { TIERED_MAPS } from './tiered-maps'
-import { mapImagePath, tallyVetoVotes, vetoLeaders } from './veto'
+import { mapImagePath, tallyVetoVotes, tallyWithPendingVote, vetoLeaders } from './veto'
 
 const OPTIONS = ['Pipeline', 'Insurgent Camp', 'Dusk', 'Canyon']
 
@@ -62,5 +62,36 @@ describe('mapImagePath', () => {
       (p) => !p || !existsSync(path.join(__dirname, '..', '..', 'public', p))
     )
     expect(missing).toEqual([])
+  })
+})
+
+describe('tallyWithPendingVote', () => {
+  const tally = tallyVetoVotes(OPTIONS, votes('Dusk', 'Pipeline', 'Dusk'))
+  const counts = (t: { votes: number }[]) => t.map((o) => o.votes)
+
+  it('adds a first vote', () => {
+    expect(counts(tallyWithPendingVote(tally, null, 'Canyon'))).toEqual([1, 0, 2, 1])
+  })
+
+  it('moves a changed vote from the old map to the new one', () => {
+    expect(counts(tallyWithPendingVote(tally, 'Dusk', 'Pipeline'))).toEqual([2, 0, 1, 0])
+  })
+
+  it('changes nothing with no pending vote, or once the server already shows it', () => {
+    expect(counts(tallyWithPendingVote(tally, 'Dusk', null))).toEqual([1, 0, 2, 0])
+    expect(counts(tallyWithPendingVote(tally, 'Dusk', 'Dusk'))).toEqual([1, 0, 2, 0])
+  })
+
+  it('only adds when the old vote was for a map that is no longer offered', () => {
+    expect(counts(tallyWithPendingVote(tally, 'Urban Assault', 'Canyon'))).toEqual([1, 0, 2, 1])
+  })
+
+  it('ignores a pending vote for a map that is not offered', () => {
+    expect(counts(tallyWithPendingVote(tally, 'Dusk', 'Urban Assault'))).toEqual([1, 0, 2, 0])
+  })
+
+  it('does not change the tally it was given', () => {
+    tallyWithPendingVote(tally, 'Dusk', 'Pipeline')
+    expect(counts(tally)).toEqual([1, 0, 2, 0])
   })
 })
