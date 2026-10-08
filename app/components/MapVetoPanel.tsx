@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { MapVetoStatus } from "@/app/scrim/actions";
-import { mapImagePath, vetoLeaders } from "@/lib/scrim/veto";
+import { mapImagePath, tallyWithPendingVote, vetoLeaders } from "@/lib/scrim/veto";
 
 /** Counts down from the server's number, so a wrong clock on the viewer's machine does not matter. */
 function useCountdown(serverSecondsLeft: number | null): number | null {
@@ -39,15 +39,23 @@ export default function MapVetoPanel({
   className?: string;
 }) {
   const [voting, setVoting] = useState(false);
+  // Shown as your vote until the server answers
+  const [pendingVote, setPendingVote] = useState<string | null>(null);
+  const myVote = pendingVote ?? status.myVote;
+  const options = tallyWithPendingVote(status.options, status.myVote, pendingVote);
+  const votesCast = options.reduce((sum, o) => sum + o.votes, 0);
   const secondsLeft = useCountdown(status.open ? status.secondsLeft : null);
-  const leaders = status.open ? vetoLeaders(status.options) : [];
+  const leaders = status.open ? vetoLeaders(options) : [];
 
   async function vote(map: string) {
     if (voting) return;
     setVoting(true);
+    setPendingVote(map);
     try {
       await onVote(map);
     } finally {
+      // status has the saved vote now, or the old one if it failed
+      setPendingVote(null);
       setVoting(false);
     }
   }
@@ -60,7 +68,7 @@ export default function MapVetoPanel({
         </span>
         <span className="text-sm text-gray-400">
           <span className="font-mono text-gray-200">
-            {status.votesCast}/{status.totalPlayers}
+            {votesCast}/{status.totalPlayers}
           </span>{" "}
           voted
           {status.open && secondsLeft !== null && (
@@ -86,10 +94,10 @@ export default function MapVetoPanel({
       </p>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-        {status.options.map((option) => {
+        {options.map((option) => {
           const image = mapImagePath(option.map);
           const isWinner = !status.open && option.map === status.winner;
-          const isMine = status.myVote === option.map;
+          const isMine = myVote === option.map;
           const isLeading = leaders.includes(option.map);
           const share = status.totalPlayers > 0 ? (option.votes / status.totalPlayers) * 100 : 0;
 
