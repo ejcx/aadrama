@@ -16,7 +16,7 @@ export type Winner = 'team_a' | 'team_b' | 'draw'
 
 export type SelectionMode = 'random' | 'skill_based' | 'captains'
 
-export type MapChoice = 'manual' | 'tiered'
+export type MapChoice = 'manual' | 'tiered' | 'veto'
 
 export interface Scrim {
   id: string
@@ -66,6 +66,7 @@ export interface ScrimPlayer {
   team: Team | null
   voted_reroll: boolean
   voted_map_reroll: boolean
+  veto_map_vote: string | null
   joined_at: string
   ready_at: string | null
 }

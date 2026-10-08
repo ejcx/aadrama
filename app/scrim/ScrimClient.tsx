@@ -25,11 +25,15 @@ import {
   voteMapReroll,
   getMapRerollStatus,
   type MapRerollStatus,
+  voteMapVeto,
+  getMapVetoStatus,
+  type MapVetoStatus,
   setCaptains,
   getDraftStatus,
   draftPlayer,
   type DraftStatus,
 } from "./actions";
+import MapVetoPanel from "../components/MapVetoPanel";
 import type { ScrimWithCounts, ScrimPlayer, MapChoice } from "@/lib/supabase/types";
 import { isCaptainsPickBlocked } from "@/lib/scrim/captains-pick";
 import { formatLabelFromPlayerCount } from "@/lib/scrim/format";
@@ -38,6 +42,9 @@ import ScrimFormatFilter from "../components/ScrimFormatFilter";
 
 /** Poll interval for live scrim/lobby/draft updates (3–5s range). */
 const SCRIM_POLL_MS = 4000;
+
+/** Statuses in which a veto scrim shows its map vote (lobby, captains draft, in progress). */
+const VETO_PANEL_STATUSES = new Set(["waiting", "drafting", "in_progress"]);
 
 const LIVE_SCRIM_STATUSES = new Set([
   "waiting",
@@ -50,6 +57,7 @@ const LIVE_SCRIM_STATUSES = new Set([
 function scrimMapLabel(scrim: Pick<ScrimWithCounts, "map" | "map_choice">): string | null {
   if (scrim.map) return scrim.map;
   if (scrim.map_choice === "tiered") return "TIERED (pending)";
+  if (scrim.map_choice === "veto") return "VETO (voting)";
   return null;
 }
 // Scrim status badges
@@ -128,6 +136,7 @@ function ScrimCard({
   const [trackerInput, setTrackerInput] = useState("");
   const [rerollStatus, setRerollStatus] = useState<RerollStatus | null>(null);
   const [mapRerollStatus, setMapRerollStatus] = useState<MapRerollStatus | null>(null);
+  const [mapVetoStatus, setMapVetoStatus] = useState<MapVetoStatus | null>(null);
   const [draftStatus, setDraftStatus] = useState<DraftStatus | null>(null);
   const [selectedCaptainA, setSelectedCaptainA] = useState("");
   const [selectedCaptainB, setSelectedCaptainB] = useState("");
@@ -156,7 +165,10 @@ function ScrimCard({
         data.length % 2 === 0 &&
         everyoneReady;
 
-      if (scrim.status === "waiting" && readyToStart) {
+      // A veto scrim cannot start until its map vote is decided. The vote poll handles that.
+      const awaitingMapVote = scrim.map_choice === "veto" && !scrim.map;
+
+      if (scrim.status === "waiting" && readyToStart && !awaitingMapVote) {
         try {
           await tryStartGameIfReady(scrim.id);
           onRefresh();
@@ -181,7 +193,7 @@ function ScrimCard({
   }
 
   async function loadMapRerollStatus() {
-    if (scrim.map_choice !== "tiered" || !scrim.map) {
+    if ((scrim.map_choice !== "tiered" && scrim.map_choice !== "veto") || !scrim.map) {
       setMapRerollStatus(null);
       return;
     }
@@ -190,6 +202,24 @@ function ScrimCard({
       setMapRerollStatus(status);
     } catch (err) {
       console.error("Failed to load map reroll status:", err);
+    }
+  }
+
+  async function loadMapVetoStatus() {
+    // Players vote in the lobby, and again after a map reroll
+    if (scrim.map_choice !== "veto" || !VETO_PANEL_STATUSES.has(scrim.status)) {
+      setMapVetoStatus(null);
+      return;
+    }
+    try {
+      const status = await getMapVetoStatus(scrim.id);
+      setMapVetoStatus(status);
+      // Vote just finished: refresh the list so the chosen map shows.
+      if (status?.winner && !scrim.map) {
+        onRefresh();
+      }
+    } catch (err) {
+      console.error("Failed to load map vote status:", err);
     }
   }
 
@@ -216,6 +246,7 @@ function ScrimCard({
         console.error("Failed to load draft status:", err);
       }
     }
+    await loadMapVetoStatus();
     if (scrim.status === "in_progress") {
       await loadRerollStatus();
       await loadMapRerollStatus();
@@ -226,7 +257,11 @@ function ScrimCard({
   }
 
   useEffect(() => {
-    if (!expanded || !LIVE_SCRIM_STATUSES.has(scrim.status)) return;
+    if (!expanded || !LIVE_SCRIM_STATUSES.has(scrim.status)) {
+      // Do not show a stale vote when the card is opened again
+      setMapVetoStatus(null);
+      return;
+    }
 
     void refreshExpandedState();
     const interval = setInterval(() => {
@@ -263,6 +298,11 @@ function ScrimCard({
                 {scrim.map_choice === "tiered" && scrim.map && (
                   <span className="px-2 py-0.5 rounded text-xs font-medium bg-cyan-900/40 text-cyan-300 border border-cyan-700/40">
                     TIERED
+                  </span>
+                )}
+                {scrim.map_choice === "veto" && scrim.map && (
+                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-cyan-900/40 text-cyan-300 border border-cyan-700/40">
+                    VETO
                   </span>
                 )}
               </h3>
@@ -538,6 +578,24 @@ function ScrimCard({
             </div>
           )}
 
+          {/* Map vote (veto scrims: in the lobby before teams, and after a map reroll) */}
+          {VETO_PANEL_STATUSES.has(scrim.status) && mapVetoStatus && (
+            <MapVetoPanel
+              status={mapVetoStatus}
+              disabled={loading || isPending}
+              className="mb-4"
+              onVote={async (map) => {
+                try {
+                  setMapVetoStatus(await voteMapVeto(scrim.id, map));
+                  onRefresh();
+                  await loadPlayers();
+                } catch (err) {
+                  alert(err instanceof Error ? err.message : "Failed to vote");
+                }
+              }}
+            />
+          )}
+
           {/* Team assignments (in_progress or scoring) */}
           {(scrim.status === "in_progress" || scrim.status === "scoring" || scrim.status === "finalized") && (
             <div className="mb-4">
@@ -619,10 +677,11 @@ function ScrimCard({
             </div>
           )}
 
-          {/* Reroll Map (tiered scrims only, after map is assigned) */}
+          {/* Reroll Map (tiered and veto scrims, after map is assigned) */}
           {scrim.status === "in_progress" &&
-            scrim.map_choice === "tiered" &&
-            !!scrim.map && (
+            (scrim.map_choice === "tiered" || scrim.map_choice === "veto") &&
+            !!scrim.map &&
+            !mapVetoStatus?.open && (
             <div className="p-3 bg-cyan-900/20 border border-cyan-700/50 rounded-lg mb-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-cyan-400 text-sm font-medium">🗺️ Reroll Map</span>
@@ -649,7 +708,9 @@ function ScrimCard({
                         alert(
                           result.newMap
                             ? `Map rerolled to ${result.newMap}!`
-                            : "Map has been rerolled!"
+                            : scrim.map_choice === "veto"
+                              ? "Map reroll passed. Vote on the 4 new maps."
+                              : "Map has been rerolled!"
                         );
                         onRefresh();
                       }
@@ -817,7 +878,8 @@ function ScrimCard({
           {/* Status messages */}
           {scrim.status === "waiting" && canStart && (
             <p className="text-green-400 text-sm mt-4">
-              ✓ All players ready! Game will start automatically.
+              ✓ All players ready! Game will start automatically
+              {scrim.map_choice === "veto" ? " once the map vote is decided." : "."}
             </p>
           )}
           {scrim.status === "waiting" && players.length > 0 && players.length % 2 !== 0 && (
@@ -1034,10 +1096,22 @@ export default function ScrimClient() {
                       >
                         TIERED
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setMapChoice("veto")}
+                        className={mapChoice === "veto" ? "aa-chip-active !px-3.5 !py-2 !text-sm" : "aa-chip !px-3.5 !py-2 !text-sm"}
+                      >
+                        VETO
+                      </button>
                     </div>
                     {mapChoice === "tiered" && (
                       <p className="text-cyan-400 text-xs mt-2">
                         Weighted random map assigned after teams are set (~2/3 Tier 1). Lower avg ELO team gets the easiest side first.
+                      </p>
+                    )}
+                    {mapChoice === "veto" && (
+                      <p className="text-cyan-400 text-xs mt-2">
+                        4 maps are drawn from the tiered pool and players vote as they ready up, before teams are picked. Most votes wins; a tie is settled by a coin flip.
                       </p>
                     )}
                   </div>
@@ -1055,7 +1129,9 @@ export default function ScrimClient() {
                       </select>
                     ) : (
                       <div className="flex-1 px-4 py-3 bg-gray-800/60 border border-cyan-700/40 rounded-lg text-cyan-300 text-sm flex items-center">
-                        Map rolls from the tiered pool when the game starts
+                        {mapChoice === "veto"
+                          ? "Players vote between 4 tiered-pool maps before teams are picked"
+                          : "Map rolls from the tiered pool when the game starts"}
                       </div>
                     )}
                     <button
