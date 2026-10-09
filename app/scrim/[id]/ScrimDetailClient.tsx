@@ -405,6 +405,11 @@ export default function ScrimDetailClient() {
                               Ranked
                           </span>
                       )}
+            {scrim.keep_will_hill_together && (
+              <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-600/20 text-purple-300 border border-purple-600/30">
+                Will &amp; Hill
+              </span>
+            )}
             <StatusBadge status={scrim.status} />
           </div>
           <p className="text-gray-400">
@@ -911,6 +916,9 @@ export default function ScrimDetailClient() {
                       If teams seem unfair, players can vote to randomly reroll them.
                       <span className="text-yellow-500"> Warning: Rerolled teams are completely random and may be even more unbalanced!</span>
                     </p>
+                  )}
+                  {scrim.keep_will_hill_together && (
+                    <p className="text-purple-300 text-sm mb-3">Will &amp; Hill stay on the same team after a reroll.</p>
                   )}
                   
                   {/* Progress bar */}
