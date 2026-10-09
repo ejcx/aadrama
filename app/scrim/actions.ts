@@ -49,6 +49,11 @@ export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
     throw new Error('Map is required')
   }
 
+  const selectionMode = input?.selection_mode || 'skill_based'
+  // Captains pick their own teams, so the option does nothing there
+  const keepWillHillTogether =
+    input?.keep_will_hill_together === true && selectionMode !== 'captains'
+
   const { data, error } = await supabase
     .from('scrims')
     .insert({
@@ -60,7 +65,9 @@ export async function createScrim(input?: CreateScrimInput): Promise<Scrim> {
       max_players_per_team: input?.max_players_per_team || 8,
       min_players_per_team: input?.min_players_per_team || 4, // 4v4 minimum
       is_ranked: input?.is_ranked !== false, // Default to ranked
-      selection_mode: input?.selection_mode || 'skill_based',
+      selection_mode: selectionMode,
+      // Only sent when ticked, so every other scrim inserts the same row as before
+      ...(keepWillHillTogether ? { keep_will_hill_together: true } : {}),
     })
     .select()
     .single()
@@ -105,7 +112,7 @@ export async function getActiveScrims(): Promise<ScrimWithCounts[]> {
     .order('created_at', { ascending: false })
   
   if (error) throw new Error(`Failed to fetch scrims: ${error.message}`)
-  return await withMapChoice(data || [])
+  return await withWillHill(await withMapChoice(data || []))
 }
 
 // Get a single scrim by ID
@@ -119,7 +126,7 @@ export async function getScrim(scrimId: string): Promise<ScrimWithCounts | null>
     .single()
   
   if (error || !data) return null
-  const [scrim] = await withMapChoice([data])
+  const [scrim] = await withWillHill(await withMapChoice([data]))
   return scrim
 }
 
@@ -153,6 +160,40 @@ async function withMapChoice<T extends { id: string; map_choice?: MapChoice | nu
   return rows.map((r) => ({
     ...r,
     map_choice: (r.map_choice as MapChoice | null | undefined) ?? byId.get(r.id) ?? 'manual',
+  }))
+}
+
+/**
+ * Same reason as withMapChoice: keep_will_hill_together is not in
+ * scrims_with_counts unless the view was recreated after the column was
+ * added, so read it from public.scrims. A failed read counts as not ticked.
+ */
+async function withWillHill<T extends { id: string; keep_will_hill_together?: boolean | null }>(
+  rows: T[]
+): Promise<(T & { keep_will_hill_together: boolean })[]> {
+  const missing = rows.filter((r) => r.keep_will_hill_together == null)
+  const ticked = new Set<string>()
+
+  if (missing.length > 0) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('scrims')
+      .select('id')
+      .eq('keep_will_hill_together', true)
+      .in(
+        'id',
+        missing.map((r) => r.id)
+      )
+
+    if (error) {
+      console.error('Failed to read keep_will_hill_together:', error)
+    }
+    for (const row of data || []) ticked.add(row.id)
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    keep_will_hill_together: r.keep_will_hill_together ?? ticked.has(r.id),
   }))
 }
 
@@ -328,6 +369,18 @@ async function checkAndStartGame(scrimId: string): Promise<void> {
     }
 
     console.log(`[Scrim ${scrimId}] Draft started successfully!`)
+  } else if (scrim.keep_will_hill_together) {
+    // Same team selection as below, with Will & Hill kept on the same team
+    console.log(`[Scrim ${scrimId}] Will & Hill together - calling assign_will_hill_teams...`)
+    const { error } = await supabase.rpc('assign_will_hill_teams', { p_scrim_id: scrimId })
+
+    if (error) {
+      console.error(`[Scrim ${scrimId}] assign_will_hill_teams failed:`, error)
+      throw new Error(`Failed to start game: ${error.message}`)
+    }
+
+    console.log(`[Scrim ${scrimId}] Teams assigned successfully! Game started.`)
+    await assignTieredMapIfNeeded(scrimId)
   } else if (
     scrim.selection_mode === 'skill_based' ||
     (scrim.selection_mode as string) === 'elo_balanced'
@@ -1132,8 +1185,13 @@ export async function voteReroll(scrimId: string): Promise<{ rerolled: boolean; 
   let rerolled = false
   if (newVote) {
     // Veto scrims balance by ELO again. Everything else rerolls purely at random.
+    // Will & Hill scrims reroll the same way, with the two kept together.
     const { data: rerollResult, error: rerollError } = await supabase.rpc(
-      scrim.map_choice === 'veto' ? 'check_and_execute_veto_team_reroll' : 'check_and_execute_reroll',
+      scrim.keep_will_hill_together
+        ? 'check_and_execute_will_hill_team_reroll'
+        : scrim.map_choice === 'veto'
+          ? 'check_and_execute_veto_team_reroll'
+          : 'check_and_execute_reroll',
       { p_scrim_id: scrimId }
     )
     

@@ -35,6 +35,8 @@ export interface Scrim {
   is_ranked: boolean
   ranked_processed_at: string | null
   selection_mode: SelectionMode
+  /** Will & Hill are always put on the same team (start and team rerolls) */
+  keep_will_hill_together?: boolean
   captain_a_user_id: string | null
   captain_a_name: string | null
   captain_b_user_id: string | null
@@ -90,6 +92,7 @@ export interface CreateScrimInput {
   min_players_per_team?: number
   is_ranked?: boolean
   selection_mode?: SelectionMode
+  keep_will_hill_together?: boolean
 }
 
 // User Game Names - mapping user accounts to in-game names

@@ -4,6 +4,7 @@
  * Keep in sync with Supabase functions:
  * - assign_elo_optimized_random_teams / assign_skill_based_teams
  * - assign_elo_balanced_teams / assign_balanced_teams / assign_purely_random_teams
+ * - split_teams_keeping_pair (keepTogether: the "Will & Hill" scrim option)
  *
  * Run: npm test -- lib/scrim/matchmaking.test.ts
  */
@@ -125,10 +126,14 @@ export function assignKillsBalancedTeams(
   )
 }
 
+/** Two player ids that must end up on the same team (ignored unless both are playing). */
+export type KeepTogetherPair = readonly [string, string]
+
 export interface AssignEloOptimizedOptions {
   minPlayers?: number
   trials?: number
   random?: () => number
+  keepTogether?: KeepTogetherPair
 }
 
 /** @deprecated Use AssignEloOptimizedOptions */
@@ -167,7 +172,7 @@ export function assignEloOptimizedRandomTeams(
   for (let trial = 0; trial < trials; trial++) {
     const assignments = assignRandomTeams(
       players.map((p) => ({ id: p.id })),
-      { minPlayers, random }
+      { minPlayers, random, keepTogether: options.keepTogether }
     )
     const diff = eloDifference(sumEloByTeam(players, assignments))
     if (diff < bestDiff) {
@@ -194,6 +199,7 @@ export function assignSkillBasedTeams(
 export interface AssignRandomTeamsOptions {
   minPlayers?: number
   random?: () => number
+  keepTogether?: KeepTogetherPair
 }
 
 export function assignRandomTeams(
@@ -213,12 +219,30 @@ export function assignRandomTeams(
   }
 
   const half = players.length / 2
-  const shuffled = [...players].sort(() => random() - 0.5)
   const assignments = new Map<string, Team>()
 
-  shuffled.forEach((player, index) => {
-    assignments.set(player.id, index < half ? 'team_a' : 'team_b')
-  })
+  const pair = options.keepTogether
+  const pairPlayers = pair && pair[0] !== pair[1] ? players.filter((p) => pair.includes(p.id)) : []
+
+  if (pairPlayers.length === 2) {
+    // The pair always takes the first two places, so it is always in the
+    // first half. A coin flip decides which team that half becomes.
+    const others = players.filter((p) => !pairPlayers.includes(p)).sort(() => random() - 0.5)
+    const pairTeam: Team = random() < 0.5 ? 'team_a' : 'team_b'
+    const otherTeam: Team = pairTeam === 'team_a' ? 'team_b' : 'team_a'
+
+    const ordered = [...pairPlayers, ...others]
+
+    ordered.forEach((player, index) => {
+      assignments.set(player.id, index < half ? pairTeam : otherTeam)
+    })
+  } else {
+    const shuffled = [...players].sort(() => random() - 0.5)
+
+    shuffled.forEach((player, index) => {
+      assignments.set(player.id, index < half ? 'team_a' : 'team_b')
+    })
+  }
 
   assertEvenTeams(assignments)
   return assignments
