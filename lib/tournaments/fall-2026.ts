@@ -241,6 +241,25 @@ export const MATCH_RESULTS: MatchResult[] = [
       },
     ],
   },
+  {
+    week: 5,
+    home: "intro",
+    away: "junk",
+    maps: [
+      {
+        name: "Woodland Outpost",
+        homeScore: 11,
+        awayScore: 1,
+        sessionId: "185.150.189.120:1797_1791745070",
+      },
+      {
+        name: "Urban Assault",
+        homeScore: 10,
+        awayScore: 2,
+        sessionId: "185.150.189.120:1797_1791747427",
+      },
+    ],
+  },
 ]
 
 export type ScheduleWeek = {
@@ -263,6 +282,12 @@ export const TEAMS: TournamentTeam[] = [
       { name: "Inverse", aliases: ["judas.inverse", "inverse", "iverse"] },
       { name: "Killerpep", aliases: ["killerpep", "-killerpep"] },
       { name: "Method", aliases: ["nx.method;", "method"] },
+      {
+        name: "TuhMat3r",
+        aliases: ["tuhmat3r"],
+        ringer: true,
+        ringerFor: "Method",
+      },
     ],
   },
   {

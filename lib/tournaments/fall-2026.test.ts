@@ -83,11 +83,11 @@ describe("Fall Classic match results", () => {
       calculateStandings().map((row) => [row.teamId, row])
     )
     expect(standings.intro).toMatchObject({
-      wins: 3,
+      wins: 5,
       losses: 2,
       ties: 1,
-      roundsFor: 39,
-      roundsAgainst: 31,
+      roundsFor: 60,
+      roundsAgainst: 34,
     })
     expect(standings.drob).toMatchObject({
       wins: 5,
@@ -119,10 +119,10 @@ describe("Fall Classic match results", () => {
     })
     expect(standings.junk).toMatchObject({
       wins: 0,
-      losses: 6,
+      losses: 8,
       ties: 0,
-      roundsFor: 16,
-      roundsAgainst: 54,
+      roundsFor: 19,
+      roundsAgainst: 75,
     })
     expect(calculateStandings()[0].teamId).toBe("joe")
     expect(calculateStandings()[1].teamId).toBe("drob")
@@ -275,6 +275,30 @@ describe("Fall Classic match results", () => {
     expect(seriesScore(match!)).toEqual({ homeScore: 11, awayScore: 12 })
   })
 
+  it("stores week 5 Dirty Mike vs Team Poland as two Dirty Mike map wins", () => {
+    const match = MATCH_RESULTS.find(
+      (m) => m.week === 5 && m.home === "intro" && m.away === "junk"
+    )
+    expect(TEAMS.find((t) => t.id === "intro")?.name).toBe(
+      "Dirty Mike and the Boys"
+    )
+    expect(match?.maps).toEqual([
+      {
+        name: "Woodland Outpost",
+        homeScore: 11,
+        awayScore: 1,
+        sessionId: "185.150.189.120:1797_1791745070",
+      },
+      {
+        name: "Urban Assault",
+        homeScore: 10,
+        awayScore: 2,
+        sessionId: "185.150.189.120:1797_1791747427",
+      },
+    ])
+    expect(seriesScore(match!)).toEqual({ homeScore: 21, awayScore: 3 })
+  })
+
   it("stores week 1 Team Poland vs bum ba da da as two bart map wins", () => {
     const match = MATCH_RESULTS.find(
       (m) => m.week === 1 && m.home === "junk" && m.away === "bart"
@@ -324,6 +348,11 @@ describe("Fall Classic match results", () => {
     expect(resolveRosterPlayer("Scott")?.player).toMatchObject({
       ringer: true,
       ringerFor: "Mediocre",
+    })
+    expect(resolveRosterPlayer("TuhMat3r")?.team.id).toBe("intro")
+    expect(resolveRosterPlayer("TuhMat3r")?.player).toMatchObject({
+      ringer: true,
+      ringerFor: "Method",
     })
   })
 
