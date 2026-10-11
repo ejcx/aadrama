@@ -13,6 +13,11 @@ function formatFrag(n: number) {
   return n.toFixed(2);
 }
 
+function formatRate(n: number | null) {
+  if (n == null) return "—";
+  return n.toFixed(2);
+}
+
 export default function PlayerStatsTable({ lines }: { lines: PlayerStatLine[] }) {
   const [teamId, setTeamId] = useState("all");
   const [mapName, setMapName] = useState("all");
@@ -45,7 +50,8 @@ export default function PlayerStatsTable({ lines }: { lines: PlayerStatLine[] })
       </h3>
       <p className="mb-4 text-sm text-gray-500">
         Combined kills, deaths, and frag rate from recorded match sessions.
-        Spectators with 0/0 are omitted.
+        Each map is a match. Kills per round uses the rounds played on those
+        maps. Spectators with 0/0 are omitted.
       </p>
       <div className="mb-4 flex flex-col gap-3">
         <div className="flex flex-wrap gap-2">
@@ -98,13 +104,19 @@ export default function PlayerStatsTable({ lines }: { lines: PlayerStatLine[] })
                 <th className="px-3 py-3 text-center">K</th>
                 <th className="px-3 py-3 text-center">D</th>
                 <th className="px-3 py-3 text-right">Frag</th>
+                <th className="px-3 py-3 text-right" title="Kills per round">
+                  K/Rnd
+                </th>
+                <th className="px-3 py-3 text-right" title="Kills per match">
+                  K/Match
+                </th>
               </tr>
             </thead>
             <tbody>
               {stats.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={8}
                     className="px-3 py-6 text-center text-sm text-gray-500"
                   >
                     No players for this filter.
@@ -149,6 +161,12 @@ export default function PlayerStatsTable({ lines }: { lines: PlayerStatLine[] })
                         }`}
                       >
                         {formatFrag(row.fragRate)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-gray-300">
+                        {formatRate(row.killsPerRound)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-gray-300">
+                        {formatRate(row.killsPerMatch)}
                       </td>
                     </tr>
                   );

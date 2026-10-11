@@ -3,6 +3,8 @@ import {
   MATCH_RESULTS,
   SCHEDULE,
   TEAMS,
+  aggregatePlayerStats,
+  annotateStatLines,
   buildPlayerStats,
   calculateStandings,
   resolveRosterPlayer,
@@ -370,6 +372,33 @@ describe("Fall Classic match results", () => {
       kills: 20,
       deaths: 12,
       fragRate: 1.67,
+    })
+  })
+
+  it("counts kills per map and per round from the recorded scores", () => {
+    const lines = annotateStatLines([
+      {
+        name: "iverse",
+        kills: 11,
+        deaths: 5,
+        sessionId: "185.150.189.120:1797_1791745070",
+        mapName: "Woodland Outpost",
+      },
+      {
+        name: "iverse",
+        kills: 13,
+        deaths: 3,
+        sessionId: "185.150.189.120:1797_1791747427",
+        mapName: "Urban Assault",
+      },
+    ])
+    expect(lines.map((line) => line.rounds)).toEqual([12, 12])
+    expect(aggregatePlayerStats(lines)[0]).toMatchObject({
+      kills: 24,
+      matches: 2,
+      rounds: 24,
+      killsPerMatch: 12,
+      killsPerRound: 1,
     })
   })
 

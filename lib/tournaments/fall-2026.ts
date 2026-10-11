@@ -512,9 +512,20 @@ export function allMatchSessionIds() {
 }
 
 export function mapNameForSession(sessionId: string) {
+  return mapResultForSession(sessionId)?.name
+}
+
+/** Rounds played in a recorded map. A map is one match. */
+export function roundsForSession(sessionId: string) {
+  const map = mapResultForSession(sessionId)
+  if (!map) return 0
+  return map.homeScore + map.awayScore
+}
+
+function mapResultForSession(sessionId: string) {
   for (const match of MATCH_RESULTS) {
     const map = match.maps.find((m) => m.sessionId === sessionId)
-    if (map) return map.name
+    if (map) return map
   }
 }
 
@@ -593,6 +604,8 @@ export type PlayerStatLine = {
   sessionId: string
   kills: number
   deaths: number
+  /** Rounds in this map. Each map is one match. */
+  rounds: number
 }
 
 export type TournamentPlayerStat = {
@@ -603,6 +616,10 @@ export type TournamentPlayerStat = {
   kills: number
   deaths: number
   fragRate: number
+  matches: number
+  rounds: number
+  killsPerMatch: number | null
+  killsPerRound: number | null
 }
 
 export function annotateStatLines(
@@ -644,6 +661,7 @@ export function annotateStatLines(
       sessionId: row.sessionId,
       kills: row.kills,
       deaths: row.deaths,
+      rounds: roundsForSession(row.sessionId),
     }
   })
 }
@@ -673,6 +691,8 @@ export function aggregatePlayerStats(lines: PlayerStatLine[]): TournamentPlayerS
       teamName: string | null
       kills: number
       deaths: number
+      matches: number
+      rounds: number
     }
   >()
 
@@ -683,6 +703,8 @@ export function aggregatePlayerStats(lines: PlayerStatLine[]): TournamentPlayerS
     if (existing) {
       existing.kills += line.kills
       existing.deaths += line.deaths
+      existing.matches += 1
+      existing.rounds += line.rounds
     } else {
       byKey.set(key, {
         trackerName: line.trackerName,
@@ -691,6 +713,8 @@ export function aggregatePlayerStats(lines: PlayerStatLine[]): TournamentPlayerS
         teamName: line.teamName,
         kills: line.kills,
         deaths: line.deaths,
+        matches: 1,
+        rounds: line.rounds,
       })
     }
   }
@@ -704,6 +728,10 @@ export function aggregatePlayerStats(lines: PlayerStatLine[]): TournamentPlayerS
             ? row.kills
             : 0
           : Number((row.kills / row.deaths).toFixed(2)),
+      killsPerMatch:
+        row.matches > 0 ? Number((row.kills / row.matches).toFixed(2)) : null,
+      killsPerRound:
+        row.rounds > 0 ? Number((row.kills / row.rounds).toFixed(2)) : null,
     }))
     .sort((a, b) => {
       if (b.kills !== a.kills) return b.kills - a.kills
