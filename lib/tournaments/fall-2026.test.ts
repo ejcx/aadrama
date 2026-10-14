@@ -92,18 +92,18 @@ describe("Fall Classic match results", () => {
       roundsAgainst: 34,
     })
     expect(standings.drob).toMatchObject({
-      wins: 5,
+      wins: 7,
       losses: 1,
       ties: 0,
-      roundsFor: 40,
-      roundsAgainst: 30,
+      roundsFor: 54,
+      roundsAgainst: 38,
     })
     expect(standings.joe).toMatchObject({
       wins: 6,
-      losses: 2,
+      losses: 4,
       ties: 0,
-      roundsFor: 57,
-      roundsAgainst: 36,
+      roundsFor: 65,
+      roundsAgainst: 50,
     })
     expect(standings.farmer).toMatchObject({
       wins: 2,
@@ -126,8 +126,8 @@ describe("Fall Classic match results", () => {
       roundsFor: 19,
       roundsAgainst: 75,
     })
-    expect(calculateStandings()[0].teamId).toBe("joe")
-    expect(calculateStandings()[1].teamId).toBe("drob")
+    expect(calculateStandings()[0].teamId).toBe("drob")
+    expect(calculateStandings()[1].teamId).toBe("joe")
   })
 
   it("stores week 2 bart vs drob as two High T map wins", () => {
@@ -254,6 +254,27 @@ describe("Fall Classic match results", () => {
       },
     ])
     expect(seriesScore(match!)).toEqual({ homeScore: 15, awayScore: 9 })
+  })
+
+  it("stores week 4 High T vs WWJD as two High T map wins", () => {
+    const match = MATCH_RESULTS.find(
+      (m) => m.week === 4 && m.home === "drob" && m.away === "joe"
+    )
+    expect(match?.maps).toEqual([
+      {
+        name: "Collapsed Tunnel",
+        homeScore: 8,
+        awayScore: 4,
+        sessionId: "185.150.189.120:1797_1791941387",
+      },
+      {
+        name: "Mountain Ambush",
+        homeScore: 6,
+        awayScore: 4,
+        sessionId: "185.150.189.120:1797_1791943374",
+      },
+    ])
+    expect(seriesScore(match!)).toEqual({ homeScore: 14, awayScore: 8 })
   })
 
   it("stores week 5 joe vs bart as a split", () => {
