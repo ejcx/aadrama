@@ -1383,7 +1383,9 @@ export async function getMapVetoStatus(scrimId: string): Promise<MapVetoStatus |
 }
 
 export async function voteMapVeto(scrimId: string, map: string): Promise<MapVetoStatus | null> {
-  const { userId } = await getCurrentUser()
+  // Only the id is needed. getCurrentUser also calls Clerk for the name.
+  const { userId } = await auth()
+  if (!userId) throw new Error('Not authenticated')
   const supabase = await createClient()
 
   const { error } = await supabase.rpc('cast_map_veto_vote', {
