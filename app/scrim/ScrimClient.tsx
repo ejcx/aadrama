@@ -318,6 +318,11 @@ function ScrimCard({
               Ranked
             </span>
           )}
+          {scrim.keep_will_hill_together && (
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-600/20 text-purple-300 border border-purple-600/30">
+              Will &amp; Hill
+            </span>
+          )}
           <StatusBadge status={scrim.status} />
           {scrim.status === "waiting" && <ExpiresIn expiresAt={scrim.expires_at} />}
         </div>
@@ -908,6 +913,7 @@ export default function ScrimClient() {
   const [mapChoice, setMapChoice] = useState<MapChoice>("manual");
   const [isRanked, setIsRanked] = useState(true);
   const [selectionMode, setSelectionMode] = useState<"random" | "skill_based" | "captains">("skill_based");
+  const [keepWillHillTogether, setKeepWillHillTogether] = useState(false);
   const captainsPickBlocked = isCaptainsPickBlocked(user?.username);
 
   useEffect(() => {
@@ -1034,6 +1040,7 @@ export default function ScrimClient() {
           map_choice: mapChoice,
           is_ranked: isRanked,
           selection_mode: selectionMode,
+          keep_will_hill_together: keepWillHillTogether && selectionMode !== "captains",
         });
         setSelectedMap("");
         await loadScrims();
@@ -1159,6 +1166,19 @@ export default function ScrimClient() {
                     <span className="text-white text-sm">Ranked</span>
                     <span className="text-gray-400 text-xs">(ELO tracking)</span>
                   </label>
+
+                  {selectionMode !== "captains" && (
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={keepWillHillTogether}
+                        onChange={(e) => setKeepWillHillTogether(e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-white text-sm">Will &amp; Hill</span>
+                      <span className="text-gray-400 text-xs">(same team)</span>
+                    </label>
+                  )}
 
                   <div>
                     <label className="text-white text-sm font-medium mb-2 block">Team Selection:</label>

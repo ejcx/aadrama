@@ -159,6 +159,67 @@ describe('assignEloOptimizedRandomTeams', () => {
   })
 })
 
+describe('keepTogether (Will & Hill)', () => {
+  // top and bottom of the ladder: a pure ELO split would never pair them
+  const pairFor = (players: MatchmakingPlayer[]) =>
+    [players[0].id, players[players.length - 1].id] as const
+
+  it('always puts the pair on the same team with even teams', () => {
+    for (const size of [8, 10, 12, 16]) {
+      const players = makeLadder(size, 1000, 40)
+      const keepTogether = pairFor(players)
+      for (let run = 0; run < 50; run++) {
+        const teams = assignEloOptimizedRandomTeams(players, { keepTogether })
+        expect(countTeams(teams)).toEqual({ team_a: size / 2, team_b: size / 2 })
+        expect(teams.get(keepTogether[0])).toBe(teams.get(keepTogether[1]))
+      }
+    }
+  })
+
+  it('still balances ELO: finds the best split that keeps the pair together', () => {
+    const players = makeLadder(8, 1000, 40)
+    const keepTogether = pairFor(players)
+
+    // brute force every 4v4 split with the pair together
+    const others = players.filter((p) => !keepTogether.includes(p.id))
+    const pairElo = players[0].elo + players[7].elo
+    const total = players.reduce((sum, p) => sum + p.elo, 0)
+    let bestPossible = Infinity
+    for (let i = 0; i < others.length; i++) {
+      for (let j = i + 1; j < others.length; j++) {
+        const pairSide = pairElo + others[i].elo + others[j].elo
+        bestPossible = Math.min(bestPossible, Math.abs(total - 2 * pairSide))
+      }
+    }
+
+    const teams = assignEloOptimizedRandomTeams(players, { keepTogether, trials: 500 })
+    expect(eloDifference(sumEloByTeam(players, teams))).toBe(bestPossible)
+  })
+
+  it('puts the pair on either team', () => {
+    const players = makeLadder(8)
+    const keepTogether = pairFor(players)
+    const seen = new Set<string>()
+    for (let run = 0; run < 100; run++) {
+      const teams = assignRandomTeams(players, { keepTogether })
+      expect(teams.get(keepTogether[0])).toBe(teams.get(keepTogether[1]))
+      seen.add(teams.get(keepTogether[0])!)
+    }
+    expect(seen).toEqual(new Set(['team_a', 'team_b']))
+  })
+
+  it('is ignored when only one of the pair is playing', () => {
+    const players = makeLadder(8)
+    const keepTogether = [players[0].id, 'not-in-this-scrim'] as const
+    let seed = 0
+    const random = () => ((seed += 7) % 100) / 100
+    const withOption = assignEloOptimizedRandomTeams(players, { random, trials: 20, keepTogether })
+    seed = 0
+    const without = assignEloOptimizedRandomTeams(players, { random, trials: 20 })
+    expect(Array.from(withOption.entries())).toEqual(Array.from(without.entries()))
+  })
+})
+
 describe('assignSkillBasedTeams', () => {
   const players = makeSkillLadder(10)
 
