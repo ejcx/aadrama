@@ -340,6 +340,14 @@ export default async function FallClassic2026Page() {
             <PlayerStatsTable lines={namedPlayerLines} />
           )}
 
+          <p className="text-sm text-gray-500">
+            <a href="/fall-classic-draft.html" className="text-cyan-400 hover:text-cyan-300">
+              Draft and performance report
+            </a>
+            {" "}
+            — picks versus ELO, scrim rate, and who they played.
+          </p>
+
           <div className="w-full">
             <h3 className="mb-3 text-xl font-bold text-white sm:text-2xl">
               Schedule

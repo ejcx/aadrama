@@ -242,6 +242,25 @@ export const MATCH_RESULTS: MatchResult[] = [
     ],
   },
   {
+    week: 4,
+    home: "farmer",
+    away: "junk",
+    maps: [
+      {
+        name: "Collapsed Tunnel",
+        homeScore: 9,
+        awayScore: 3,
+        sessionId: "185.150.189.120:1797_1792268114",
+      },
+      {
+        name: "Mountain Ambush",
+        homeScore: 8,
+        awayScore: 2,
+        sessionId: "185.150.189.120:1797_1792270024",
+      },
+    ],
+  },
+  {
     week: 5,
     home: "joe",
     away: "bart",
@@ -389,6 +408,7 @@ export const TEAMS: TournamentTeam[] = [
       { name: "Potejto", aliases: ["potejto"] },
       { name: "Krishu", aliases: ["krishu"] },
       { name: "Yoshii", aliases: ["yoshii", ".YOshii^"] },
+      { name: "Nukubu", aliases: ["nukubu", "-nukubu."], ringer: true },
     ],
   },
 ]

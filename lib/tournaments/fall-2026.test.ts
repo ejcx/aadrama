@@ -106,11 +106,11 @@ describe("Fall Classic match results", () => {
       roundsAgainst: 50,
     })
     expect(standings.farmer).toMatchObject({
-      wins: 2,
+      wins: 4,
       losses: 3,
       ties: 1,
-      roundsFor: 33,
-      roundsAgainst: 37,
+      roundsFor: 50,
+      roundsAgainst: 42,
     })
     expect(standings.bart).toMatchObject({
       wins: 3,
@@ -121,10 +121,10 @@ describe("Fall Classic match results", () => {
     })
     expect(standings.junk).toMatchObject({
       wins: 0,
-      losses: 8,
+      losses: 10,
       ties: 0,
-      roundsFor: 19,
-      roundsAgainst: 75,
+      roundsFor: 24,
+      roundsAgainst: 92,
     })
     expect(calculateStandings()[0].teamId).toBe("drob")
     expect(calculateStandings()[1].teamId).toBe("joe")
@@ -277,6 +277,27 @@ describe("Fall Classic match results", () => {
     expect(seriesScore(match!)).toEqual({ homeScore: 14, awayScore: 8 })
   })
 
+  it("stores week 4 Hotdog vs Team Poland as two Hotdog map wins", () => {
+    const match = MATCH_RESULTS.find(
+      (m) => m.week === 4 && m.home === "farmer" && m.away === "junk"
+    )
+    expect(match?.maps).toEqual([
+      {
+        name: "Collapsed Tunnel",
+        homeScore: 9,
+        awayScore: 3,
+        sessionId: "185.150.189.120:1797_1792268114",
+      },
+      {
+        name: "Mountain Ambush",
+        homeScore: 8,
+        awayScore: 2,
+        sessionId: "185.150.189.120:1797_1792270024",
+      },
+    ])
+    expect(seriesScore(match!)).toEqual({ homeScore: 17, awayScore: 5 })
+  })
+
   it("stores week 5 joe vs bart as a split", () => {
     const match = MATCH_RESULTS.find(
       (m) => m.week === 5 && m.home === "joe" && m.away === "bart"
@@ -372,6 +393,16 @@ describe("Fall Classic match results", () => {
       ringer: true,
       ringerFor: "Mediocre",
     })
+    expect(
+      resolveRosterPlayer("-nukubu.", ["Bart", "Hype", "Banana"])?.team.id
+    ).toBe("bart")
+    expect(
+      resolveRosterPlayer("-nukubu.", ["+JunK+", "ERNIAA", "poTejto"])?.team.id
+    ).toBe("junk")
+    expect(
+      resolveRosterPlayer("-nukubu.", ["+JunK+", "ERNIAA", "poTejto"])?.player
+        .ringer
+    ).toBe(true)
     expect(resolveRosterPlayer("TuhMat3r")?.team.id).toBe("intro")
     expect(resolveRosterPlayer("TuhMat3r")?.player).toMatchObject({
       ringer: true,
