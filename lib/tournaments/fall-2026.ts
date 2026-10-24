@@ -298,6 +298,25 @@ export const MATCH_RESULTS: MatchResult[] = [
       },
     ],
   },
+  {
+    week: 5,
+    home: "farmer",
+    away: "drob",
+    maps: [
+      {
+        name: "Woodland Outpost",
+        homeScore: 6,
+        awayScore: 6,
+        sessionId: "185.150.189.120:1797_1792807294",
+      },
+      {
+        name: "Urban Assault",
+        homeScore: 5,
+        awayScore: 7,
+        sessionId: "185.150.189.120:1797_1792810434",
+      },
+    ],
+  },
 ]
 
 export type ScheduleWeek = {
