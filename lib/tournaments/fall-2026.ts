@@ -317,6 +317,25 @@ export const MATCH_RESULTS: MatchResult[] = [
       },
     ],
   },
+  {
+    week: 4,
+    home: "bart",
+    away: "intro",
+    maps: [
+      {
+        name: "Collapsed Tunnel",
+        homeScore: 6,
+        awayScore: 6,
+        sessionId: "185.150.189.120:1797_1792868486",
+      },
+      {
+        name: "Mountain Ambush",
+        homeScore: 8,
+        awayScore: 2,
+        sessionId: "185.150.189.120:1797_1792870008",
+      },
+    ],
+  },
 ]
 
 export type ScheduleWeek = {

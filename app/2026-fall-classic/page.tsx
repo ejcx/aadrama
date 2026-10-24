@@ -4,11 +4,14 @@ import SidebarLayout from "../components/SidebarLayout";
 import { lookupRosterElos } from "../tracker/actions";
 import {
   calculateStandings,
+  getMatchResult,
   getTeam,
   MAP_WEEKS,
+  SCHEDULE,
   TEAMS,
   UNRANKED_ELO,
   teamEloSum,
+  type StandingRow,
   type TournamentTeam,
 } from "@/lib/tournaments/fall-2026";
 import { fetchTournamentPlayerLines } from "@/lib/tournaments/session-players";
@@ -32,6 +35,55 @@ function formatElo(n: number) {
 function formatPct(n: number | null) {
   if (n == null) return "—";
   return `${(n * 100).toFixed(1)}%`;
+}
+
+function formatRecord(row: StandingRow) {
+  return `${row.wins}–${row.losses}–${row.ties}`;
+}
+
+function FinalistCard({
+  seed,
+  team,
+  record,
+}: {
+  seed: "1st seed" | "2nd seed";
+  team?: TournamentTeam;
+  record?: string;
+}) {
+  const body = (
+    <>
+      <div
+        className={`mb-1 text-[10px] font-semibold uppercase tracking-wider ${
+          seed === "1st seed" ? "text-amber-400" : "text-cyan-400"
+        }`}
+      >
+        {seed}
+      </div>
+      <div className={team ? "text-lg font-bold text-white" : "text-gray-500"}>
+        {team?.name ?? "TBD"}
+      </div>
+      {team?.subtitle && (
+        <div className="text-xs text-gray-400">{team.subtitle}</div>
+      )}
+      {record && (
+        <div className="mt-1 text-xs tabular-nums text-gray-400">{record}</div>
+      )}
+    </>
+  );
+
+  if (!team) {
+    return (
+      <div className="rounded-lg border border-gray-700 bg-gray-800/60 px-4 py-4 text-center">
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`rounded-lg bg-gradient-to-br p-[1px] ${team.color}`}>
+      <div className="rounded-lg bg-gray-900 px-4 py-4 text-center">{body}</div>
+    </div>
+  );
 }
 
 function PlayerRow({
@@ -122,6 +174,17 @@ export default async function FallClassic2026Page() {
   );
   const standings = calculateStandings();
   const anyResults = standings.some((s) => s.wins + s.losses + s.ties > 0);
+  const groupComplete = SCHEDULE.every((week) =>
+    week.matches.every((match) =>
+      getMatchResult(week.week, match.home, match.away)
+    )
+  );
+  const finalists = groupComplete
+    ? standings.slice(0, 2).map((row) => ({
+        row,
+        team: getTeam(row.teamId),
+      }))
+    : [];
   const orderedStandings = anyResults
     ? standings
     : [...standings].sort(
@@ -375,22 +438,24 @@ export default async function FallClassic2026Page() {
                 from those three within a day. The third map is only played if
                 rounds won are equal after the first two. Last week of October.
               </p>
-              <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-3">
-                <div className="rounded-lg border border-amber-500/20 bg-gray-800/60 p-4 text-center">
-                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-amber-400">
-                    1st seed
-                  </div>
-                  <div className="text-gray-500">TBD</div>
-                </div>
+              <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
+                <FinalistCard
+                  seed="1st seed"
+                  team={finalists[0]?.team}
+                  record={
+                    finalists[0] ? formatRecord(finalists[0].row) : undefined
+                  }
+                />
                 <div className="text-center text-xs font-bold uppercase tracking-widest text-amber-500">
                   vs
                 </div>
-                <div className="rounded-lg border border-cyan-500/20 bg-gray-800/60 p-4 text-center">
-                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-cyan-400">
-                    2nd seed
-                  </div>
-                  <div className="text-gray-500">TBD</div>
-                </div>
+                <FinalistCard
+                  seed="2nd seed"
+                  team={finalists[1]?.team}
+                  record={
+                    finalists[1] ? formatRecord(finalists[1].row) : undefined
+                  }
+                />
               </div>
             </div>
           </div>

@@ -86,10 +86,10 @@ describe("Fall Classic match results", () => {
     )
     expect(standings.intro).toMatchObject({
       wins: 5,
-      losses: 2,
-      ties: 1,
-      roundsFor: 60,
-      roundsAgainst: 34,
+      losses: 3,
+      ties: 2,
+      roundsFor: 68,
+      roundsAgainst: 48,
     })
     expect(standings.drob).toMatchObject({
       wins: 8,
@@ -113,11 +113,11 @@ describe("Fall Classic match results", () => {
       roundsAgainst: 55,
     })
     expect(standings.bart).toMatchObject({
-      wins: 3,
+      wins: 4,
       losses: 5,
-      ties: 0,
-      roundsFor: 48,
-      roundsAgainst: 45,
+      ties: 1,
+      roundsFor: 62,
+      roundsAgainst: 53,
     })
     expect(standings.junk).toMatchObject({
       wins: 0,
@@ -272,6 +272,27 @@ describe("Fall Classic match results", () => {
         homeScore: 6,
         awayScore: 4,
         sessionId: "185.150.189.120:1797_1791943374",
+      },
+    ])
+    expect(seriesScore(match!)).toEqual({ homeScore: 14, awayScore: 8 })
+  })
+
+  it("stores week 4 bum ba da da vs Dirty Mike as a tie and a bart map win", () => {
+    const match = MATCH_RESULTS.find(
+      (m) => m.week === 4 && m.home === "bart" && m.away === "intro"
+    )
+    expect(match?.maps).toEqual([
+      {
+        name: "Collapsed Tunnel",
+        homeScore: 6,
+        awayScore: 6,
+        sessionId: "185.150.189.120:1797_1792868486",
+      },
+      {
+        name: "Mountain Ambush",
+        homeScore: 8,
+        awayScore: 2,
+        sessionId: "185.150.189.120:1797_1792870008",
       },
     ])
     expect(seriesScore(match!)).toEqual({ homeScore: 14, awayScore: 8 })
